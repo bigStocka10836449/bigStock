@@ -26,4 +26,8 @@ public class StockInfoService {
 	public Optional<StockInfo> findById(String stockCode){
 		return stockInfoRepository.findById(stockCode);
 	}
+	
+	public List<String> getStockCodeByStockType(String stockType) {
+		return stockInfoRepository.getStockCodeByStockType(stockType);
+	}
 }

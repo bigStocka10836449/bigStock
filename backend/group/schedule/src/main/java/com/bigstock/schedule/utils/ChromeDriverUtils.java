@@ -3,6 +3,8 @@ package com.bigstock.schedule.utils;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -11,6 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.IsoFields;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -19,6 +22,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClientException;
@@ -30,6 +34,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Lists;
+
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -324,6 +330,186 @@ public class ChromeDriverUtils {
 			}
 			return stockInfo;
 		}).collect(Collectors.toList());
+	}
+	
+//	private static final String baseUrl = "https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=%1s&stkno=6272&_=17225";
+	
+	public static List<StockDayPrice> getTpexStockHistory(Date startDate, Date endDate, String baseUrl, String stockCode) throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException{
+		Calendar startCalendar = Calendar.getInstance();
+		startCalendar.setTime(startDate);
+		Calendar endCalendar = Calendar.getInstance();
+		endCalendar.setTime(endDate);
+		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
+		int totalStartDateMonth =  startCalendar.get(Calendar.YEAR) * 12 + startCalendar.get(Calendar.MONTH);
+		int totalendDateMonth =  endCalendar.get(Calendar.YEAR) * 12 + endCalendar.get(Calendar.MONTH);
+		int monthDiff = totalendDateMonth - totalStartDateMonth;
+		if(monthDiff == 0) {
+			monthDiff = 1 ;
+		}
+		for(int index = 0 ; index < monthDiff ; index++) {
+			  SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd");
+		        String formattedDate = dateFormat.format(startCalendar.getTime());
+		        String realUrl = String.format(baseUrl, formattedDate, stockCode);
+		        String jsonResponse = fetchApiData(realUrl);
+
+				ObjectMapper objectMapper = new ObjectMapper();
+				Map<String, Object> responseList = objectMapper.readValue(jsonResponse,
+						new TypeReference<Map<String, Object>>() {
+						});
+				
+				List<List<String>> stockPrices = (List<List<String>>) responseList.get("data");
+				//[111/08/01, 6, 647, 106.00, 107.00, 106.00, 107.00, 0.00, 11]
+				List<StockDayPrice> singleMonthStockDayPrices = stockPrices.stream().map(data -> {
+					StockDayPrice stockPrice = new StockDayPrice();
+					String tradingDateStr = data.get(0);
+					  // 拆分民国日期字符串
+			        String[] parts = tradingDateStr.split("/");
+			        int innerTaiwanYear = Integer.parseInt(parts[0]); // 民国年份
+			        int month = Integer.parseInt(parts[1]); // 月
+			        int day = Integer.parseInt(parts[2]); // 日
+
+			        // 将民国年份转换为公历年份
+			        int year = innerTaiwanYear + 1911;
+
+			        // 构造公历日期字符串
+			        String gregorianDateStr = year + "/" + month + "/" + day;
+			        SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
+			        Date tradingDate;
+					try {
+						tradingDate = sdf.parse(gregorianDateStr);
+					} catch (ParseException e) {
+						log.warn(e.getMessage(), e);
+						tradingDate = new Date();
+					}
+			        
+			        LocalDate today = tradingDate.toInstant()
+			        		.atZone(ZoneId.systemDefault())
+			        		.toLocalDate();
+
+					// 設置本周第一天的日期
+					LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
+
+					// 設置本周最後一天的日期
+					LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
+					// 獲取系統默認時區
+					ZoneId zoneId = ZoneId.systemDefault();
+
+					// 獲取偏移量
+					ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
+
+					// 將 LocalDate 轉換為 Date
+					Date startOfWeeDate = Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
+					Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
+			        
+			        // 定义日期格式
+					stockPrice.setTradingDay(tradingDate);
+					stockPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
+					stockPrice.setStockCode(stockCode);
+					stockPrice.setStartOfWeekDate(startOfWeeDate);
+					stockPrice.setEndOfWeekDate(endOfWeekDate);
+					stockPrice.setOpeningPrice(data.get(3));
+					stockPrice.setClosingPrice(data.get(6));
+					stockPrice.setHighPrice(data.get(4));
+					stockPrice.setLowPrice(data.get(5));
+					stockPrice.setChange(data.get(7).replace("+", ""));
+					return stockPrice;
+				}).toList();
+				allStockDayPrices.addAll(singleMonthStockDayPrices);
+		        startCalendar.add(Calendar.MONTH, 1);
+		}
+		return allStockDayPrices;
+	}
+	
+	public static List<StockDayPrice> getTwseStockHistory(Date startDate, Date endDate, String baseUrl, String stockCode) throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException{
+		Calendar startCalendar = Calendar.getInstance();
+		startCalendar.setTime(startDate);
+		Calendar endCalendar = Calendar.getInstance();
+		endCalendar.setTime(endDate);
+		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
+		int totalStartDateMonth =  startCalendar.get(Calendar.YEAR) * 12 + startCalendar.get(Calendar.MONTH);
+		int totalendDateMonth =  endCalendar.get(Calendar.YEAR) * 12 + endCalendar.get(Calendar.MONTH);
+		int monthDiff = totalendDateMonth - totalStartDateMonth;
+		if(monthDiff == 0) {
+			monthDiff = 1 ;
+		}
+		for(int index = 0 ; index < monthDiff ; index++) {
+			  int taiwanYear = startCalendar.get(Calendar.YEAR) - 1911;
+			  SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd");
+		        String formattedDate = dateFormat.format(startCalendar.getTime());
+		        String searchDateString = taiwanYear  + "/" +formattedDate;
+		        String realUrl = String.format(baseUrl, searchDateString, stockCode);
+		        String jsonResponse = fetchApiData(realUrl);
+
+				ObjectMapper objectMapper = new ObjectMapper();
+				Map<String, Object> responseList = objectMapper.readValue(jsonResponse,
+						new TypeReference<Map<String, Object>>() {
+						});
+				
+				List<List<String>> stockPrices = (List<List<String>>) responseList.get("aaData");
+				//[111/08/01, 6, 647, 106.00, 107.00, 106.00, 107.00, 0.00, 11]
+				List<StockDayPrice> singleMonthStockDayPrices = stockPrices.stream().map(data -> {
+					StockDayPrice stockPrice = new StockDayPrice();
+					String tradingDateStr = data.get(0);
+					  // 拆分民国日期字符串
+			        String[] parts = tradingDateStr.split("/");
+			        int innerTaiwanYear = Integer.parseInt(parts[0]); // 民国年份
+			        int month = Integer.parseInt(parts[1]); // 月
+			        int day = Integer.parseInt(parts[2]); // 日
+
+			        // 将民国年份转换为公历年份
+			        int year = innerTaiwanYear + 1911;
+
+			        // 构造公历日期字符串
+			        String gregorianDateStr = year + "/" + month + "/" + day;
+			        SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
+			        Date tradingDate;
+					try {
+						tradingDate = sdf.parse(gregorianDateStr);
+					} catch (ParseException e) {
+						log.warn(e.getMessage(), e);
+						tradingDate = new Date();
+					}
+			        
+			        LocalDate today = tradingDate.toInstant()
+			        		.atZone(ZoneId.systemDefault())
+			        		.toLocalDate();
+
+					// 設置本周第一天的日期
+					LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
+
+					// 設置本周最後一天的日期
+					LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
+					// 獲取系統默認時區
+					ZoneId zoneId = ZoneId.systemDefault();
+
+					// 獲取偏移量
+					ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
+
+					// 將 LocalDate 轉換為 Date
+					Date startOfWeeDate = Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
+					Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
+			        
+			        // 定义日期格式
+					stockPrice.setTradingDay(tradingDate);
+					stockPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
+					stockPrice.setStockCode(stockCode);
+					stockPrice.setStartOfWeekDate(startOfWeeDate);
+					stockPrice.setEndOfWeekDate(endOfWeekDate);
+					stockPrice.setOpeningPrice(data.get(3));
+					stockPrice.setClosingPrice(data.get(6));
+					stockPrice.setHighPrice(data.get(4));
+					stockPrice.setLowPrice(data.get(5));
+					String change = "--";
+					if( !"--".equals(stockPrice.getClosingPrice()) && !"--".equals(stockPrice.getOpeningPrice())) {
+						change = String.format("%.2f", Float.valueOf(stockPrice.getClosingPrice()) - Float.valueOf(stockPrice.getOpeningPrice()));
+					}
+					stockPrice.setChange(change);
+					return stockPrice;
+				}).toList();
+				allStockDayPrices.addAll(singleMonthStockDayPrices);
+		        startCalendar.add(Calendar.MONTH, 1);
+		}
+		return allStockDayPrices;
 	}
 
 	private static String fetchApiData(String url) throws URISyntaxException, RestClientException {

@@ -48,9 +48,9 @@ public class GraspStockPrice {
 
 	private final StockDayPriceService stockDayPriceService;
 
-	@PostConstruct
+//	@PostConstruct
 	// 每周日早上8点触发更新
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 	public void updateShareholderStructure() throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
 		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");

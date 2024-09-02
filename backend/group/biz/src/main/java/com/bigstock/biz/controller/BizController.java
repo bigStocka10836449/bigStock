@@ -1,4 +1,4 @@
-package com.bigstock.biz.ctroller;
+package com.bigstock.biz.controller;
 
 import java.util.List;
 

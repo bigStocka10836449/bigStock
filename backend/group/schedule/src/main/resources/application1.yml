@@ -10,12 +10,12 @@ spring:
     allow-bean-definition-overriding: true
   cloud:
     consul:
-      host: 127.0.0.1
-      port: 8500
+      host: ${SPRING_CONSUL_HOST}
+      port: ${SPRING_CONSUL_PORT}      
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/bstock
-    username: bstockuser
-    password: postgresql
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -29,14 +29,16 @@ spring:
     sampler:
       probability: 1.0        
   redis:
-    host: 127.0.0.1
-    port: 6379
+    host: ${SPRING_REDIS_HOST}
+    port: ${SPRING_REDIS_PORT}
     lettuce:
       pool:
         max-active: 200
         max-idle: 500
         min-idle: 10
         max-wait: 100000
+    cache:
+      type: redis    
 logging:
   config: classpath:logback.xml
 
@@ -51,11 +53,11 @@ schedule:
           sync-start-date: 20240606
   chromeDriverPath:
     windows: 
-      active: true	
+      active: false	
       path: D:/sts/chromedriver-win64/chromedriver.exe
     linux:
-       active: false
-       driver-path: 1111
+       active: true
+       driver-path: ${CHROME_DRIVER_LINUX_PATH}	
      #  chrome-path: ${CHROME_LINUX_PATH}	
   tdccQryStockUrl: https://www.tdcc.com.tw/portal/zh/smWeb/qryStock
   overTheCounterUrl: https://mops.twse.com.tw/mops/web/t51sb01
@@ -71,4 +73,4 @@ opentracing:
       port: 6831
     sampler:
       type: const
-      param: 1      
+      param: 1         

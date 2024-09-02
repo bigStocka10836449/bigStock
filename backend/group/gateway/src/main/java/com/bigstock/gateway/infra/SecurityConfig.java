@@ -1,10 +1,8 @@
 package com.bigstock.gateway.infra;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 import javax.crypto.SecretKey;
@@ -32,11 +30,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
-import com.bigstock.sharedComponent.entity.RolePath;
-import com.bigstock.sharedComponent.service.RolePathService;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
 
@@ -58,9 +51,15 @@ public class SecurityConfig {
 		return NimbusReactiveJwtDecoder.withSecretKey(signingKey).build();
 	}
 
+//	@Bean
+//	public JwtDecoder jwtDecoder(ReactiveJwtDecoder reactiveJwtDecoder) {
+//	    return new JwtDecoderAdapter(reactiveJwtDecoder);
+//	}
+
 	@Bean
 	public JwtAuthenticationConverter jwtAuthenticationConverter() {
 		JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
+		// 設置你的 JwtAuthenticationConverter 配置
 		return jwtAuthenticationConverter;
 	}
 
@@ -70,49 +69,42 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	public SecurityWebFilterChain securityFilterChain(ServerHttpSecurity http, RolePathService rolePathService)
-			throws Exception {
-
-		// 獲取所有的角色及其對應的路徑
-		List<RolePath> rolePaths = rolePathService.getAllRolePaths();
-
+	public SecurityWebFilterChain securityFilterChain(ServerHttpSecurity http) throws Exception { // disable CSRF
 		http.addFilterBefore(bigStockGatewayCustomWebFilter, SecurityWebFiltersOrder.HTTP_BASIC).cors()
-				.configurationSource(corsConfiguration()).and().authorizeExchange(exchanges -> {
+				.configurationSource(corsConfiguration()).and()
+				.authorizeExchange(exchanges -> exchanges.pathMatchers(HttpMethod.OPTIONS).permitAll()
+						// EAM 系統
+						.pathMatchers(HttpMethod.POST, "/txn")
+						.access(new JwtReactiveAuthorizationManager(List.of("Admin", "Member", "User")))
+						.pathMatchers(HttpMethod.POST, "/gateway/**")
+						.access(new JwtReactiveAuthorizationManager(List.of("Admin", "Member", "User")))
+						.pathMatchers(HttpMethod.GET, "/gateway/swagger/**").permitAll()
+						.pathMatchers(HttpMethod.GET, "/gateway/**")
+						.access(new JwtReactiveAuthorizationManager(List.of("Admin", "Member", "User")))
+						.pathMatchers(HttpMethod.PATCH, "/schedule/**")
+						.access(new JwtReactiveAuthorizationManager(List.of("Admin", "Member", "User")))
+						.pathMatchers(HttpMethod.GET, "/biz/**")		
+						.access(new JwtReactiveAuthorizationManager(List.of("Admin", "Member", "User")))
+						.pathMatchers(HttpMethod.GET, "/api/biz/**")		
+						.access(new JwtReactiveAuthorizationManager(List.of("Admin", "Member", "User")))
+						.pathMatchers(HttpMethod.GET, "/api/biz/swagger/**").permitAll()
+						.pathMatchers(HttpMethod.GET, "/auth/swagger/**").permitAll()
+						.pathMatchers(HttpMethod.POST, "/biz/**")
+						.access(new JwtReactiveAuthorizationManager(List.of("Admin", "Member")))
+						.pathMatchers(HttpMethod.POST, "/auth/**").permitAll()
+						.pathMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
+//						.pathMatchers(HttpMethod.POST, "/swagger/**").permitAll()
+//						.pathMatchers(HttpMethod.GET, "/swagger/**").permitAll()
+						.pathMatchers(HttpMethod.POST, "/webjars/**").permitAll()
+						.pathMatchers(HttpMethod.GET, "/webjars/**").permitAll()
+//						.pathMatchers(HttpMethod.POST, "/swagger-ui.html").permitAll()
+//						.pathMatchers(HttpMethod.GET, "/swagger-ui.html").permitAll()
 
-					// 動態生成每個角色的 pathMatchers
-				    for (RolePath rolePath : rolePaths) {
-		                String roleId = rolePath.getRoleId().toString();
-		                Map<String, List<String>> pathsMap = parseRoleAllowedUrlPath(rolePath.getRoleAllowedUrlPath());
-
-		                // 根據每個 HTTP 方法設置 pathMatchers 和動態的 JwtReactiveAuthorizationManager
-		                for (Map.Entry<String, List<String>> entry : pathsMap.entrySet()) {
-		                    String httpMethod = entry.getKey();
-		                    List<String> paths = entry.getValue();
-
-		                    JwtReactiveAuthorizationManager authorizationManager = new JwtReactiveAuthorizationManager(List.of(roleId));
-
-		                    // 動態配置每個 HTTP 方法對應的路徑和授權管理器
-		                    switch (httpMethod) {
-		                        case "GET":
-		                            exchanges.pathMatchers(HttpMethod.GET, paths.toArray(new String[0]))
-		                                     .access(authorizationManager);
-		                            break;
-		                        case "POST":
-		                            exchanges.pathMatchers(HttpMethod.POST, paths.toArray(new String[0]))
-		                                     .access(authorizationManager);
-		                            break;
-		                        // 其他 HTTP 方法的處理
-		                    }
-		                }
-		            }
-
-					String[] publicPaths = { "/gateway/swagger/**", "/api/biz/swagger/**", "/auth/swagger/**",
-							"/webjars/**", "/actuator/health" };
-					exchanges.pathMatchers(HttpMethod.OPTIONS, publicPaths).permitAll();
-					exchanges.pathMatchers(HttpMethod.GET, publicPaths).permitAll();
-					exchanges.pathMatchers(HttpMethod.POST, "/auth/**", "/api/auth/**", "/webjars/**").permitAll();
-				}).oauth2ResourceServer(oauth2 -> oauth2.jwt().jwtAuthenticationConverter(this::convert)).csrf()
-				.disable().httpBasic().disable().formLogin().disable();
+						.pathMatchers(HttpMethod.GET, "/actuator/health").permitAll().and()
+						.oauth2ResourceServer(oauth2ResourceServer -> oauth2ResourceServer.jwt()
+								.jwtAuthenticationConverter(this::convert)))
+				.csrf().disable().httpBasic().disable().formLogin().disable();
+		;
 
 		return http.build();
 	}
@@ -126,6 +118,7 @@ public class SecurityConfig {
 		corsConfig.addAllowedMethod(HttpMethod.PUT);
 		corsConfig.addAllowedMethod(HttpMethod.DELETE);
 		corsConfig.addAllowedMethod(HttpMethod.OPTIONS);
+//		corsConfig.setAllowedOrigins(Arrays.asList("http://127.0.0.1:8081", "http://localhost:8080"));
 		corsConfig.setAllowedOrigins(Arrays.asList("*"));
 		corsConfig.setAllowedHeaders(Arrays.asList("*"));
 		corsConfig.setMaxAge(36000L);
@@ -146,15 +139,5 @@ public class SecurityConfig {
 		Collection<SimpleGrantedAuthority> authorities = ((Collection<String>) authoritiesObj).stream()
 				.map(SimpleGrantedAuthority::new).collect(Collectors.toSet());
 		return Mono.just(new JwtAuthenticationToken(jwt, authorities));
-	}
-
-	private Map<String, List<String>> parseRoleAllowedUrlPath(String roleAllowedUrlPath) {
-		ObjectMapper objectMapper = new ObjectMapper();
-		try {
-			return objectMapper.readValue(roleAllowedUrlPath, new TypeReference<Map<String, List<String>>>() {
-			});
-		} catch (IOException e) {
-			throw new RuntimeException("Error parsing role_allowed_url_path JSON", e);
-		}
 	}
 }
