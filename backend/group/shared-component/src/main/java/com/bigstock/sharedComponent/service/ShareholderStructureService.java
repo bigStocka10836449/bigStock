@@ -9,7 +9,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
-import com.bigstock.sharedComponent.annotation.BacchusCacheableWithLock;
+import com.bigstock.sharedComponent.annotation.BigStockCacheableWithLock;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.repository.ShareholderStructureRepository;
@@ -74,19 +74,19 @@ public class ShareholderStructureService {
 		return shareholderStructureRepository.countByWeekOfYear(weekOfYear) > 0;
 	}
 
-	@BacchusCacheableWithLock(value = "longLivedCache", key = "#id")
+	@BigStockCacheableWithLock(value = "longLivedCache", key = "#id")
 	public Optional<ShareholderStructure> getByIdWithDataBase(String id) {
 		return shareholderStructureRepository.findById(id);
 	}
 
-	@BacchusCacheableWithLock(value = "longLivedCache", key = "#p0 + '-' + #p1 + '-' + #p2")
+	@BigStockCacheableWithLock(value = "longLivedCache", key = "#p0 + '-' + #p1 + '-' + #p2")
 	public List<ShareholderStructure> getShareholderStructureLastTwoWeeksWithDataBase(String firstWeekOfYear,
 			String secondWeekOfYear, String thirdWeekOfYear) {
 		return shareholderStructureRepository.getByOverFourHundreLotContinueIncrease(firstWeekOfYear, secondWeekOfYear,
 				thirdWeekOfYear);
 	}
 
-	@BacchusCacheableWithLock(value = "longLivedCache", key = "#id")
+	@BigStockCacheableWithLock(value = "longLivedCache", key = "#id")
 	public List<ShareholderStructure> getShareholderStructureByStockCodeDescWithDataBase(String stockCode) {
 //		stockDayPriceRepository
 		List<ShareholderStructure> shareholderStructures = shareholderStructureRepository

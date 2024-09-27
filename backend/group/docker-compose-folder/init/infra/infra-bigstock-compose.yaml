@@ -4,16 +4,20 @@ services:
     container_name: bstock-postgresql
     image: postgres:15-alpine
     ports:
-      - "5432:5432"
+      - "15432:5432"
     restart: always  
     volumes:
       - ./bstock_dump.sql:/tmp/bstock_dump.sql
       - ./bstock_dump.sql:/docker-entrypoint-initdb.d/02_bstock_dump.sql
       - ./init.sql:/docker-entrypoint-initdb.d/01_init.sql  # 添加初始化腳本
+   #   - ./postgresql.conf:/etc/postgresql/postgresql.conf
+    shm_size: 2gb  
     networks:
       - big_stock_network   
     environment:
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgresql 
+      POSTGRES_SHARED_BUFFERS: "256MB"  
   redis:
     image: redis:7.2.4
     container_name: redis
@@ -76,6 +80,7 @@ services:
     networks:
       - big_stock_network    
     environment:
+      COLLECTOR_OTLP_ENABLED: true
       COLLECTOR_ZIPKIN_HTTP_PORT: 9411
       JAEGER_SAMPLER_TYPE: const
       JAEGER_SAMPLER_PARAM: 1
@@ -112,16 +117,19 @@ services:
     restart: always 
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/data:/prometheus
     command:
+      - '--storage.tsdb.path=/prometheus'
       - '--config.file=/etc/prometheus/prometheus.yml'
     ports:
       - "29090:9090"
     networks:
       - big_stock_network       
   postgres_exporter:
+    restart: always 
     image: prometheuscommunity/postgres-exporter:v0.15.0
     environment:
-      DATA_SOURCE_NAME: "postgresql://bstockuser:postgresql@bstock-postgresql:5432/bstock?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://postgres:postgresql@bstock-postgresql:5432/bstock?sslmode=disable"
     ports:
       - "39187:9187"
     networks:
@@ -131,9 +139,32 @@ services:
     restart: always 
     ports:
       - "3000:3000"
+    volumes:
+      - ./grafana_data:/var/lib/grafana  # 持久化數據  
     networks:
       - big_stock_network      
-                  
+  rabbitmq_exporter :
+    hostname: rabbitmqexporter
+    image: kbudde/rabbitmq-exporter:1.0.0  
+    restart: always 
+    ports:
+      - "9419:9419"
+    environment:
+      RABBIT_URL: http://rabbitmq:15672
+      RABBIT_USER: admin
+      RABBIT_PASSWORD: rabbitmq
+    networks:
+      - big_stock_network    
+  redis_exporter:
+    hostname: redisexporter
+    image: oliver006/redis_exporter:v1.63.0
+    restart: always 
+    ports:
+      - "9121:9121"
+    environment:  
+      REDIS_ADDR: redis://redis:6379
+    networks:
+      - big_stock_network     
 networks:
   big_stock_network:
     external: true                  

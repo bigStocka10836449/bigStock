@@ -39,34 +39,36 @@
 			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
 
-		<!-- https://mvnrepository.com/artifact/io.micrometer/micrometer-tracing -->
-		<!--		<dependency>-->
-		<!--			<groupId>io.micrometer</groupId>-->
-		<!--			<artifactId>micrometer-tracing</artifactId>-->
-		<!--		</dependency>-->
-
-
-		<!--
-		https://mvnrepository.com/artifact/io.micrometer/micrometer-tracing-bridge-brave -->
-		<!--		<dependency>-->
-		<!--			<groupId>io.micrometer</groupId>-->
-		<!--			<artifactId>micrometer-tracing-bridge-brave</artifactId>-->
-		<!--		</dependency>-->
-
-		<!--
-		https://mvnrepository.com/artifact/io.opentracing.contrib/opentracing-spring-jaeger-cloud-starter -->
 		<dependency>
-			<groupId>io.opentracing.contrib</groupId>
-			<artifactId>opentracing-spring-jaeger-cloud-starter</artifactId>
-			<version>3.3.1</version>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-tracing</artifactId>
 		</dependency>
 
-		<!-- https://mvnrepository.com/artifact/io.jaegertracing/jaeger-client -->
 		<dependency>
-			<groupId>io.jaegertracing</groupId>
-			<artifactId>jaeger-client</artifactId>
-			<version>1.8.1</version>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-tracing-bridge-otel</artifactId> 
 		</dependency>
+
+		<dependency>
+			<groupId>io.opentelemetry</groupId>
+			<artifactId>opentelemetry-exporter-otlp</artifactId>
+		</dependency>
+		<!--		<dependency>-->
+		<!--			<groupId>org.springframework.cloud</groupId>-->
+		<!--			<artifactId>spring-cloud-starter-sleuth</artifactId>-->
+		<!--			<version>3.1.11</version>-->
+		<!--		</dependency>-->
+		<!--		<dependency>-->
+		<!--			<groupId>io.opentracing.contrib</groupId>-->
+		<!--			<artifactId>opentracing-spring-jaeger-cloud-starter</artifactId>-->
+		<!--			<version>3.3.1</version>-->
+		<!--		</dependency>-->
+
+		<!--		<dependency>-->
+		<!--			<groupId>io.jaegertracing</groupId>-->
+		<!--			<artifactId>jaeger-client</artifactId>-->
+		<!--			<version>1.8.1</version>-->
+		<!--		</dependency>-->
 		<dependency>
 			<groupId>p6spy</groupId>
 			<artifactId>p6spy</artifactId>

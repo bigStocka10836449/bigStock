@@ -1,0 +1,74 @@
+server:
+  port: 18081
+  shutdown: graceful
+  servlet:
+    context-path: /schedule
+spring:
+  application:
+    name: bigstock-schedule
+  main:
+    allow-bean-definition-overriding: true
+  cloud:
+    consul:
+      host: 127.0.0.1
+      port: 8500
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/bstock
+    username: bstockuser
+    password: postgresql
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        show-sql: true
+  sleuth:
+    sampler:
+      probability: 1.0        
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    lettuce:
+      pool:
+        max-active: 200
+        max-idle: 500
+        min-idle: 10
+        max-wait: 100000
+logging:
+  config: classpath:logback.xml
+
+schedule:
+  task:
+    scheduling:
+      cron:
+        expression: 
+          grasp-stock-price: "0 0 20 ? * *"
+          update-shareholder-structure: "0 0 8 ? * SUN"
+          update-stock-info: "0 0 8 ? * SAT"
+          sync-start-date: 20240606
+  chromeDriverPath:
+    windows: 
+      active: true	
+      path: D:/sts/chromedriver-win64/chromedriver.exe
+    linux:
+       active: false
+       driver-path: 1111
+     #  chrome-path: ${CHROME_LINUX_PATH}	
+  tdccQryStockUrl: https://www.tdcc.com.tw/portal/zh/smWeb/qryStock
+  overTheCounterUrl: https://mops.twse.com.tw/mops/web/t51sb01
+  stock-price:
+    url:
+      tpex: https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&d={dateString}&s=asc
+      twse: https://www.twse.com.tw/pcversion/zh/exchangeReport/MI_INDEX
+      
+opentracing:
+  jaeger:
+    udp-sender:
+      host: localhost
+      port: 6831
+    sampler:
+      type: const
+      param: 1      

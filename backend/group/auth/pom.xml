@@ -144,4 +144,39 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<!-- LOCAL (Default Profile) -->
+		<profile>
+			<id>local</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+			<build>
+				<resources>
+					<resource>
+						<directory>src/main/resources/local</directory>
+					</resource>
+				</resources>
+			</build>
+		</profile>
+
+		<!-- DEV -->
+		<profile>
+			<id>dev</id>
+			<activation>
+				<property>
+					<name>env</name>
+					<value>dev</value>
+				</property>
+			</activation>
+			<build>
+				<resources>
+					<resource>
+						<directory>src/main/resources/dev</directory>
+					</resource>
+				</resources>
+			</build>
+		</profile>
+	</profiles>
 </project>
