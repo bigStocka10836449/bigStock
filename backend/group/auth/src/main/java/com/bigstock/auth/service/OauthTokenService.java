@@ -91,11 +91,11 @@ public class OauthTokenService {
 		// 使用 Jwts.builder() 建立 JWT
 		JwtBuilder builder = Jwts.builder();
 		String roleId = userAccount.getRoleId();
-		RoleInfo roleInfo = roleInfoService.getByRoleId(roleId)
+		RoleInfo roleInfo = roleInfoService.getAll().stream().filter(data -> data.getRoleId().equals(roleId)).findAny()
 				.orElseThrow(() -> new JwtException("role can not found"));
 		// 設定 JWT 主體
 		builder.subject(subject);
-		builder.claim("roles", Lists.newArrayList(roleInfo.getRoleName()));
+		builder.claim("roles", Lists.newArrayList(roleInfo.getRoleId()));
 		// 設定 JWT 發行時間
 		builder.issuedAt(new Date());
 
@@ -123,11 +123,11 @@ public class OauthTokenService {
 			throw new JwtException("invalid token");
 		}
 		String roleId = userAccountsOp.get().getRoleId();
-		RoleInfo roleInfo = roleInfoService.getByRoleId(roleId)
+		RoleInfo roleInfo = roleInfoService.getAll().stream().filter(data -> data.getRoleId().equals(roleId)).findAny()
 				.orElseThrow(() -> new JwtException("role can not found"));
 		// 設定 JWT 主體
 		builder.subject(subject);
-		builder.claim("roles", Lists.newArrayList(roleInfo.getRoleName()));
+		builder.claim("roles", Lists.newArrayList(roleInfo.getRoleId()));
 		// 設定 JWT 發行時間
 		builder.issuedAt(new Date());
 

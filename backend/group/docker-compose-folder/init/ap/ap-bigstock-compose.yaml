@@ -32,7 +32,7 @@ services:
       SPRING_RABBITMQ_PASSWORD: rabbitmq
       JAVA_COMMAND_STR: -Xlog:gc+heap=trace:file=/opt/bigstock/logs/Xlog.log:time,uptimemillis,tid  -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -Dcatalina.home=/opt/bigstock -Xms1868M -Xmx1868M -Xss1M  -XX:MetaspaceSize=512m -XX:MaxMetaspaceSize=512m  -XX:MaxGCPauseMillis=10 -XX:InitiatingHeapOccupancyPercent=60 -XX:+UnlockExperimentalVMOptions -XX:MaxTenuringThreshold=10 -XX:G1NewSizePercent=3
       JAR_NAME: bigstock-gateway.jar
-      OPENTRACING_JAEGER_HTTP-SENDER_URL: http://localhost:14268/api/traces
+      OPENTRACING_JAEGER_HTTP-SENDER_URL: http://localhost:14250
       OPENTRACING_JAEGER_SAMPLER_PARAM: 0.1
     deploy:
       resources:
@@ -71,7 +71,7 @@ services:
       SPRING_MAIL_FROM: a26404691@gmail.com
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_TRUST: smtp.gmail.com
       SERVER_REGISTRY_VERIFY_RUL: http://127.0.0.1:10093/auth/verify?token= 
-      OPENTRACING_JAEGER_HTTP-SENDER_URL: http://localhost:14268/api/traces
+      OPENTRACING_JAEGER_HTTP-SENDER_URL: http://localhost:14250
       OPENTRACING_JAEGER_SAMPLER_PARAM: 0.1
     deploy:
       resources:
@@ -104,7 +104,7 @@ services:
       SPRING_RABBITMQ_PASSWORD: rabbitmq 
       JAVA_COMMAND_STR: -Xlog:gc+heap=trace:file=/opt/bigstock/logs/Xlog.log:time,uptimemillis,tid  -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -Dcatalina.home=/opt/bigstock -Xms1868M -Xmx1868M -Xss1M  -XX:MetaspaceSize=512m -XX:MaxMetaspaceSize=512m  -XX:MaxGCPauseMillis=10 -XX:InitiatingHeapOccupancyPercent=60 -XX:+UnlockExperimentalVMOptions -XX:MaxTenuringThreshold=10 -XX:G1NewSizePercent=3
       JAR_NAME: bigstock-biz.jar  
-      OPENTRACING_JAEGER_HTTP-SENDER_URL: http://localhost:14268/api/traces
+      OPENTRACING_JAEGER_HTTP-SENDER_URL: http://localhost:14250
       OPENTRACING_JAEGER_SAMPLER_PARAM: 0.1
     networks:
       - big_stock_network  

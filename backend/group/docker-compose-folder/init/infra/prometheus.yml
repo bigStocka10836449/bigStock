@@ -11,4 +11,10 @@ scrape_configs:
       - targets: ['postgres_exporter:9187']
   - job_name: 'jaeger'
     static_configs:
-      - targets: ['jaeger:14269']  # 使用 Jaeger 暴露的 9090 端口    
+      - targets: ['jaeger:14269']  # 使用 Jaeger 暴露的 9090 端口 
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmqexporter:9419']            
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redisexporter:9121']          

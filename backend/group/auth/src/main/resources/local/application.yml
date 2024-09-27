@@ -1,0 +1,102 @@
+server:
+  port: 10093    
+  oauth2:
+    secret-key: 4903837210390382930293802938293802932038203920382039203820392038
+    key: classpath:jwt.pem
+  registry-verify-url: http://127.0.0.1:10093/auth/verify?token=  
+spring:
+  main: 
+    web-application-type: reactive
+    allow-bean-definition-overriding: true
+  application:
+    name: bigstock-auth
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: admin
+    password: rabbitmq
+    virtual-host: /
+    pool:
+      channelCacheSize: 5   
+  cloud:
+    consul:
+      host: 127.0.0.1
+      port: 8500
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    timeout: 5000
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:15432/bstock
+    username: bstockuser
+    password: postgresql
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        show-sql: true
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: a26404691@gmail.com
+    password: uynt zdgf suhj cjmi
+    from: a26404691@gmail.com
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          ssl:
+            trust: smtp.gmail.com     
+#  sleuth:
+#    sampler:
+#      probability: 1.0 # 设置采样率为100%          
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: '*'  # 先排除所有端点
+        include: health, info  # 只包括健康检查和信息端点    
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0  # 设置采样率为 100%
+    export:
+      otlp:
+        enabled: true
+        endpoint: http://localhost:14250  # Jaeger 的 OTLP 接收端点                 
+logging:
+  config: classpath:logback.xml
+  level:
+    org:
+      springdoc: INFO
+      springframework:
+        web: INFO 
+  
+springdoc:
+  api-docs:
+    path: /auth/swagger/v3/api-docs   
+  swagger-ui:
+    path: /auth/swagger/swagger-ui.html  
+    enable: true
+tracing:
+  url: http://localhost:4317
+#opentracing:
+#  jaeger:
+#    enabled: true
+#    http-sender:
+#      url: http://localhost:14268/api/traces
+#    sampler:
+#      type: const
+#      param: 0.1
+#    reporter:
+#      log-spans: true
+#      flush-interval: 1000
+#      max-queue-size: 10000
+

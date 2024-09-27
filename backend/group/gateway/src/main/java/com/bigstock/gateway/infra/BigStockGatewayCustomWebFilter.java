@@ -43,7 +43,6 @@ public class BigStockGatewayCustomWebFilter implements WebFilter {
 
 	@Override
 	public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-		log.info("Request URL: {}", exchange.getRequest().getURI().toString());
 
 		ServerHttpRequest request = exchange.getRequest();
 		ServerHttpResponse response = exchange.getResponse();
@@ -54,6 +53,7 @@ public class BigStockGatewayCustomWebFilter implements WebFilter {
 					|| request.getPath().value().contains("/webjars/")) {
 				return chain.filter(exchange);
 			}
+			log.info("Request URL: {}", exchange.getRequest().getURI().toString());
 			String token = request.getHeaders().getFirst("Authorization");
 			if (token == null || !token.startsWith("Bearer ")) {
 				return unauthorized(response);

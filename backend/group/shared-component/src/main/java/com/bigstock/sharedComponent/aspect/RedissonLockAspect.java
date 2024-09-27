@@ -3,7 +3,6 @@ package com.bigstock.sharedComponent.aspect;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
-
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -14,7 +13,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 
-import com.bigstock.sharedComponent.annotation.BacchusCacheableWithLock;
+import com.bigstock.sharedComponent.annotation.BigStockCacheableWithLock;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +27,7 @@ public class RedissonLockAspect {
 	private final RedissonClient redissonClient;
 	private final CacheManager cacheManager;
 
-	@Around("@annotation(com.bigstock.sharedComponent.annotation.BacchusCacheableWithLock)")
+	@Around("@annotation(com.bigstock.sharedComponent.annotation.BigStockCacheableWithLock)")
 	public Object aroundAdvice(ProceedingJoinPoint joinPoint) throws Throwable {
 
 		// Get the method signature and the method
@@ -43,8 +42,8 @@ public class RedissonLockAspect {
 		log.info("method {} not hit cache, excecutr database access", methodSignature.getMethod().getName());
 		// Evaluate the key expression
 		String cacheKey = String.join("-", argStrings);
-		BacchusCacheableWithLock bacchusCacheableWithLock = methodSignature.getMethod()
-				.getAnnotation(BacchusCacheableWithLock.class);
+		BigStockCacheableWithLock bigStockCacheableWithLock = methodSignature.getMethod()
+				.getAnnotation(BigStockCacheableWithLock.class);
 		String lockKey = "lock:" + methodSignature.getMethod().getName() + ":" + cacheKey;
 		RLock lock = redissonClient.getLock(lockKey);
 		boolean lockAcquired = false;
@@ -52,7 +51,7 @@ public class RedissonLockAspect {
 		try {
 			lockAcquired = lock.tryLock(10,TimeUnit.MINUTES);
 			if (lockAcquired) {
-				Cache cache = cacheManager.getCache(bacchusCacheableWithLock.value());
+				Cache cache = cacheManager.getCache(bigStockCacheableWithLock.value());
 				// Double-check if another thread has already populated the cache
 				Cache.ValueWrapper cachedValue = cache.get(cacheKey);
 				if (cachedValue != null) {
