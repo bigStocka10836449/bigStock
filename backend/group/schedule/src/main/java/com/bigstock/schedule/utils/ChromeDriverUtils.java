@@ -1,11 +1,13 @@
 package com.bigstock.schedule.utils;
 
+import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -22,7 +24,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.StringUtils;
+import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeDriverService;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.Select;
+import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClientException;
@@ -53,111 +64,111 @@ public class ChromeDriverUtils {
 		initializeColumnNames();
 	}
 
-//	public static List<StockInfo> grepStockInfo(String chromeDriverPath, String overTheCounterUrl)
-//			throws InterruptedException {
-//		ChromeDriverService service = new ChromeDriverService.Builder()
-//				.usingDriverExecutable(new File(chromeDriverPath)).usingAnyFreePort().build();
-//
-//		List<StockInfo> stockInfos = Lists.newArrayList();
-//		ChromeOptions options = new ChromeOptions();
-////		options.setBinary(linuxChromePath); // 指定Chrome的路徑
-//		options.addArguments("--headless"); // 設定無頭模式
-//		options.addArguments("--no-sandbox"); // 取消沙盒模式
-//		options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
-//		WebDriver driver = new ChromeDriver(service, options);
-//		WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
-//		try {
-//			log.info("begining sync grepStockInfo ");
-//			driver.get(overTheCounterUrl);
-//
-//			Thread.sleep(4000);
-//			WebElement siiSelectElement = wait
-//					.until(ExpectedConditions.presenceOfElementLocated((By.cssSelector("tbody select[name='TYPEK']"))));
-//
-//			// 使用 Select 类初始化
-//			Select siiTypekSelect = new Select(siiSelectElement);
-//
-//			// 通过 value 属性设置选项值为 "otc"
-//			siiTypekSelect.selectByValue("sii");
-//			Thread.sleep(2000);
-//			WebElement siiCcodeSelectElement = wait
-//					.until(ExpectedConditions.presenceOfElementLocated((By.name("code"))));
-//
-//			// 使用 Select 类初始化
-//			Select siiCodeSelect = new Select(siiCcodeSelectElement);
-//
-//			// 通过可见文本选择空白选项
-//			siiCodeSelect.selectByVisibleText("");
-//
-//			WebElement siiSearchButton = wait.until(
-//					ExpectedConditions.presenceOfElementLocated((By.cssSelector("div.search input[type='button']"))));
-//			siiSearchButton.click();
-//			Thread.sleep(2000);
-////			// 点击按钮
-////			searchButton.click();
-//			wait.until(ExpectedConditions
-//					.presenceOfElementLocated((By.xpath("//th[@class='tblHead' and contains(text(), '產業類別')]"))));
-//			JavascriptExecutor siijs = (JavascriptExecutor) driver;
-//			siijs.executeScript("window.scrollTo(0, document.body.scrollHeight);");
-//			List<WebElement> siiEvenAndOldRows = wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(
-//					By.xpath("//tr[contains(@class, 'even') or contains(@class, 'odd')]")));
-//			for (WebElement webElement : siiEvenAndOldRows) {
-//				List<WebElement> cells = webElement.findElements(By.tagName("td"));
-//				StockInfo stockInfo = new StockInfo();
-//				stockInfo.setStockCode(cells.get(0).getText().trim());
-//				stockInfo.setStockName(cells.get(1).getText().trim());
-//				stockInfo.setStockType("1");
-//				stockInfos.add(stockInfo);
-//			}
-//
-//			driver.get(overTheCounterUrl);
-//			Thread.sleep(4000);
-//			WebElement otcSelectElement = wait
-//					.until(ExpectedConditions.presenceOfElementLocated((By.cssSelector("tbody select[name='TYPEK']"))));
-//
-//			// 使用 Select 类初始化
-//			Select otcTypekSelect = new Select(otcSelectElement);
-//
-//			// 通过 value 属性设置选项值为 "otc"
-//			otcTypekSelect.selectByValue("otc");
-//			Thread.sleep(2000);
-//			WebElement otcCcodeSelectElement = wait
-//					.until(ExpectedConditions.presenceOfElementLocated((By.name("code"))));
-//
-//			// 使用 Select 类初始化
-//			Select otcCodeSelect = new Select(otcCcodeSelectElement);
-//
-//			// 通过可见文本选择空白选项
-//			otcCodeSelect.selectByVisibleText("");
-//
-//			WebElement otcSearchButton = wait.until(
-//					ExpectedConditions.presenceOfElementLocated((By.cssSelector("div.search input[type='button']"))));
-//			otcSearchButton.click();
-//			Thread.sleep(2000);
-////			// 点击按钮
-////			searchButton.click();
-//			wait.until(ExpectedConditions
-//					.presenceOfElementLocated((By.xpath("//th[@class='tblHead' and contains(text(), '產業類別')]"))));
-//			JavascriptExecutor js = (JavascriptExecutor) driver;
-//			js.executeScript("window.scrollTo(0, document.body.scrollHeight);");
-//			List<WebElement> evenAndOldRows = wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(
-//					By.xpath("//tr[contains(@class, 'even') or contains(@class, 'odd')]")));
-//			for (WebElement webElement : evenAndOldRows) {
-//				List<WebElement> cells = webElement.findElements(By.tagName("td"));
-//				StockInfo stockInfo = new StockInfo();
-//				stockInfo.setStockCode(cells.get(0).getText().trim());
-//				stockInfo.setStockName(cells.get(1).getText().trim());
-//				stockInfo.setStockType("0");
-//				stockInfos.add(stockInfo);
-//			}
-//		} catch (Exception e) {
-//			log.error(e.getMessage(), e);
-//		} finally {
-//			driver.quit();
-//			log.info("finshed add stockInfos ");
-//		}
-//		return stockInfos;
-//	}
+	public static List<StockInfo> grepStockInfo(String chromeDriverPath, String overTheCounterUrl)
+			throws InterruptedException {
+		ChromeDriverService service = new ChromeDriverService.Builder()
+				.usingDriverExecutable(new File(chromeDriverPath)).usingAnyFreePort().build();
+
+		List<StockInfo> stockInfos = Lists.newArrayList();
+		ChromeOptions options = new ChromeOptions();
+//		options.setBinary(linuxChromePath); // 指定Chrome的路徑
+		options.addArguments("--headless"); // 設定無頭模式
+		options.addArguments("--no-sandbox"); // 取消沙盒模式
+		options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
+		WebDriver driver = new ChromeDriver(service, options);
+		WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+		try {
+			log.info("begining sync grepStockInfo ");
+			driver.get(overTheCounterUrl);
+
+			Thread.sleep(4000);
+			WebElement siiSelectElement = wait
+					.until(ExpectedConditions.presenceOfElementLocated((By.cssSelector("tbody select[name='TYPEK']"))));
+
+			// 使用 Select 类初始化
+			Select siiTypekSelect = new Select(siiSelectElement);
+
+			// 通过 value 属性设置选项值为 "otc"
+			siiTypekSelect.selectByValue("sii");
+			Thread.sleep(2000);
+			WebElement siiCcodeSelectElement = wait
+					.until(ExpectedConditions.presenceOfElementLocated((By.name("code"))));
+
+			// 使用 Select 类初始化
+			Select siiCodeSelect = new Select(siiCcodeSelectElement);
+
+			// 通过可见文本选择空白选项
+			siiCodeSelect.selectByVisibleText("");
+
+			WebElement siiSearchButton = wait.until(
+					ExpectedConditions.presenceOfElementLocated((By.cssSelector("div.search input[type='button']"))));
+			siiSearchButton.click();
+			Thread.sleep(2000);
+//			// 点击按钮
+//			searchButton.click();
+			wait.until(ExpectedConditions
+					.presenceOfElementLocated((By.xpath("//th[@class='tblHead' and contains(text(), '產業類別')]"))));
+			JavascriptExecutor siijs = (JavascriptExecutor) driver;
+			siijs.executeScript("window.scrollTo(0, document.body.scrollHeight);");
+			List<WebElement> siiEvenAndOldRows = wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(
+					By.xpath("//tr[contains(@class, 'even') or contains(@class, 'odd')]")));
+			for (WebElement webElement : siiEvenAndOldRows) {
+				List<WebElement> cells = webElement.findElements(By.tagName("td"));
+				StockInfo stockInfo = new StockInfo();
+				stockInfo.setStockCode(cells.get(0).getText().trim());
+				stockInfo.setStockName(cells.get(1).getText().trim());
+				stockInfo.setStockType("1");
+				stockInfos.add(stockInfo);
+			}
+
+			driver.get(overTheCounterUrl);
+			Thread.sleep(4000);
+			WebElement otcSelectElement = wait
+					.until(ExpectedConditions.presenceOfElementLocated((By.cssSelector("tbody select[name='TYPEK']"))));
+
+			// 使用 Select 类初始化
+			Select otcTypekSelect = new Select(otcSelectElement);
+
+			// 通过 value 属性设置选项值为 "otc"
+			otcTypekSelect.selectByValue("otc");
+			Thread.sleep(2000);
+			WebElement otcCcodeSelectElement = wait
+					.until(ExpectedConditions.presenceOfElementLocated((By.name("code"))));
+
+			// 使用 Select 类初始化
+			Select otcCodeSelect = new Select(otcCcodeSelectElement);
+
+			// 通过可见文本选择空白选项
+			otcCodeSelect.selectByVisibleText("");
+
+			WebElement otcSearchButton = wait.until(
+					ExpectedConditions.presenceOfElementLocated((By.cssSelector("div.search input[type='button']"))));
+			otcSearchButton.click();
+			Thread.sleep(2000);
+//			// 点击按钮
+//			searchButton.click();
+			wait.until(ExpectedConditions
+					.presenceOfElementLocated((By.xpath("//th[@class='tblHead' and contains(text(), '產業類別')]"))));
+			JavascriptExecutor js = (JavascriptExecutor) driver;
+			js.executeScript("window.scrollTo(0, document.body.scrollHeight);");
+			List<WebElement> evenAndOldRows = wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(
+					By.xpath("//tr[contains(@class, 'even') or contains(@class, 'odd')]")));
+			for (WebElement webElement : evenAndOldRows) {
+				List<WebElement> cells = webElement.findElements(By.tagName("td"));
+				StockInfo stockInfo = new StockInfo();
+				stockInfo.setStockCode(cells.get(0).getText().trim());
+				stockInfo.setStockName(cells.get(1).getText().trim());
+				stockInfo.setStockType("0");
+				stockInfos.add(stockInfo);
+			}
+		} catch (Exception e) {
+			log.error(e.getMessage(), e);
+		} finally {
+			driver.quit();
+			log.info("finshed add stockInfos ");
+		}
+		return stockInfos;
+	}
 
 	public static List<StockDayPrice> graspTwseDayPrice(String url, Date tradeDate) throws InterruptedException, JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
 		String jsonResponse = fetchApiData(url);
