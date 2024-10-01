@@ -61,4 +61,9 @@ public class GraspStockPrice {
 		stockDayPriceService.saveAll(stockTwseDayPrices);
 		log.info("finsh sync stockDayPrice");
 	}
+	
+	@PostConstruct
+	public void test() throws InterruptedException {
+		ChromeDriverUtils.grepStockInfo();
+	}
 }

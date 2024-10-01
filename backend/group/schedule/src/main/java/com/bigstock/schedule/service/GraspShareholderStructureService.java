@@ -30,14 +30,14 @@ public class GraspShareholderStructureService {
 	@Value("${schedule.chromeDriverPath.windows.active}")
 	private boolean windowsActive;
 
-	@Value("${schedule.chromeDriverPath.windows.path}")
-	private String windowsChromeDriverPath;
+//	@Value("${schedule.chromeDriverPath.windows.path}")
+//	private String windowsChromeDriverPath;
 
 	@Value("${schedule.chromeDriverPath.linux.active}")
 	private boolean linuxActive;
-
-	@Value("${schedule.chromeDriverPath.linux.driver-path}")
-	private String linuxChromeDriverPath;
+//
+//	@Value("${schedule.chromeDriverPath.linux.driver-path}")
+//	private String linuxChromeDriverPath;
 	
 	@Value("${schedule.task.scheduling.cron.expression.sync-start-date}")
 	private String syncStartDate;
