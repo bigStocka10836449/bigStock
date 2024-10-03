@@ -74,7 +74,7 @@ public class ChromeDriverUtils {
 			throws InterruptedException {
 		ChromeDriverService service = new ChromeDriverService.Builder()
 				.usingDriverExecutable(new File("D:\\bigStock\\backend\\group\\schedule\\src\\main\\resources\\chrome-driver\\chromedriver-win64\\chromedriver-win64\\chromedriver.exe")).usingAnyFreePort().build();
-
+ 
 		List<StockInfo> stockInfos = Lists.newArrayList();
 		ChromeOptions options = new ChromeOptions();
 //		options.setBinary(linuxChromePath); // 指定Chrome的路徑
@@ -90,7 +90,8 @@ public class ChromeDriverUtils {
 			  // 等待並找到驗證碼圖片元素
 	        WebElement captchaImage = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//img[contains(@src,'CaptchaImage.aspx')]")));
 	        File srcFile = captchaImage.getScreenshotAs(OutputType.FILE);
-
+	        RestTemplate template = new RestTemplate();
+	        
 	        File captchaImageFile = new File("captcha.png");
 	        FileUtils.copyFile(srcFile, captchaImageFile);
 	        // 使用 Tesseract4J OCR 解析驗證碼
