@@ -136,12 +136,12 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: admin
       SPRING_RABBITMQ_PASSWORD: rabbitmq  
-      CHROME_DRIVER_LINUX_PATH: /usr/local/bin/chromedriver
-      #CHROME_LINUX_PATH: /home/bigstock/chrome-driver/chromedriver-linux64/chrome-linux64/chrome
-      #DISPLAY: ":99"
-      #CHROME_BIN: /usr/bin/google-chrome
+      CHROME_DRIVER_LINUX_PATH: /home/bigstock/chrome-driver/chromedriver-linux64/chromedriver
       JAVA_COMMAND_STR: -Xlog:gc+heap=trace:file=/opt/bigstock/logs/Xlog.log:time,uptimemillis,tid  -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -Dcatalina.home=/opt/bigstock -Xms1868M -Xmx1868M -Xss1M  -XX:MetaspaceSize=512m -XX:MaxMetaspaceSize=512m  -XX:MaxGCPauseMillis=10 -XX:InitiatingHeapOccupancyPercent=60 -XX:+UnlockExperimentalVMOptions -XX:MaxTenuringThreshold=10 -XX:G1NewSizePercent=3
       JAR_NAME: bigstock-schedule.jar  
+      SCHEDULE_BPYTHON_URL: http://bigstock-python:8000/captcha/
+      SCHEDULE_CREDENTIALS-PATHL: /opt/bigstock/google-api-cloud-speech-to-text.json
+      CHROME_DOWNLOAD_PATH: /opt/bigstock/download
     deploy:
       resources:
         limits:
@@ -150,9 +150,8 @@ services:
           memory: 2g       
     networks:
       - big_stock_network       
-   # volumes:
-   #   - ../../../schedule/chrome-driver/chromedriver-linux64/chromedriver-linux64/chromedriver:/home/bigstock/chrome-driver/chromedriver-linux64/chromedriver  
-   #   - ../../../schedule/chrome-driver/chromedriver-linux64/chrome-linux64/:/home/bigstock/chrome-driver/chromedriver-linux64/chrome-linux64
+    volumes:
+      - ../../../schedule/chrome-driver/chromedriver-linux64/chromedriver:/home/bigstock/chrome-driver/chromedriver-linux64/chromedriver
 networks:
   big_stock_network:
     external: true                

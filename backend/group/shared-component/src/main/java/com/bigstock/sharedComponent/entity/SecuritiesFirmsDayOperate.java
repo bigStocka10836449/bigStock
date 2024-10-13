@@ -28,7 +28,7 @@ public class SecuritiesFirmsDayOperate {
 
 	@Id
 	@Column(name = "seq", nullable = false)
-	private String seq;
+	private Integer seq;
 
 	@Column(name = "price")
 	private String price;
@@ -38,6 +38,9 @@ public class SecuritiesFirmsDayOperate {
 
 	@Column(name = "stock_sell_amount")
 	private Long stockSellAmount;
+	
+	@Column(name = "securities_firms")
+	private String securitiesFirms;
 
 	@Getter
 	@Setter
@@ -54,6 +57,6 @@ public class SecuritiesFirmsDayOperate {
 
 		@Id
 		@Column(name = "seq", nullable = false)
-		private String seq;
+		private Integer seq;
 	}
 }

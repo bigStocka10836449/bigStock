@@ -1,0 +1,130 @@
+server:
+  port: 10093    
+  oauth2:
+    secret-key: 4903837210390382930293802938293802932038203920382039203820392038
+    key: classpath:jwt.pem
+  registry-verify-url: ${SERVER_REGISTRY_VERIFY_RUL}
+spring:
+  main: 
+    web-application-type: reactive
+    allow-bean-definition-overriding: true
+  application:
+    name: bigstock-auth
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST}
+    port: ${SPRING_RABBITMQ_PORT}
+    username: ${SPRING_RABBITMQ_USERNAME}
+    password: ${SPRING_RABBITMQ_PASSWORD}
+    virtual-host: /
+    pool:
+      channelCacheSize: 5   
+  cloud:
+    consul:
+      host: ${SPRING_CONSUL_HOST}
+      port: ${SPRING_CONSUL_PORT}    
+  redis:
+    host: ${SPRING_REDIS_HOST}
+    port: ${SPRING_REDIS_PORT}
+    timeout: 5000
+  datasource:
+<<<<<<<< HEAD:backend/group/auth/src/main/resources/local/application.yml
+    url: jdbc:postgresql://127.0.0.1:15432/bstock
+    username: bstockuser
+    password: postgresql
+========
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+>>>>>>>> 28371c3 (stage):backend/group/auth/src/main/resources/application2.yml
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        show-sql: true
+  sleuth:
+    sampler:
+      probability: 1.0      
+  mail:
+    host: ${SPRING_MAIL_HOST}
+    port: ${SPRING_MAIL_PORT}
+    username: ${SPRING_MAIL_USERNAME}
+    password: ${SPRING_MAIL_PASSWORD}
+    from: ${SPRING_MAIL_FROM}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          ssl:
+<<<<<<<< HEAD:backend/group/auth/src/main/resources/local/application.yml
+            trust: smtp.gmail.com     
+#  sleuth:
+#    sampler:
+#      probability: 1.0 # 设置采样率为100%          
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: '*'  # 先排除所有端点
+        include: health, info  # 只包括健康检查和信息端点    
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0  # 设置采样率为 100%
+    export:
+      otlp:
+        enabled: true
+        endpoint: http://localhost:14250  # Jaeger 的 OTLP 接收端点                 
+========
+            trust: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_TRUST}    
+>>>>>>>> 28371c3 (stage):backend/group/auth/src/main/resources/application2.yml
+logging:
+  config: classpath:logback.xml
+  
+springdoc:
+  api-docs:
+    path: /auth/swagger/v3/api-docs   
+  swagger-ui:
+    path: /auth/swagger/swagger-ui.html  
+<<<<<<<< HEAD:backend/group/auth/src/main/resources/local/application.yml
+    enable: true
+tracing:
+  url: http://localhost:4317
+#opentracing:
+#  jaeger:
+#    enabled: true
+#    http-sender:
+#      url: http://localhost:14268/api/traces
+#    sampler:
+#      type: const
+#      param: 0.1
+#    reporter:
+#      log-spans: true
+#      flush-interval: 1000
+#      max-queue-size: 10000
+
+========
+    enable: true  
+    
+    
+    
+opentracing:
+  jaeger:
+    enabled: true
+    http-sender:
+      url: ${OPENTRACING_JAEGER_HTTP-SENDER_URL}
+      #http://localhost:14268/api/traces
+    sampler:
+      type: const
+      param: ${OPENTRACING_JAEGER_SAMPLER_PARAM}
+    reporter:
+      log-spans: true
+      flush-interval: 1000
+      max-queue-size: 10000   
+>>>>>>>> 28371c3 (stage):backend/group/auth/src/main/resources/application2.yml

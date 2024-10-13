@@ -10,6 +10,7 @@ RUN useradd -m -s /bin/bash bigstock
 RUN echo "bigstock ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 # 创建目录并设置权限
 RUN mkdir -p /opt/bigstock/logs && \
+    mkdir -p /opt/bigstock/download && \ 
     chown -R bigstock:bigstock /opt/bigstock
 RUN apt-get update && apt-get install -y \
     wget \
@@ -40,7 +41,8 @@ RUN apt-get update && apt-get install -y \
     libatk-bridge2.0-0 \
     libgtk-3-0 \
     libgbm1 \
-    libglib2.0-0
+    libglib2.0-0 \
+    ffmpeg
 
 
 # 安装chrome-for-testing版本
@@ -64,6 +66,7 @@ WORKDIR /home/bigstock
 
 # 将bigstockmodule复制到bigstock文件夹下
 COPY ./bigstock-schedule.jar /opt/bigstock/
+COPY ./google-api-cloud-speech-to-text.json /opt/bigstock/google-api-cloud-speech-to-text.json
 COPY ./init.sh /opt/bigstock/
 
 # 確保 init.sh 有執行權限

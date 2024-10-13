@@ -4,3 +4,6 @@
 [submodule "k8s-infra"]
 	path = k8s-infra
 	url = https://github.com/bigStocka10836449/k8s-infra.git
+[submodule "BstockPython"]
+	path = BstockPython
+	url = https://github.com/bigStocka10836449/BstockPython.git

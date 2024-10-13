@@ -11,21 +11,21 @@ spring:
   application:
     name: bigstock-gateway
   rabbitmq:
-    host: ${SPRING_RABBITMQ_HOST}
-    port: ${SPRING_RABBITMQ_PORT}
-    username: ${SPRING_RABBITMQ_USERNAME}
-    password: ${SPRING_RABBITMQ_PASSWORD}
+    host: 127.0.0.1
+    port: 5672
+    username: admin
+    password: rabbitmq
     virtual-host: /
     pool:
       channelCacheSize: 5    
   redis:
-    host: ${SPRING_REDIS_HOST}
-    port: ${SPRING_REDIS_PORT}
+    host: 127.0.0.1
+    port: 6379
     timeout: 5000
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: jdbc:postgresql://127.0.0.1:5432/bstock
+    username: bstockuser
+    password: postgresql
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -40,8 +40,8 @@ spring:
       probability: 1.0      
   cloud:
     consul:
-      host: ${SPRING_CONSUL_HOST}
-      port: ${SPRING_CONSUL_PORT}    
+      host: 127.0.0.1
+      port: 8500 
     discovery:
       health-check-path: /actuator/health # 设置健康检查路径为 Actuator 的健康端点路径
       health-check-interval: 15s # 设置健康检查间隔为 15 秒
@@ -58,6 +58,10 @@ spring:
         uri: lb://bigstock-auth
         predicates:
         - Path=/auth/**
+      - id: big-stock-schedule
+        uri: lb://bigstock-schedule
+        predicates:
+        - Path=/schedule/**   
 
 logging:
   config: classpath:logback.xml
@@ -96,11 +100,11 @@ opentracing:
   jaeger:
     enabled: true
     http-sender:
-      url: ${OPENTRACING_JAEGER_HTTP-SENDER}
+      url: http://localhost:14268/api/traces
       #http://localhost:14268/api/traces
     sampler:
       type: const
-      param: ${OPENTRACING_JAEGER_SAMPLER_PARAM}
+      param: 1
     reporter:
       log-spans: true
       flush-interval: 1000

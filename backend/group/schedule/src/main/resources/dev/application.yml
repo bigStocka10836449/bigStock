@@ -1,8 +1,6 @@
 server:
   port: 18081
   shutdown: graceful
-  servlet:
-    context-path: /schedule
 spring:
   application:
     name: bigstock-schedule
@@ -10,12 +8,12 @@ spring:
     allow-bean-definition-overriding: true
   cloud:
     consul:
-      host: ${SPRING_CONSUL_HOST}
-      port: ${SPRING_CONSUL_PORT}      
+      host: 127.0.0.1
+      port: 8500 
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: jdbc:postgresql://127.0.0.1:5432/bstock
+    username: bstockuser
+    password: postgresql
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -29,20 +27,28 @@ spring:
     sampler:
       probability: 1.0        
   redis:
-    host: ${SPRING_REDIS_HOST}
-    port: ${SPRING_REDIS_PORT}
+    host: 127.0.0.1
+    port: 6379
     lettuce:
       pool:
         max-active: 200
         max-idle: 500
         min-idle: 10
         max-wait: 100000
-    cache:
-      type: redis    
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: admin
+    password: rabbitmq
+    virtual-host: /
+    pool:
+      channelCacheSize: 5          
 logging:
   config: classpath:logback.xml
 
 schedule:
+  bpython-url: ${SCHEDULE_BPYTHON_URL}
+  credentials-pathl: ${SCHEDULE_CREDENTIALS-PATHL}
   task:
     scheduling:
       cron:
@@ -57,15 +63,18 @@ schedule:
       path: D:/sts/chromedriver-win64/chromedriver.exe
     linux:
        active: true
-       driver-path: ${CHROME_DRIVER_LINUX_PATH}	
-     #  chrome-path: ${CHROME_LINUX_PATH}	
+       driver-path: ${CHROME_DRIVER_LINUX_PATH}
+     #  chrome-path: ${CHROME_DRIVER_LINUX_PATH}	
+    download-path: ${CHROME_DOWNLOAD_PATH}
   tdccQryStockUrl: https://www.tdcc.com.tw/portal/zh/smWeb/qryStock
   overTheCounterUrl: https://mops.twse.com.tw/mops/web/t51sb01
   stock-price:
     url:
       tpex: https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&d={dateString}&s=asc
       twse: https://www.twse.com.tw/pcversion/zh/exchangeReport/MI_INDEX
-      
+  manual-date-range:
+    tpex-baseurl: https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=%1s&stkno=%2s&_=17225  
+    twse-baseurl: https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=%1s&stockNo=%2s&_=16481  
 opentracing:
   jaeger:
     udp-sender:
@@ -73,4 +82,4 @@ opentracing:
       port: 6831
     sampler:
       type: const
-      param: 1         
+      param: 1      

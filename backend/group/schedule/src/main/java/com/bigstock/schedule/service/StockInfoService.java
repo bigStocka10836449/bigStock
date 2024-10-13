@@ -23,7 +23,15 @@ public class StockInfoService {
 		return stockInfoRepository.saveAll(stockInfos);
 	}
 	
+	public List<StockInfo> findByStockType(String stockType){
+		return stockInfoRepository.findByStockType(stockType);
+	}
+	
 	public Optional<StockInfo> findById(String stockCode){
 		return stockInfoRepository.findById(stockCode);
+	}
+	
+	public List<String> getStockCodeByStockType(String stockType) {
+		return stockInfoRepository.getStockCodeByStockType(stockType);
 	}
 }
