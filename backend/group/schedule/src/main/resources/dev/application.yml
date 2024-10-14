@@ -8,12 +8,12 @@ spring:
     allow-bean-definition-overriding: true
   cloud:
     consul:
-      host: 127.0.0.1
-      port: 8500 
+      host: ${SPRING_CONSUL_HOST}
+      port: ${SPRING_CONSUL_PORT} 
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/bstock
-    username: bstockuser
-    password: postgresql
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -22,13 +22,10 @@ spring:
       ddl-auto: none
     properties:
       hibernate:
-        show-sql: true
-  sleuth:
-    sampler:
-      probability: 1.0        
+        show-sql: true  
   redis:
-    host: 127.0.0.1
-    port: 6379
+    host: ${SPRING_REDIS_HOST}
+    port: ${SPRING_REDIS_PORT}
     lettuce:
       pool:
         max-active: 200
@@ -36,10 +33,10 @@ spring:
         min-idle: 10
         max-wait: 100000
   rabbitmq:
-    host: 127.0.0.1
-    port: 5672
-    username: admin
-    password: rabbitmq
+    host: ${SPRING_RABBITMQ_HOST}
+    port: ${SPRING_RABBITMQ_PORT}
+    username: ${SPRING_RABBITMQ_USERNAME}
+    password: ${SPRING_RABBITMQ_PASSWORD}
     virtual-host: /
     pool:
       channelCacheSize: 5          
@@ -76,11 +73,24 @@ schedule:
   manual-date-range:
     tpex-baseurl: https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=%1s&stkno=%2s&_=17225  
     twse-baseurl: https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=%1s&stockNo=%2s&_=16481  
-opentracing:
-  jaeger:
-    udp-sender:
-      host: localhost
-      port: 6831
-    sampler:
-      type: const
-      param: 1      
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*" # 包含所有的Actuator端点，可以根据需要进行调整
+  endpoint:
+    health:
+      show-details: always
+  health:
+    consul:
+      enabled: true  
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY}  # 设置采样率为 100%
+    export:
+      otlp:
+        enabled: true
+        endpoint: ${MANAGEMENT_TRACING_EXPORT_ENDPOINT}  # Jaeger 的 OTLP 接收端点          
+tracing:
+  url: ${TRACING_URL}   

@@ -22,10 +22,7 @@ spring:
       ddl-auto: none
     properties:
       hibernate:
-        show-sql: true
-  sleuth:
-    sampler:
-      probability: 1.0        
+        show-sql: true    
   redis:
     host: 127.0.0.1
     port: 6379
@@ -76,11 +73,24 @@ schedule:
   manual-date-range:
     tpex-baseurl: https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=%1s&stkno=%2s&_=17225  
     twse-baseurl: https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=%1s&stockNo=%2s&_=16481  
-opentracing:
-  jaeger:
-    udp-sender:
-      host: localhost
-      port: 6831
-    sampler:
-      type: const
-      param: 1      
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*" # 包含所有的Actuator端点，可以根据需要进行调整
+  endpoint:
+    health:
+      show-details: always
+  health:
+    consul:
+      enabled: true  
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0  # 设置采样率为 100%
+    export:
+      otlp:
+        enabled: true
+        endpoint: http://localhost:14250  # Jaeger 的 OTLP 接收端点    
+tracing:
+  url: http://localhost:4317     

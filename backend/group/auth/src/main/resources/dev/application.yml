@@ -3,7 +3,7 @@ server:
   oauth2:
     secret-key: 4903837210390382930293802938293802932038203920382039203820392038
     key: classpath:jwt.pem
-  registry-verify-url: http://127.0.0.1:10093/auth/verify?token=  
+  registry-verify-url: ${SERVER_REGISTRY_VERIFY_RUL}
 spring:
   main: 
     web-application-type: reactive
@@ -11,25 +11,25 @@ spring:
   application:
     name: bigstock-auth
   rabbitmq:
-    host: 127.0.0.1
-    port: 5672
-    username: admin
-    password: rabbitmq
+    host: ${SPRING_RABBITMQ_HOST}
+    port: ${SPRING_RABBITMQ_PORT}
+    username: ${SPRING_RABBITMQ_USERNAME}
+    password: ${SPRING_RABBITMQ_PASSWORD}
     virtual-host: /
     pool:
       channelCacheSize: 5   
   cloud:
     consul:
-      host: 127.0.0.1
-      port: 8500
+      host: ${SPRING_CONSUL_HOST}
+      port: ${SPRING_CONSUL_PORT}
   redis:
-    host: 127.0.0.1
-    port: 6379
+    host: ${SPRING_REDIS_HOST}
+    port: ${SPRING_REDIS_PORT}
     timeout: 5000
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/bstock
-    username: bstockuser
-    password: postgresql
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -40,11 +40,11 @@ spring:
       hibernate:
         show-sql: true
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: a26404691@gmail.com
-    password: uynt zdgf suhj cjmi
-    from: a26404691@gmail.com
+    host: ${SPRING_MAIL_HOST}
+    port: ${SPRING_MAIL_PORT}
+    username: ${SPRING_MAIL_USERNAME}
+    password: ${SPRING_MAIL_PASSWORD}
+    from: ${SPRING_MAIL_FROM}
     properties:
       mail:
         smtp:
@@ -53,14 +53,23 @@ spring:
             enable: true
             required: true
           ssl:
-            trust: smtp.gmail.com     
+            trust: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_TRUST}
             
 management:
   endpoints:
     web:
       exposure:
         exclude: '*'  # 先排除所有端点
-        include: health, info  # 只包括健康检查和信息端点               
+        include: health, info  # 只包括健康检查和信息端点
+  #  Jaeger 整合  Spring Sleuth， 達到chain tree結構
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY}  # 设置采样率为 100%
+    export:
+      otlp:
+        enabled: true
+        endpoint: ${MANAGEMENT_TRACING_EXPORT_ENDPOINT}  # Jaeger 的 OTLP 接收端点                           
 logging:
   config: classpath:logback.xml
   level:
@@ -75,7 +84,7 @@ springdoc:
   swagger-ui:
     path: /auth/swagger/swagger-ui.html  
     enable: true
-
+# OpenTelemetry 連接到jaeger模式 
 tracing:
-  url: http://localhost:4317
+  url: ${TRACING_URL}
 

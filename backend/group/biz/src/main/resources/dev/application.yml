@@ -13,12 +13,12 @@ spring:
     allow-bean-definition-overriding: true
   cloud:
     consul:
-      host: 127.0.0.1
-      port: 8500      
+      host: ${SPRING_CONSUL_HOST}
+      port: ${SPRING_CONSUL_PORT}    
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/bstock
-    username: bstockuser
-    password: postgresql
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -29,19 +29,19 @@ spring:
       hibernate:
         show-sql: true   
   redis:
-    host: 127.0.0.1
+    host: ${SPRING_REDIS_HOST}
     lettuce:
       pool:
         max-active: 200
         max-idle: 500
         min-idle: 10
         max-wait: 100000
-    port: 6379
+    port: ${SPRING_REDIS_PORT}
   rabbitmq:
-    host: 127.0.0.1
-    port: 5672
-    username: admin
-    password: rabbitmq
+    host: ${SPRING_RABBITMQ_HOST}
+    port: ${SPRING_RABBITMQ_PORT}
+    username: ${SPRING_RABBITMQ_USERNAME}
+    password: ${SPRING_RABBITMQ_PASSWORD}
     virtual-host: /
     pool:
       channelCacheSize: 5        
@@ -54,11 +54,14 @@ springdoc:
   swagger-ui:
     path: /biz/swagger/swagger-ui.html  
     
-opentracing:
-  jaeger:
+management:
+  tracing:
     enabled: true
-    http-sender:
-      url: http://localhost:14268/api/traces
-    sampler:
-      type: const
-      param: 1
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY}  # 设置采样率为 100%
+    export:
+      otlp:
+        enabled: true
+        endpoint: ${MANAGEMENT_TRACING_EXPORT_ENDPOINT}  # Jaeger 的 OTLP 接收端点          
+tracing:
+  url: ${TRACING_URL}  
