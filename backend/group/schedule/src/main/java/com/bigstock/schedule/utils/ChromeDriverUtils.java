@@ -313,7 +313,9 @@ public class ChromeDriverUtils {
 	    driver.get("https://www.tpex.org.tw/web/stock/aftertrading/broker_trading/brokerBS.php?l=zh-tw");
 	    Thread.sleep(4000);
 	    log.info("start driver------------------");
-
+	    WebElement test =  driver.findElement(By.xpath("/html/body/center/div[3]/div[2]/div[1]"));
+	    
+		  log.info("testElement info------------------{}",test.toString());
 	    // CAPTCHA 判斷與處理
 	    WebElement reCAPTCHA = driver.findElement(By.cssSelector("iframe[title='reCAPTCHA']"));
 	    boolean captchaResolved = ObjectUtils.isEmpty(reCAPTCHA);
