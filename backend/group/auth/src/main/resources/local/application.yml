@@ -27,7 +27,7 @@ spring:
     port: 6379
     timeout: 5000
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/bstock
+    url: jdbc:postgresql://127.0.0.1:15432/bstock
     username: bstockuser
     password: postgresql
     driver-class-name: org.postgresql.Driver
@@ -54,13 +54,23 @@ spring:
             required: true
           ssl:
             trust: smtp.gmail.com     
-            
+#  sleuth:
+#    sampler:
+#      probability: 1.0 # 设置采样率为100%          
 management:
   endpoints:
     web:
       exposure:
         exclude: '*'  # 先排除所有端点
-        include: health, info  # 只包括健康检查和信息端点               
+        include: health, info  # 只包括健康检查和信息端点    
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0  # 设置采样率为 100%
+    export:
+      otlp:
+        enabled: true
+        endpoint: http://localhost:14250  # Jaeger 的 OTLP 接收端点                 
 logging:
   config: classpath:logback.xml
   level:
@@ -75,7 +85,18 @@ springdoc:
   swagger-ui:
     path: /auth/swagger/swagger-ui.html  
     enable: true
-
 tracing:
   url: http://localhost:4317
+#opentracing:
+#  jaeger:
+#    enabled: true
+#    http-sender:
+#      url: http://localhost:14268/api/traces
+#    sampler:
+#      type: const
+#      param: 0.1
+#    reporter:
+#      log-spans: true
+#      flush-interval: 1000
+#      max-queue-size: 10000
 
