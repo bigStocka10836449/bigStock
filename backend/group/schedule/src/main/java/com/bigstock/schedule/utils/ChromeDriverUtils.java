@@ -289,7 +289,7 @@ public class ChromeDriverUtils {
 	    prefs.put("safebrowsing.enabled", true); // 啟用安全下載
 
 	    ChromeOptions options = new ChromeOptions();
-//	    options.addArguments("--headless"); // 設定無頭模式
+	    options.addArguments("--headless"); // 設定無頭模式
 	    options.addArguments("--no-sandbox"); // 取消沙盒模式
 	    options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
 	    options.setCapability("goog:loggingPrefs", new HashMap<String, String>() {{
@@ -300,7 +300,7 @@ public class ChromeDriverUtils {
 	    WebDriver driver = new ChromeDriver(service, options);
 	    driver.get("https://www.tpex.org.tw/web/stock/aftertrading/broker_trading/brokerBS.php?l=zh-tw");
 	    log.info("start driver------------------");
-	    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+	    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
 
 	    // CAPTCHA 判斷與處理
 	    WebElement reCAPTCHA = driver.findElement(By.cssSelector("iframe[title='reCAPTCHA']"));
