@@ -289,6 +289,7 @@ public class ChromeDriverUtils {
 	    prefs.put("safebrowsing.enabled", true); // 啟用安全下載
 
 	    ChromeOptions options = new ChromeOptions();
+	    options.addArguments("--lang=zh-TW"); 
 	    options.addArguments("--headless"); // 設定無頭模式
 	    options.addArguments("--no-sandbox"); // 取消沙盒模式
 	    options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
