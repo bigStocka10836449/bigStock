@@ -316,6 +316,13 @@ public class ChromeDriverUtils {
 	    WebElement test =  driver.findElement(By.xpath("/html/body/center/div[3]/div[2]/div[1]"));
 	    
 		  log.info("testElement info------------------{}",test.toString());
+		// 获取所有 iframe 元素
+		  List<WebElement> iframes = driver.findElements(By.tagName("iframe"));
+		// 打印每个 iframe 的 title 属性
+		  for (WebElement iframe : iframes) {
+		      String iframeTitle = iframe.getAttribute("title");
+		      System.out.println("Iframe title: " + iframeTitle);
+		  }
 	    // CAPTCHA 判斷與處理
 	    WebElement reCAPTCHA = driver.findElement(By.cssSelector("iframe[title='reCAPTCHA']"));
 	    boolean captchaResolved = ObjectUtils.isEmpty(reCAPTCHA);
