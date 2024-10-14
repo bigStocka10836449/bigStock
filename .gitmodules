@@ -1,9 +1,9 @@
 [submodule "AndroidProject"]
 	path = AndroidProject
-	url = https://github.com/bigStocka10836449/Android.git
+	url = git@github.com:bigStocka10836449/Android.git
 [submodule "k8s-infra"]
 	path = k8s-infra
-	url = https://github.com/bigStocka10836449/k8s-infra.git
+	url = git@github.com:bigStocka10836449/k8s-infra.git
 [submodule "BstockPython"]
 	path = BstockPython
-	url = https://github.com/bigStocka10836449/BstockPython.git
+	url = git@github.com:bigStocka10836449/BstockPython.git
