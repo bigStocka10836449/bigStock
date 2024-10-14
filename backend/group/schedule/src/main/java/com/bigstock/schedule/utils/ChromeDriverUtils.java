@@ -299,7 +299,7 @@ public class ChromeDriverUtils {
 
 	    WebDriver driver = new ChromeDriver(service, options);
 	    driver.get("https://www.tpex.org.tw/web/stock/aftertrading/broker_trading/brokerBS.php?l=zh-tw");
-
+	    log.info("start driver------------------");
 	    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
 
 	    // CAPTCHA 判斷與處理
@@ -323,6 +323,7 @@ public class ChromeDriverUtils {
 	                        ExpectedConditions.visibilityOfElementLocated(By.xpath("//iframe[@title='reCAPTCHA 驗證問題將在兩分鐘後失效']"))
 	                    ));
 	                } catch (TimeoutException ex) {
+	                	log.warn(ex.getMessage(),ex);
 	                    break;
 	                }
 
@@ -400,6 +401,7 @@ public class ChromeDriverUtils {
 	                    try {
 	                        reCAPTCHAag = driver.findElement(By.cssSelector("iframe[title='reCAPTCHA']"));
 	                    } catch (NoSuchElementException err) {
+	                    	 log.warn(err.getMessage(), err);
 	                        break;
 	                    }
 
@@ -496,6 +498,7 @@ public class ChromeDriverUtils {
 	            }
 	        }
 	    } catch (Exception e) {
+	    	log.warn(e.getMessage(),e);
 	        driver.quit();
 	        List<String> notDownloadStockCode = tpexStockCodes.stream()
 	                .filter(stockCode -> !copyTpexStockCodes.contains(stockCode))
