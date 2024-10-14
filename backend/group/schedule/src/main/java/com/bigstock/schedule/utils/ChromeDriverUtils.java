@@ -297,10 +297,22 @@ public class ChromeDriverUtils {
 	    }});
 	    options.setExperimentalOption("prefs", prefs);
 
+	    
+	    
+	    
 	    WebDriver driver = new ChromeDriver(service, options);
-	    driver.get("https://www.tpex.org.tw/web/stock/aftertrading/broker_trading/brokerBS.php?l=zh-tw");
-	    log.info("start driver------------------");
 	    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+	    
+		driver.get("https://mops.twse.com.tw/mops/web/t51sb01");
+
+		Thread.sleep(4000);
+		WebElement siiSelectElement = wait
+				.until(ExpectedConditions.presenceOfElementLocated((By.cssSelector("tbody select[name='TYPEK']"))));
+		  log.info("siiSelectElement info------------------{}",siiSelectElement.toString());
+		
+	    driver.get("https://www.tpex.org.tw/web/stock/aftertrading/broker_trading/brokerBS.php?l=zh-tw");
+	    Thread.sleep(4000);
+	    log.info("start driver------------------");
 
 	    // CAPTCHA 判斷與處理
 	    WebElement reCAPTCHA = driver.findElement(By.cssSelector("iframe[title='reCAPTCHA']"));
