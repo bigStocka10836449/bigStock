@@ -103,6 +103,7 @@ public class GraspStockPrice {
 				.map(stockInfo -> stockInfo.getStockCode()).toList();
 		List<String> TESEtockCodes = stockInfoService.findByStockType("1").stream()
 				.map(stockInfo -> stockInfo.getStockCode()).toList();
+		log.info("exec grepSecuritiesFirmsDayOperate");
 		ChromeDriverUtils.grepTPEXsecuritiesFirmsDayOperate(downloadPath,
 				windowsActive ? windowsChromeDriverPath : linuxChromeDriverPath, TPEXStockCodes, credentialsPath);
 		ChromeDriverUtils.grepTWSESsecuritiesFirmsDayOperate(downloadPath,
