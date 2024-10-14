@@ -480,6 +480,9 @@ public class ChromeDriverUtils {
 	                            ExpectedConditions.visibilityOfElementLocated(By.xpath("//button[@class='btn btn-default' and @type='button' and @onclick=\"downloadCSV('BIG5')\"]"))
 	                        );
 	                        downloadButton.click();
+	                        File folder = new File(downloadFilepath);
+	                        log.info("downloadFilepath :{}",folder.getPath());
+	                        log.info("folder Sile :{}", folder.list().length);
 	                    } catch (TimeoutException timeoutException) {
 	                        log.warn(timeoutException.getMessage());
 	                        continue;
