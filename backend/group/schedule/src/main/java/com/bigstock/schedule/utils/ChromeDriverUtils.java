@@ -292,6 +292,9 @@ public class ChromeDriverUtils {
 	    options.addArguments("--headless"); // 設定無頭模式
 	    options.addArguments("--no-sandbox"); // 取消沙盒模式
 	    options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
+	    options.setCapability("goog:loggingPrefs", new HashMap<String, String>() {{
+	        put("performance", "ALL");
+	    }});
 	    options.setExperimentalOption("prefs", prefs);
 
 	    WebDriver driver = new ChromeDriver(service, options);
