@@ -197,7 +197,6 @@ public class ChromeDriverUtils {
         prefs.put("download.directory_upgrade", true);
         prefs.put("safebrowsing.enabled", true); // 啟用安全下載
 		ChromeOptions options = new ChromeOptions();
-//		options.setBinary(linuxChromePath); // 指定Chrome的路徑
 		options.addArguments("--headless"); // 設定無頭模式
 		options.addArguments("--no-sandbox"); // 取消沙盒模式
 		options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
@@ -260,7 +259,6 @@ public class ChromeDriverUtils {
 						if (downloadLink != null) {
 							// 點擊下載鏈接
 							downloadLink.click();
-							System.out.println("CSV 下載鏈接已點擊");
 							Thread.sleep(2000);
 						}
 						captchaResolved = true; // 退出循環

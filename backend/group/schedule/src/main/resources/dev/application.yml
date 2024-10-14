@@ -54,6 +54,7 @@ schedule:
       cron:
         expression: 
           grasp-stock-price: "0 0 20 ? * *"
+          grasp-securitiesfirms-dayoperate: "0 0 17 ? * *"
           update-shareholder-structure: "0 0 8 ? * SUN"
           update-stock-info: "0 0 8 ? * SAT"
           sync-start-date: 20240606

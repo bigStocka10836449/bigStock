@@ -75,7 +75,6 @@ public class GraspStockPrice {
 
 	private final StockInfoService stockInfoService;
 
-	@PostConstruct
 	// 每周日早上8点触发更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 	public void updateShareholderStructure() throws RestClientException, URISyntaxException, JsonMappingException,
@@ -92,11 +91,14 @@ public class GraspStockPrice {
 		log.info("finsh sync stockDayPrice");
 	}
 
-	@PostConstruct
+    @PostConstruct
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-securitiesfirms-dayoperate}")
 	public void grepSecuritiesFirmsDayOperate() throws InterruptedException, RestClientException, URISyntaxException,
 			UnsupportedAudioFileException, IOException, LineUnavailableException, JavaLayerException {
 //			ChromeDriverUtils.grepCanvas(windowsChromeDriverPath);
+    	File downloadPathFolder = new File(downloadPath);
+    	downloadPathFolder.delete();
+    	downloadPathFolder.mkdirs();
 		List<String> TPEXStockCodes = stockInfoService.findByStockType("0").stream()
 				.map(stockInfo -> stockInfo.getStockCode()).toList();
 		List<String> TESEtockCodes = stockInfoService.findByStockType("1").stream()
@@ -108,7 +110,6 @@ public class GraspStockPrice {
 		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
 				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
 		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
-		File downloadPathFolder = new File(downloadPath);
 		List.of(downloadPathFolder.listFiles()).stream().forEach(downloadFile -> {
 			// 讀取CSV文件
 			CSVReader reader = null;
@@ -119,7 +120,6 @@ public class GraspStockPrice {
 				csvData = reader.readAll();
 				reader.close();
 			} catch (IOException | CsvException e) {
-				// TODO Auto-generated catch block
 				log.info(e.getMessage(),e);
 				return;
 			}
