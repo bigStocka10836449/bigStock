@@ -342,7 +342,7 @@ public class ChromeDriverUtils {
 
 	                try {
 	                    driver.switchTo().frame(wait.until(
-	                        ExpectedConditions.visibilityOfElementLocated(By.xpath("//iframe[@title='reCAPTCHA 驗證問題將在兩分鐘後失效']"))
+	                        ExpectedConditions.visibilityOfElementLocated(By.xpath("//iframe[@title='recaptcha challenge expires in two minutes']"))
 	                    ));
 	                } catch (TimeoutException ex) {
 	                	log.warn(ex.getMessage(),ex);
