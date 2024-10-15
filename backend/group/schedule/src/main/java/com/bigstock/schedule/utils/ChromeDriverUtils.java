@@ -349,20 +349,24 @@ public class ChromeDriverUtils {
 	                    ExpectedConditions.visibilityOfElementLocated((By.id("recaptcha-audio-button")))
 	                );
 
-	                // 等待頁面刷新或載入後，查找所有 <a> 標籤的元素
-	                List<WebElement> anchorElements = driver.findElements(By.tagName("a"));
-
-	                // 遍歷找到的 <a> 標籤，輸出其 class 屬性
-	                for (WebElement anchor : anchorElements) {
-	                    String anchorClass = anchor.getAttribute("class");
-	                    String title = anchor.getAttribute("title");
-	                    log.info("Anchor class: " + anchorClass);
-	                    log.info("Anchor class: " + title);
-	                }
+	           
 	                
 	                Actions audioActions = new Actions(driver);
 	                audioActions.moveToElement(recaptchaAudioButton).click().perform();
 
+	             // 查找所有具有 title 屬性的元素
+	                List<WebElement> elementsWithTitle = driver.findElements(By.xpath("//*[@title]"));
+
+	                // 遍歷找到的元素，輸出其標籤名和 class 屬性
+	                for (WebElement element : elementsWithTitle) {
+	                    String tagName = element.getTagName();   // 獲取標籤名
+	                    String elementClass = element.getAttribute("class");
+	                    String elementTitle = element.getAttribute("title");
+	                    log.info("--------------Tag: " + tagName + " | Title: " + elementTitle + " | Class: " + elementClass);
+	                    log.info("--------------Tag: " + tagName + " | Title: " + elementTitle + " | Class: " + elementClass);
+	                }
+	                
+	                
 	                WebElement audioDownloadLink = wait.until(
 	                    ExpectedConditions.visibilityOfElementLocated(By.className("rc-audiochallenge-tdownload-link"))
 	                );
