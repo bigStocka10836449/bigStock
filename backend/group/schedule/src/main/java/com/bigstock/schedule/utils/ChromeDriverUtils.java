@@ -384,7 +384,7 @@ public class ChromeDriverUtils {
 
 	        } catch (Exception e) {
 	            log.warn(e.getMessage(), e);
-	            continue;
+	            break;
 	        }
 	    }
 
