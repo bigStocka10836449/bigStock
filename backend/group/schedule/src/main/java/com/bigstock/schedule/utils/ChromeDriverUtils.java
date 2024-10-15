@@ -299,13 +299,9 @@ public class ChromeDriverUtils {
 	    options.setExperimentalOption("prefs", prefs);
 
 	    
-	    
-	    
 	    WebDriver driver = new ChromeDriver(service, options);
-	    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+	    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
 	    
-	
-		
 		
 	    driver.get("https://www.tpex.org.tw/web/stock/aftertrading/broker_trading/brokerBS.php?l=zh-tw");
 	    Thread.sleep(1000);
@@ -353,19 +349,6 @@ public class ChromeDriverUtils {
 	                
 	                Actions audioActions = new Actions(driver);
 	                audioActions.moveToElement(recaptchaAudioButton).click().perform();
-
-	             // 查找所有具有 title 屬性的元素
-	                List<WebElement> elementsWithTitle = driver.findElements(By.xpath("//*[@title]"));
-
-	                // 遍歷找到的元素，輸出其標籤名和 class 屬性
-	                for (WebElement element : elementsWithTitle) {
-	                    String tagName = element.getTagName();   // 獲取標籤名
-	                    String elementClass = element.getAttribute("class");
-	                    String elementTitle = element.getAttribute("title");
-	                    log.info("--------------Tag: " + tagName + " | Title: " + elementTitle + " | Class: " + elementClass);
-	                    log.info("--------------Tag: " + tagName + " | Title: " + elementTitle + " | Class: " + elementClass);
-	                }
-	                
 	                
 	                WebElement audioDownloadLink = wait.until(
 	                    ExpectedConditions.visibilityOfElementLocated(By.className("rc-audiochallenge-tdownload-link"))
@@ -524,11 +507,12 @@ public class ChromeDriverUtils {
 	                }
 
 	                copyTpexStockCodes.add(tpexStockCode);
-	                Thread.sleep(3500);
+	                Thread.sleep(7000);
 	                break;
 	            }
 	        }
 	    } catch (Exception e) {
+	    	Thread.sleep(6000);
 	    	log.warn(e.getMessage(),e);
 	    	log.info("retry grepTPEXsecuritiesFirmsDayOperate-----------------");
 	        driver.quit();
