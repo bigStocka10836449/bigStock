@@ -304,15 +304,13 @@ public class ChromeDriverUtils {
 	    WebDriver driver = new ChromeDriver(service, options);
 	    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
 	    
-		driver.get("https://mops.twse.com.tw/mops/web/t51sb01");
-
-		Thread.sleep(4000);
+	
 		WebElement siiSelectElement = wait
 				.until(ExpectedConditions.presenceOfElementLocated((By.cssSelector("tbody select[name='TYPEK']"))));
 		  log.info("siiSelectElement info------------------{}",siiSelectElement.toString());
 		
 	    driver.get("https://www.tpex.org.tw/web/stock/aftertrading/broker_trading/brokerBS.php?l=zh-tw");
-	    Thread.sleep(4000);
+	    Thread.sleep(1000);
 	    log.info("start driver------------------");
 	    WebElement test =  driver.findElement(By.xpath("/html/body/center/div[3]/div[2]/div[1]"));
 	    
@@ -513,7 +511,7 @@ public class ChromeDriverUtils {
 	                }
 
 	                copyTpexStockCodes.add(tpexStockCode);
-	                Thread.sleep(5000);
+	                Thread.sleep(3500);
 	                break;
 	            }
 	        }
