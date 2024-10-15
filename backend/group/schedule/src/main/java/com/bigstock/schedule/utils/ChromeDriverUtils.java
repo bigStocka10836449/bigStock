@@ -401,7 +401,8 @@ public class ChromeDriverUtils {
 	                        ExpectedConditions.visibilityOfElementLocated(By.id("stk_code"))
 	                    );
 	                } catch (TimeoutException timeoutException) {
-	                    throw timeoutException
+	                	log.info("error stkCode: {}",tpexStockCode);
+	                    throw timeoutException;
 	                }
 
 	                stockCodeInput.clear();
@@ -507,7 +508,7 @@ public class ChromeDriverUtils {
 	                        log.info("downloadFilepath :{}",folder.getPath());
 	                        log.info("folder Sile :{}", folder.list().length);
 	                    } catch (TimeoutException timeoutException) {
-	                       throw e;
+	                       throw timeoutException;
 	                    }
 	                }
 
