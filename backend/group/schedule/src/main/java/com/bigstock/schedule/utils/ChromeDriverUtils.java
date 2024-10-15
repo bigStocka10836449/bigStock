@@ -349,6 +349,17 @@ public class ChromeDriverUtils {
 	                    ExpectedConditions.visibilityOfElementLocated((By.id("recaptcha-audio-button")))
 	                );
 
+	                // 等待頁面刷新或載入後，查找所有 <a> 標籤的元素
+	                List<WebElement> anchorElements = driver.findElements(By.tagName("a"));
+
+	                // 遍歷找到的 <a> 標籤，輸出其 class 屬性
+	                for (WebElement anchor : anchorElements) {
+	                    String anchorClass = anchor.getAttribute("class");
+	                    String title = anchor.getAttribute("title");
+	                    log.info("Anchor class: " + anchorClass);
+	                    log.info("Anchor class: " + title);
+	                }
+	                
 	                Actions audioActions = new Actions(driver);
 	                audioActions.moveToElement(recaptchaAudioButton).click().perform();
 
@@ -439,7 +450,7 @@ public class ChromeDriverUtils {
 
 	                                try {
 	                                    driver.switchTo().frame(wait.until(
-	                                        ExpectedConditions.visibilityOfElementLocated(By.xpath("//iframe[@title='reCAPTCHA 驗證問題將在兩分鐘後失效']"))
+	                                        ExpectedConditions.visibilityOfElementLocated(By.xpath("//iframe[@title='recaptcha challenge expires in two minutes']"))
 	                                    ));
 	                                } catch (TimeoutException ex) {
 	                                    break;
