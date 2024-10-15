@@ -401,8 +401,7 @@ public class ChromeDriverUtils {
 	                        ExpectedConditions.visibilityOfElementLocated(By.id("stk_code"))
 	                    );
 	                } catch (TimeoutException timeoutException) {
-	                    log.warn(timeoutException.getMessage());
-	                    continue;
+	                    throw timeoutException
 	                }
 
 	                stockCodeInput.clear();
@@ -483,8 +482,7 @@ public class ChromeDriverUtils {
 	                            }
 
 	                        } catch (Exception e) {
-	                            log.warn(e.getMessage(), e);
-	                            break;
+	                        	throw e;
 	                        }
 	                    }
 
@@ -509,8 +507,7 @@ public class ChromeDriverUtils {
 	                        log.info("downloadFilepath :{}",folder.getPath());
 	                        log.info("folder Sile :{}", folder.list().length);
 	                    } catch (TimeoutException timeoutException) {
-	                        log.warn(timeoutException.getMessage());
-	                        continue;
+	                       throw e;
 	                    }
 	                }
 
