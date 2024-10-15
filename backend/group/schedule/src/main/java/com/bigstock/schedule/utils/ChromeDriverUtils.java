@@ -305,9 +305,7 @@ public class ChromeDriverUtils {
 	    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
 	    
 	
-		WebElement siiSelectElement = wait
-				.until(ExpectedConditions.presenceOfElementLocated((By.cssSelector("tbody select[name='TYPEK']"))));
-		  log.info("siiSelectElement info------------------{}",siiSelectElement.toString());
+		
 		
 	    driver.get("https://www.tpex.org.tw/web/stock/aftertrading/broker_trading/brokerBS.php?l=zh-tw");
 	    Thread.sleep(1000);
