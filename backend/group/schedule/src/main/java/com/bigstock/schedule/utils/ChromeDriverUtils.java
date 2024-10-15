@@ -518,6 +518,7 @@ public class ChromeDriverUtils {
 	        }
 	    } catch (Exception e) {
 	    	log.warn(e.getMessage(),e);
+	    	log.info("retry grepTPEXsecuritiesFirmsDayOperate-----------------");
 	        driver.quit();
 	        List<String> notDownloadStockCode = tpexStockCodes.stream()
 	                .filter(stockCode -> !copyTpexStockCodes.contains(stockCode))
