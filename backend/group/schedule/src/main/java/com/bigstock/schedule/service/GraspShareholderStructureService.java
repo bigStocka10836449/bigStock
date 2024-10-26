@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.apache.commons.compress.utils.Lists;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,10 +15,11 @@ import com.bigstock.schedule.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockInfo;
 import com.bigstock.sharedComponent.service.ShareholderStructureService;
+import com.bigstock.sharedComponent.service.StockInfoService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.google.common.collect.Lists;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -32,23 +32,18 @@ public class GraspShareholderStructureService {
 	@Value("${schedule.chromeDriverPath.windows.active}")
 	private boolean windowsActive;
 
-	@Value("${schedule.chromeDriverPath.windows.path}")
-	private String windowsChromeDriverPath;
+//	@Value("${schedule.chromeDriverPath.windows.path}")
+//	private String windowsChromeDriverPath;
 
 	@Value("${schedule.chromeDriverPath.linux.active}")
 	private boolean linuxActive;
-
-	@Value("${schedule.chromeDriverPath.linux.driver-path}")
-	private String linuxChromeDriverPath;
+//
+//	@Value("${schedule.chromeDriverPath.linux.driver-path}")
+//	private String linuxChromeDriverPath;
+	
 	@Value("${schedule.task.scheduling.cron.expression.sync-start-date}")
 	private String syncStartDate;
-
-//	@Value("${schedule.tdcc-open-api}")
-//	private String tdccOpenApi;
-
-//	@Value("${schedule.chromeDriverPath.linux.chrome-path}")
-//	private String linuxChromePath;
-
+	
 	@Value("${schedule.tdccQryStockUrl}")
 	private String tdccQryStockUrl;
 
@@ -59,7 +54,7 @@ public class GraspShareholderStructureService {
 
 	private final StockInfoService stockInfoService;
 
-	@PostConstruct
+//	@PostConstruct
 	// 每周日早上8点触发更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}")
 	public void updateShareholderStructure()
@@ -147,13 +142,16 @@ public class GraspShareholderStructureService {
 		return shareholderStructure;
 	}
 
-	@PostConstruct
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-stock-info}")
-	public void updateStockInfo() throws InterruptedException, JsonMappingException, RestClientException,
-			JsonProcessingException, URISyntaxException {
-		List<StockInfo> stockInfos = ChromeDriverUtils
-				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2");
-		stockInfoService.insertAll(stockInfos);
-		log.info("finsh sync updateStockInfo ");
-	}
+//	@PostConstruct
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-stock-info}")
+//	public void updateStockInfo() throws InterruptedException, JsonMappingException, RestClientException,
+//			JsonProcessingException, URISyntaxException {
+//		List<StockInfo> stockInfos = ChromeDriverUtils
+//				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2");
+//		stockInfoService.insertAll(stockInfos);
+//		log.info("finsh sync updateStockInfo ");
+//	}
+	
+
+	
 }

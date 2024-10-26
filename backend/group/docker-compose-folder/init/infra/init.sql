@@ -1,3 +1,0 @@
-CREATE DATABASE bstock;
-CREATE USER bstockuser WITH ENCRYPTED PASSWORD 'postgresql';
-GRANT ALL PRIVILEGES ON DATABASE bstock TO bstockuser;

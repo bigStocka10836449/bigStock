@@ -1,0 +1,45 @@
+package com.bigstock.schedule.controller;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import com.bigstock.schedule.dto.GrapAndInserDateRangeStockPrice.GrapAndInserDateRangeStockPriceRequest;
+import com.bigstock.schedule.dto.GrapAndInserDateRangeStockPrice.GrapAndInserDateRangeStockPriceResponse;
+import com.bigstock.schedule.service.GraspHistoryStockPrice;
+import com.bigstock.schedule.service.GraspStockPrice;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("schedule")
+@Slf4j
+public class AdminController {
+
+	private final GraspHistoryStockPrice graspHistoryStockPrice;
+
+	private final GraspStockPrice graspStockPrice;
+
+	@PatchMapping("grapAndInserDateRangeStockPrice")
+	public ResponseEntity<GrapAndInserDateRangeStockPriceResponse> getStockShareholderStructure(
+			@RequestBody GrapAndInserDateRangeStockPriceRequest request) {
+		graspHistoryStockPrice.manualGrapRangeHistoryStockPrice(request.getDateRangeDto().getStartDate(),
+				request.getDateRangeDto().getEndDate());
+		return ResponseEntity.ok(new GrapAndInserDateRangeStockPriceResponse());
+	}
+
+	@PatchMapping("graspStockPrice")
+	public ResponseEntity<String> graspStockPrice() {
+		try {
+			graspStockPrice.tryRedoGrepSecuritiesFirmsDayOperate();
+		} catch (Exception e) {
+			log.error(e.getMessage(), e);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+		}
+		return ResponseEntity.ok().build();
+	}
+
+}

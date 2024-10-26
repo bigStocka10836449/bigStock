@@ -16,11 +16,13 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SecuritiesFirmsDayOperateService {
 	private final SecuritiesFirmsDayOperateRepository securitiesFirmsDayOperateRepository;
-	private final RedissonClient redissonClient;
 	
 	public SecuritiesFirmsDayOperate insert(SecuritiesFirmsDayOperate securitiesFirmsDayOperate) {
-		SecuritiesFirmsDayOperate  result = securitiesFirmsDayOperateRepository.save(securitiesFirmsDayOperate);
-		return result;
+		return securitiesFirmsDayOperateRepository.save(securitiesFirmsDayOperate);
+	}
+	
+	public List<SecuritiesFirmsDayOperate> insertAll(List<SecuritiesFirmsDayOperate> securitiesFirmsDayOperates) {
+		return securitiesFirmsDayOperateRepository.saveAll(securitiesFirmsDayOperates);
 	}
 	
 	public void deleteById(SecuritiesFirmsDayOperate.SecuritiesFirmsDayOperateId id) {
