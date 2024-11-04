@@ -15,5 +15,5 @@ public interface SecuritiesFirmsDayOperateRepository
 	
 	List<SecuritiesFirmsDayOperate> findByStockCode(String stockCode);
 	
-	List<SecuritiesFirmsDayOperate> findByStockCodeAndTradingDay(String stockCode, Date tradingDay);
+	List<SecuritiesFirmsDayOperate> findByStockCodeAndTradingDate(String stockCode, Date tradingDate);
 }

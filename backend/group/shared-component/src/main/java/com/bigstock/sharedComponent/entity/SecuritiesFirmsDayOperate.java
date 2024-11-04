@@ -23,8 +23,8 @@ public class SecuritiesFirmsDayOperate {
 	private String stockCode;
 
 	@Id
-	@Column(name = "trading_day", nullable = false)
-	private Date tradingDay;
+	@Column(name = "trading_date", nullable = false)
+	private Date tradingDate;
 
 	@Id
 	@Column(name = "seq", nullable = false)
@@ -52,8 +52,8 @@ public class SecuritiesFirmsDayOperate {
 		private String stockCode;
 
 		@Id
-		@Column(name = "trading_day", nullable = false)
-		private Date tradingDay;
+		@Column(name = "trading_date", nullable = false)
+		private Date tradingDate;
 
 		@Id
 		@Column(name = "seq", nullable = false)

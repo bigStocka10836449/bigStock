@@ -50,11 +50,10 @@ schedule:
     scheduling:
       cron:
         expression: 
-          grasp-stock-price: "0 0 20 ? * *"
-          grasp-securitiesfirms-dayoperate: "0 0 17 ? * *"
-          update-shareholder-structure: "0 0 8 ? * SUN"
+          grasp-stock-price: "0 0 17 ? * *"
+          grasp-securitiesfirms-dayoperate: "0 19 * * * *"
+          update-shareholder-structure: "0 8 * * * *"
           update-stock-info: "0 0 8 ? * SAT"
-          sync-start-date: 20240606
   chromeDriverPath:
     windows: 
       active: false	
@@ -66,10 +65,6 @@ schedule:
     download-path: ${CHROME_DOWNLOAD_PATH}
   tdccQryStockUrl: https://www.tdcc.com.tw/portal/zh/smWeb/qryStock
   overTheCounterUrl: https://mops.twse.com.tw/mops/web/t51sb01
-  stock-price:
-    url:
-      tpex: https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&d={dateString}&s=asc
-      twse: https://www.twse.com.tw/pcversion/zh/exchangeReport/MI_INDEX
   manual-date-range:
     tpex-baseurl: https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=%1s&stkno=%2s&_=17225  
     twse-baseurl: https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=%1s&stockNo=%2s&_=16481  

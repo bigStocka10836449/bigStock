@@ -94,14 +94,14 @@ public class ShareholderStructureService {
 		shareholderStructures.stream().forEach(data -> {
 			List<StockDayPrice> stockDayPrices = stockDayPriceRepository.findThisWeekStockDayPrices(data.getStockCode(),
 					data.getWeekOfYear());
-	        Optional<StockDayPrice> minTradingDayPrice = stockDayPrices.stream()
-	                .min(Comparator.comparing(StockDayPrice::getTradingDay));
+	        Optional<StockDayPrice> minTradingDatePrice = stockDayPrices.stream()
+	                .min(Comparator.comparing(StockDayPrice::getTradingDate));
 
-	        // 找到最大的 tradingDay 的 StockDayPrice 对象
-	        Optional<StockDayPrice> maxTradingDayPrice = stockDayPrices.stream()
-	                .max(Comparator.comparing(StockDayPrice::getTradingDay));
-	        data.setClosingPrice(maxTradingDayPrice.isPresent() ? maxTradingDayPrice.get().getClosingPrice() : "0.0");
-	        data.setOpeningPrice(minTradingDayPrice.isPresent() ? minTradingDayPrice.get().getOpeningPrice() : "0.0");
+	        // 找到最大的 tradingDate 的 StockDayPrice 对象
+	        Optional<StockDayPrice> maxTradingDatePrice = stockDayPrices.stream()
+	                .max(Comparator.comparing(StockDayPrice::getTradingDate));
+	        data.setClosingPrice(maxTradingDatePrice.isPresent() ? maxTradingDatePrice.get().getClosingPrice() : "0.0");
+	        data.setOpeningPrice(minTradingDatePrice.isPresent() ? minTradingDatePrice.get().getOpeningPrice() : "0.0");
 		});
 		return shareholderStructureRepository.getShareholderStructureByStockCodeDesc(stockCode);
 	}

@@ -11,22 +11,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMqConfig {
 
-	// 401 Exchange
-	public String singleStockPriceExchangeError = "SingleStockPriceExchangeError";
 
-	// 401 Queue
-	public String singleStockPrice = "SingleStockPriceQueue";
-	public String singleStockPriceQueueError = "SingleStockPriceQueueError";
-
-	// 401 Exchange
-	public String receivedSingleStockPriceExchangeError = "ReceivedSingleStockPriceExchangeError";
-
-	// 401 Queue
-	public String receivedSingleStockPrice = "ReceivedSingleStockPrice";
-	public String receivedStockPriceQueueError = "ReceivedStockPriceQueueError";
-
-	// ---------401
-
+	//---------------------------單一個股每次開盤收盤行情---------------------
 	@Bean
 	public DirectExchange singleStockPriceExchange() {
 		return new DirectExchange("SingleStockPriceExchange", true, false);
@@ -38,7 +24,7 @@ public class RabbitMqConfig {
 	}
 
 	@Bean
-	public Binding binding401() {
+	public Binding bindingSingleStockPrice() {
 		return BindingBuilder.bind(singleStockPriceQueue()).to(singleStockPriceExchange()).withQueueName();
 	}
 
@@ -58,6 +44,8 @@ public class RabbitMqConfig {
 	}
 	
 	
+	
+	//-------------------持股分布----------------------------------------------------
 	@Bean
 	public DirectExchange shareholderStructureIncreaseExchange() {
 		return new DirectExchange("ShareholderStructureIncreaseExchange", true, false);
@@ -87,5 +75,38 @@ public class RabbitMqConfig {
 	public Binding bindingSingleStockPriceQueueError() {
 		return BindingBuilder.bind(shareholderStructureIncreaseQueueError()).to(shareholderStructureIncreaseExchangeError()).withQueueName();
 	}
+	
+	
+	//--------------------------------個股每日交易明細---------------------------------
+	@Bean
+	public DirectExchange stockExchangeDetailExchange() {
+		return new DirectExchange("StockExchangeDetailExchange", true, false);
+	}
+
+	@Bean
+	public Queue stockExchangeDetailQueue() {
+		return QueueBuilder.durable("StockExchangeDetailQueue").build();
+	}
+
+	@Bean
+	public Binding stockExchangeDetailBinding() {
+		return BindingBuilder.bind(stockExchangeDetailQueue()).to(stockExchangeDetailExchange()).withQueueName();
+	}
+
+	@Bean
+	public DirectExchange stockExchangeDetailExchangeError() {
+		return new DirectExchange("StockExchangeDetailExchangeError", true, false);
+	}
+
+	@Bean
+	public Queue stockExchangeDetailQueueError() {
+		return QueueBuilder.durable("StockExchangeDetailQueueError").build();
+	}
+
+	@Bean
+	public Binding bindingStockExchangeDetailQueueError() {
+		return BindingBuilder.bind(stockExchangeDetailQueueError()).to(stockExchangeDetailExchangeError()).withQueueName();
+	}
+	
 	
 }

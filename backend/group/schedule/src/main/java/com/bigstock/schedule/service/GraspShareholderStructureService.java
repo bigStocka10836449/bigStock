@@ -41,8 +41,8 @@ public class GraspShareholderStructureService {
 //	@Value("${schedule.chromeDriverPath.linux.driver-path}")
 //	private String linuxChromeDriverPath;
 	
-	@Value("${schedule.task.scheduling.cron.expression.sync-start-date}")
-	private String syncStartDate;
+//	@Value("${schedule.task.scheduling.cron.expression.sync-start-date}")
+//	private String syncStartDate;
 	
 	@Value("${schedule.tdccQryStockUrl}")
 	private String tdccQryStockUrl;
@@ -55,7 +55,7 @@ public class GraspShareholderStructureService {
 	private final StockInfoService stockInfoService;
 
 //	@PostConstruct
-	// 每周日早上8点触发更新
+	// 每天晚上8點更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}")
 	public void updateShareholderStructure()
 			throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException {
@@ -65,9 +65,6 @@ public class GraspShareholderStructureService {
 		List<ShareholderStructure> shareholderStructures = Lists.newArrayList();
 		stockCodeWeekInfos.stream().forEach(stockCodeWeekInfo -> {
 			String stockCode = stockCodeWeekInfo.get(37);
-			if (stockCode.equals("3686")) {
-				log.warn("");
-			}
 			try {
 				Optional<StockInfo> stockInfoOp = stockInfoService.findById(stockCode);
 				if (stockInfoOp.isPresent()) {
@@ -143,14 +140,14 @@ public class GraspShareholderStructureService {
 	}
 
 //	@PostConstruct
-//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-stock-info}")
-//	public void updateStockInfo() throws InterruptedException, JsonMappingException, RestClientException,
-//			JsonProcessingException, URISyntaxException {
-//		List<StockInfo> stockInfos = ChromeDriverUtils
-//				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2");
-//		stockInfoService.insertAll(stockInfos);
-//		log.info("finsh sync updateStockInfo ");
-//	}
+	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-stock-info}")
+	public void updateStockInfo() throws InterruptedException, JsonMappingException, RestClientException,
+			JsonProcessingException, URISyntaxException {
+		List<StockInfo> stockInfos = ChromeDriverUtils
+				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2");
+		stockInfoService.insertAll(stockInfos);
+		log.info("finsh sync updateStockInfo ");
+	}
 	
 
 	

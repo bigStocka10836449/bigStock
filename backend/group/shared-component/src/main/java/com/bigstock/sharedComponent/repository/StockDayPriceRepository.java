@@ -14,10 +14,10 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 
 	List<StockDayPrice> findByStockCode(String stockCode);
 
-	@Query("select t from StockDayPrice t where t.stockCode = :stockCode and t.weekOfYear = :weekOfYear order by t.tradingDay asc")
+	@Query("select t from StockDayPrice t where t.stockCode = :stockCode and t.weekOfYear = :weekOfYear order by t.tradingDate asc")
 	List<StockDayPrice> findThisWeekStockDayPrices(@Param("stockCode") String stockCode,
 			@Param("weekOfYear") String weekOfYear);
 	
-	Optional<StockDayPrice> findByStockCodeAndTradingDay(String stockCode, Date tradingDay);
+	Optional<StockDayPrice> findByStockCodeAndTradingDate(String stockCode, Date tradingDate);
 	
 }

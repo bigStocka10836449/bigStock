@@ -25,8 +25,8 @@ public class StockDayPrice {
 	private String stockCode;
 
 	@Id
-	@Column(name = "trading_day")
-	private Date tradingDay;
+	@Column(name = "trading_date")
+	private Date tradingDate;
 
 	@Column(name = "opening_price")
 	private String openingPrice;
@@ -62,7 +62,7 @@ public class StockDayPrice {
 		private String stockCode;
 
 		@Id
-		@Column(name = "trading_day")
-		private Date tradingDay;
+		@Column(name = "trading_date")
+		private Date tradingDate;
 	}
 }

@@ -1,8 +1,10 @@
 package com.bigstock.schedule.service;
 
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -52,4 +54,18 @@ public class GraspHistoryStockPrice {
 		});
 	}
 	
+	
+	public Date getLastTradeDate() {
+		Date currentDate = Calendar.getInstance().getTime();
+		return stockInfoService.getStockCodeByStockType("0").stream().map(stockCode -> {
+			try {
+				return ChromeDriverUtils
+						.getTpexStockHistory(currentDate, currentDate, manualDateRangeTpexBaseurl, stockCode).stream()
+						.map(stockDayPrice -> stockDayPrice.getTradingDate()).toList();
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}).filter(tradingDates -> CollectionUtils.isNotEmpty(tradingDates)).flatMap(List::stream)
+				.reduce((first, second) -> second).orElseThrow(() -> new RuntimeException("找不到最新的交易日期"));
+	}
 }

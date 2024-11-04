@@ -13,8 +13,10 @@ import com.bigstock.sharedComponent.dto.SingleStockPriceVo;
 import com.bigstock.sharedComponent.dto.StructureContinueIncreaseVo;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
+import com.bigstock.sharedComponent.entity.StockExchangeDetail;
 import com.bigstock.sharedComponent.service.ShareholderStructureService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
+import com.bigstock.sharedComponent.service.StockExchangeDetailService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,7 +27,13 @@ public class BizService {
 	private final ShareholderStructureService shareholderStructureService;
 
 	private final StockDayPriceService stockDayPriceService;
+	
+	private final StockExchangeDetailService stockExchangeDetailService;
 
+	public List<StockExchangeDetail> getStockExchangeDetail(String stockCode, Date tradeDate){
+		return stockExchangeDetailService.findByStockCodeAndTradingDateOrderBySeqAsc(stockCode, tradeDate);
+	}
+	
 	public List<ShareholderStructure> getStockShareholderStructure(String stockCode, int limit) {
 		 List<ShareholderStructure> shareholderStructures = shareholderStructureService.getShareholderStructureByStockCodeDesc(stockCode);
 		 if(shareholderStructures.size() > 52) {
@@ -37,7 +45,7 @@ public class BizService {
 
 	public SingleStockPriceVo getSingleStockPrice(String stockCode, Date searchDate) {
 
-		Optional<StockDayPrice> stockDayPriceOp = stockDayPriceService.findByStockCodeAndTradingDay(stockCode,
+		Optional<StockDayPrice> stockDayPriceOp = stockDayPriceService.findByStockCodeAndTradingDate(stockCode,
 				searchDate);
 		String highPrice = stockDayPriceOp.isPresent() ? stockDayPriceOp.get().getHighPrice() : "0.0";
 		String lowPrice = stockDayPriceOp.isPresent() ? stockDayPriceOp.get().getLowPrice() : "0.0";

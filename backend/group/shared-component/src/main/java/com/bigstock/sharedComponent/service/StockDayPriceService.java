@@ -39,7 +39,7 @@ public class StockDayPriceService {
 	public List<StockDayPrice> findThisWeekStockDayPrices(String stockCode, String weekOfYear) {
 		return stockDayPriceRepository.findThisWeekStockDayPrices(stockCode, weekOfYear);
 	}
-	public Optional<StockDayPrice> findByStockCodeAndTradingDay(String stockCode, Date tradingDay){
-		return stockDayPriceRepository.findByStockCodeAndTradingDay(stockCode, tradingDay);
+	public Optional<StockDayPrice> findByStockCodeAndTradingDate(String stockCode, Date tradingDate){
+		return stockDayPriceRepository.findByStockCodeAndTradingDate(stockCode, tradingDate);
 	}
 }

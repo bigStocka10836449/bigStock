@@ -31,8 +31,8 @@ public class AdminController {
 		return ResponseEntity.ok(new GrapAndInserDateRangeStockPriceResponse());
 	}
 
-	@PatchMapping("graspStockPrice")
-	public ResponseEntity<String> graspStockPrice() {
+	@PatchMapping("doGrepSecuritiesFirmsDayOperate")
+	public ResponseEntity<String> doGrepSecuritiesFirmsDayOperate() {
 		try {
 			graspStockPrice.tryRedoGrepSecuritiesFirmsDayOperate();
 		} catch (Exception e) {

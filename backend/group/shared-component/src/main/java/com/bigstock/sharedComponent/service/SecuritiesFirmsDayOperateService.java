@@ -37,7 +37,7 @@ public class SecuritiesFirmsDayOperateService {
 		return securitiesFirmsDayOperateRepository.findByStockCode(stockCode);
 	}
 	
-	public List<SecuritiesFirmsDayOperate> getByStockCodeAndTradingDay(String stockCode, Date tradingDay){
-		return securitiesFirmsDayOperateRepository.findByStockCodeAndTradingDay(stockCode, tradingDay);
+	public List<SecuritiesFirmsDayOperate> getByStockCodeAndTradingDate(String stockCode, Date tradingDate){
+		return securitiesFirmsDayOperateRepository.findByStockCodeAndTradingDate(stockCode, tradingDate);
 	}
 }

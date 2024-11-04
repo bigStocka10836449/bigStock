@@ -5,10 +5,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URISyntaxException;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import javax.annotation.PostConstruct;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
@@ -24,9 +26,9 @@ import org.springframework.web.client.RestClientException;
 
 import com.bigstock.schedule.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.entity.SecuritiesFirmsDayOperate;
-import com.bigstock.sharedComponent.entity.StockDayPrice;
+import com.bigstock.sharedComponent.entity.StockExchangeDetail;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
-import com.bigstock.sharedComponent.service.StockDayPriceService;
+import com.bigstock.sharedComponent.service.StockExchangeDetailService;
 import com.bigstock.sharedComponent.service.StockInfoService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -34,6 +36,7 @@ import com.google.common.collect.Lists;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvException;
 
+import io.micrometer.common.util.StringUtils;
 import javazoom.jl.decoder.JavaLayerException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,15 +58,6 @@ public class GraspStockPrice {
 	@Value("${schedule.chromeDriverPath.linux.driver-path}")
 	private String linuxChromeDriverPath;
 
-//	@Value("${schedule.chromeDriverPath.linux.chrome-path}")
-//	private String linuxChromePath;
-
-	@Value("${schedule.stock-price.url.tpex}")
-	private String stockPriceTPEXUrl;
-
-	@Value("${schedule.stock-price.url.twse}")
-	private String stockPriceTWSEUrl;
-
 	@Value("${schedule.chromeDriverPath.download-path}")
 	private String downloadPath;
 
@@ -73,35 +67,44 @@ public class GraspStockPrice {
 	@Value("${schedule.credentials-pathl}")
 	private String credentialsPath;
 
-	private final StockDayPriceService stockDayPriceService;
+	private final GraspHistoryStockPrice graspHistoryStockPrice;
 
 	private final SecuritiesFirmsDayOperateService securitiesFirmsDayOperateService;
 
 	private final StockInfoService stockInfoService;
+	
+	private final StockExchangeDetailService stockExchangeDetailService;
 	
 	private final RedissonClient redissonClient;
 	
 	private static final String GRASPSTOCK_REDIS_ENABLE_KEY = "bstock:schedule:GraspStock:enable";
 	private static final String GRASPSTOCK_REDIS_ENABLE_IS_SHUTDOWN_KEY = "bstock:schedule:GraspStock:isSutDown";
 
-	// 每周日早上8点触发更新
+	
+	
+//	@PostConstruct
+	public void grepCandlestickChart() throws InterruptedException, JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
+		Date tradeDate = graspHistoryStockPrice.getLastTradeDate();
+		List<String> stockCodes = ChromeDriverUtils
+				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2").stream().filter(stockInfo -> StringUtils.isNotBlank(stockInfo.getStockType()))
+				.filter(stockInfo -> List.of("1", "0").contains(stockInfo.getStockType()))
+				.map(stockInfo -> stockInfo.getStockCode()).toList();
+		ChromeDriverUtils.grepCanvas(windowsActive ? windowsChromeDriverPath : linuxChromeDriverPath, stockCodes, tradeDate, stockExchangeDetailService);
+	}
+	
+	// 每天下午5點更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
-	public void updateShareholderStructure() throws RestClientException, URISyntaxException, JsonMappingException,
+	public void graspStockPrice() throws RestClientException, URISyntaxException, JsonMappingException,
 			JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
-		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
-				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
-
-		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
-		List<StockDayPrice> stockTwseDayPrices = ChromeDriverUtils
-				.graspTwseDayPrice("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", tradeDate);
-		stockDayPriceService.saveAll(stockTpexDayPrices);
-		stockDayPriceService.saveAll(stockTwseDayPrices);
+		Calendar startCalendar = Calendar.getInstance();
+		Date currentDate = startCalendar.getTime();
+		graspHistoryStockPrice.manualGrapRangeHistoryStockPrice(currentDate, currentDate);
 		log.info("finsh sync stockDayPrice");
 	}
 
 //    @PostConstruct
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-securitiesfirms-dayoperate}")
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-securitiesfirms-dayoperate}")
 	public void grepSecuritiesFirmsDayOperate() throws InterruptedException, RestClientException, URISyntaxException,
 			UnsupportedAudioFileException, IOException, LineUnavailableException, JavaLayerException {
         RBucket<Boolean> graspStockEnableKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_KEY);
@@ -193,10 +196,10 @@ public class GraspStockPrice {
     		return;
     	}
     	//抓取最新的交易日期
-    	List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
-    			.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
-    	Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
-    	List.of(downloadPathFolder.listFiles()).stream().forEach(downloadFile -> {
+//    	List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
+//    			.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
+    	Date tradeDate = graspHistoryStockPrice.getLastTradeDate();
+    	List.of(downloadPathFolder.listFiles()).stream().filter(downloadFile -> downloadFile.getName().contains(".csv")).forEach(downloadFile -> {
     		// 讀取CSV文件
     		CSVReader reader = null;
     		List<JSONObject> jsonArray = Lists.newArrayList();
@@ -220,7 +223,8 @@ public class GraspStockPrice {
     			securitiesFirmsDayOperate.setSecuritiesFirms(jsb.getString("券商"));
     			securitiesFirmsDayOperate
     			.setStockBuyAmount(Long.valueOf(jsb.getString("買進股數").trim().replace(",", "")));
-    			securitiesFirmsDayOperate.setTradingDay(tradeDate);
+    			securitiesFirmsDayOperate.setTradingDate(tradeDate);
+    			securitiesFirmsDayOperate.setStockSellAmount(Long.valueOf(jsb.getString("賣出股數").trim().replace(",", "")));
     			return securitiesFirmsDayOperate;
     		}).sorted((x1, x2) -> x1.getSeq().compareTo(x2.getSeq())).toList();
     		securitiesFirmsDayOperateService.insertAll(securitiesFirmsDayOperates);

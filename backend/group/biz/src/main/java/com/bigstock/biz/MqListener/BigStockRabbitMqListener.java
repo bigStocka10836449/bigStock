@@ -21,6 +21,7 @@ import com.bigstock.biz.service.BizService;
 import com.bigstock.sharedComponent.dto.SingleStockPriceBizVo;
 import com.bigstock.sharedComponent.dto.SingleStockPriceVo;
 import com.bigstock.sharedComponent.dto.StructureContinueIncreaseVo;
+import com.bigstock.sharedComponent.entity.StockExchangeDetail;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -120,6 +121,35 @@ public class BigStockRabbitMqListener {
 			//這裡應該也要給mq處理
 			log.error(e.getMessage(),e);
 			rabbitTemplate.convertAndSend("ShareholderStructureIncreaseExchangeError", "ShareholderStructureIncreaseExchangeError", jsonMessage);
+		}
+	}
+	
+	
+	@RabbitListener(bindings = @QueueBinding(value = @Queue(value = "StockExchangeDetailQueue"), exchange = @Exchange(value = "StockExchangeDetailExchange", type = ExchangeTypes.DIRECT), // 这里指定交换机类型为
+			// TOPIC
+			key = "StockExchangeDetailQueue" // 这里指定 routing key
+	), ackMode = "AUTO")
+	public void stockExchangeDetailListener(@Payload String jsonMessage,
+			@Header(name = "UUID", required = false) String uuid,
+			@Header(name = "sendQueueName", required = false) String sendQueueName,
+			@Header(name = "sendExchangeName", required = false) String sendExchangeName)
+			throws URISyntaxException, JsonMappingException, JsonProcessingException {
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
+			SingleStockPriceBizVo singleStockPriceBizVo = objectMapper.readValue(jsonMessage,
+					SingleStockPriceBizVo.class);
+			MessagePostProcessor messagePostProcessor = messageProperties -> {
+				messageProperties.getMessageProperties().setHeader("UUID", uuid);
+				return messageProperties;
+			};
+			 List<StockExchangeDetail> vos = bizService.getStockExchangeDetail(singleStockPriceBizVo.getStockCode(), singleStockPriceBizVo.getSearchDate());
+			String voString = objectMapper.writeValueAsString(vos);
+			rabbitTemplate.convertAndSend(sendExchangeName, uuid, voString, messagePostProcessor,
+					new CorrelationData());
+		} catch (Exception e) {
+			//這裡應該也要給mq處理
+			log.error(e.getMessage(),e);
+			rabbitTemplate.convertAndSend("StockExchangeDetailExchangeError", "StockExchangeDetailExchangeError", jsonMessage);
 		}
 	}
 }
