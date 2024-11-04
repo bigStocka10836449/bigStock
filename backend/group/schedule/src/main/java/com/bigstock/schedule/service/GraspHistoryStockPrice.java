@@ -38,6 +38,7 @@ public class GraspHistoryStockPrice {
 			stockInfoService.getStockCodeByStockType("0").stream().forEach(stockCode ->{
 				List<StockDayPrice> stockDayPrices;
 				try {
+					log.info("sync stockCode: {} , startDate : {} , endDate: {}", stockCode, startDate, endDate);
 					stockDayPrices = ChromeDriverUtils.getTpexStockHistory(startDate, endDate, manualDateRangeTpexBaseurl, stockCode);
 					stockDayPriceService.saveAll(stockDayPrices);
 					Thread.sleep(3000);
@@ -45,11 +46,12 @@ public class GraspHistoryStockPrice {
 					throw new RuntimeException(e);
 				} 
 			});
-			
+			log.info("finsh TPEX StockCodePrice sync, startDate : {} , endDate: {}", startDate, endDate);
 		} else {
 			stockInfoService.getStockCodeByStockType("1").stream().forEach(stockCode ->{
 				List<StockDayPrice> stockDayPrices;
 				try {
+					log.info("sync stockCode: {} , startDate : {} , endDate: {}", stockCode, startDate, endDate);
 					stockDayPrices = ChromeDriverUtils.getTwseStockHistory(startDate, endDate, manualDateRangeTwseBaseurl, stockCode);
 					stockDayPriceService.saveAll(stockDayPrices);
 					Thread.sleep(3000);
@@ -57,6 +59,7 @@ public class GraspHistoryStockPrice {
 					log.warn(e.getMessage(), e);
 				} 
 			});
+			log.info("finsh TWSE StockCodePrice sync, startDate : {} , endDate: {}", startDate, endDate);
 		}
 	}
 	
