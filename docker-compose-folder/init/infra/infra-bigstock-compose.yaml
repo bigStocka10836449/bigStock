@@ -10,7 +10,7 @@ services:
       - ./bstock_dump.sql:/tmp/bstock_dump.sql
       - ./bstock_dump.sql:/docker-entrypoint-initdb.d/02_bstock_dump.sql
       - ./init.sql:/docker-entrypoint-initdb.d/01_init.sql  # 添加初始化腳本
-   #   - ./postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf
     shm_size: 2gb  
     networks:
       - big_stock_network   

@@ -27,7 +27,7 @@ public class AdminController {
 	public ResponseEntity<GrapAndInserDateRangeStockPriceResponse> getStockShareholderStructure(
 			@RequestBody GrapAndInserDateRangeStockPriceRequest request) {
 		graspHistoryStockPrice.manualGrapRangeHistoryStockPrice(request.getDateRangeDto().getStartDate(),
-				request.getDateRangeDto().getEndDate());
+				request.getDateRangeDto().getEndDate(), request.getDateRangeDto().getStockType());
 		return ResponseEntity.ok(new GrapAndInserDateRangeStockPriceResponse());
 	}
 

@@ -14,4 +14,6 @@ public class DateRangeDto {
 	
 	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd", timezone = "GMT+8")
 	Date endDate;
+	
+	String stockType;
 }

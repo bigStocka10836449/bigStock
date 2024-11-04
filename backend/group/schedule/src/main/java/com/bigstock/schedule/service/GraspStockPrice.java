@@ -94,15 +94,25 @@ public class GraspStockPrice {
 	
 	// 每天下午5點更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
-	public void graspStockPrice() throws RestClientException, URISyntaxException, JsonMappingException,
+	public void graspTpexStockPrice() throws RestClientException, URISyntaxException, JsonMappingException,
 			JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
 		Calendar startCalendar = Calendar.getInstance();
 		Date currentDate = startCalendar.getTime();
-		graspHistoryStockPrice.manualGrapRangeHistoryStockPrice(currentDate, currentDate);
+		graspHistoryStockPrice.manualGrapRangeHistoryStockPrice(currentDate, currentDate, "0");
 		log.info("finsh sync stockDayPrice");
 	}
 
+	
+	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
+	public void graspTwseTpexStockPrice() throws RestClientException, URISyntaxException, JsonMappingException,
+			JsonProcessingException, InterruptedException {
+		// 先抓DB裡面全部的代號資料
+		Calendar startCalendar = Calendar.getInstance();
+		Date currentDate = startCalendar.getTime();
+		graspHistoryStockPrice.manualGrapRangeHistoryStockPrice(currentDate, currentDate, "1");
+		log.info("finsh sync stockDayPrice");
+	}
 //    @PostConstruct
 //	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-securitiesfirms-dayoperate}")
 	public void grepSecuritiesFirmsDayOperate() throws InterruptedException, RestClientException, URISyntaxException,

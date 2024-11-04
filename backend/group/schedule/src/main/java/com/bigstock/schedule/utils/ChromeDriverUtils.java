@@ -959,7 +959,7 @@ public class ChromeDriverUtils {
 
 	public static List<StockDayPrice> getTpexStockHistory(Date startDate, Date endDate, String baseUrl,
 			String stockCode)
-			throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException {
+			throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException, InterruptedException {
 		Calendar startCalendar = Calendar.getInstance();
 		startCalendar.setTime(startDate);
 		Calendar endCalendar = Calendar.getInstance();
@@ -1043,6 +1043,7 @@ public class ChromeDriverUtils {
 			}).toList();
 			allStockDayPrices.addAll(singleMonthStockDayPrices);
 			startCalendar.add(Calendar.MONTH, 1);
+			Thread.sleep(5000);
 		}
 		return allStockDayPrices;
 	}

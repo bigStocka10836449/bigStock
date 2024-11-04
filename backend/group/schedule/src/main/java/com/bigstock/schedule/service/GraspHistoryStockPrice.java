@@ -31,27 +31,33 @@ public class GraspHistoryStockPrice {
 	
 	private final StockInfoService stockInfoService;
 	
-	public void manualGrapRangeHistoryStockPrice(Date startDate, Date endDate) {
+	public void manualGrapRangeHistoryStockPrice(Date startDate, Date endDate, String stockType) {
 		
-		stockInfoService.getStockCodeByStockType("0").stream().forEach(stockCode ->{
-			List<StockDayPrice> stockDayPrices;
-			try {
-				stockDayPrices = ChromeDriverUtils.getTpexStockHistory(startDate, endDate, manualDateRangeTpexBaseurl, stockCode);
-				stockDayPriceService.saveAll(stockDayPrices);
-			} catch (Exception e) {
-				throw new RuntimeException(e);
-			} 
-		});
-		
-		stockInfoService.getStockCodeByStockType("1").stream().forEach(stockCode ->{
-			List<StockDayPrice> stockDayPrices;
-			try {
-				stockDayPrices = ChromeDriverUtils.getTwseStockHistory(startDate, endDate, manualDateRangeTwseBaseurl, stockCode);
-				stockDayPriceService.saveAll(stockDayPrices);
-			} catch (Exception e) {
-				log.warn(e.getMessage(), e);
-			} 
-		});
+		if("0".equals(stockType)) {
+			
+			stockInfoService.getStockCodeByStockType("0").stream().forEach(stockCode ->{
+				List<StockDayPrice> stockDayPrices;
+				try {
+					stockDayPrices = ChromeDriverUtils.getTpexStockHistory(startDate, endDate, manualDateRangeTpexBaseurl, stockCode);
+					stockDayPriceService.saveAll(stockDayPrices);
+					Thread.sleep(3000);
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				} 
+			});
+			
+		} else {
+			stockInfoService.getStockCodeByStockType("1").stream().forEach(stockCode ->{
+				List<StockDayPrice> stockDayPrices;
+				try {
+					stockDayPrices = ChromeDriverUtils.getTwseStockHistory(startDate, endDate, manualDateRangeTwseBaseurl, stockCode);
+					stockDayPriceService.saveAll(stockDayPrices);
+					Thread.sleep(3000);
+				} catch (Exception e) {
+					log.warn(e.getMessage(), e);
+				} 
+			});
+		}
 	}
 	
 	
