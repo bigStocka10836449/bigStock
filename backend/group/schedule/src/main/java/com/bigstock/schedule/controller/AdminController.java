@@ -1,5 +1,7 @@
 package com.bigstock.schedule.controller;
 
+import java.util.concurrent.CompletableFuture;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,8 +28,10 @@ public class AdminController {
 	@PatchMapping("grapAndInserDateRangeStockPrice")
 	public ResponseEntity<GrapAndInserDateRangeStockPriceResponse> getStockShareholderStructure(
 			@RequestBody GrapAndInserDateRangeStockPriceRequest request) {
-		graspHistoryStockPrice.manualGrapRangeHistoryStockPrice(request.getDateRangeDto().getStartDate(),
-				request.getDateRangeDto().getEndDate(), request.getDateRangeDto().getStockType());
+		CompletableFuture.runAsync(() -> {
+			graspHistoryStockPrice.manualGrapRangeHistoryStockPrice(request.getDateRangeDto().getStartDate(),
+					request.getDateRangeDto().getEndDate(), request.getDateRangeDto().getStockType());
+		});
 		return ResponseEntity.ok(new GrapAndInserDateRangeStockPriceResponse());
 	}
 
