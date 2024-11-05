@@ -1,3 +1,4 @@
 CREATE DATABASE bstock;
 CREATE USER bstockuser WITH ENCRYPTED PASSWORD 'postgresql';
 GRANT ALL PRIVILEGES ON DATABASE bstock TO bstockuser;
+ALTER SYSTEM SET max_connections = 1000;
