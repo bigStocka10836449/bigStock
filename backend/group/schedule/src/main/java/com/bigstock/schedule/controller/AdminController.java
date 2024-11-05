@@ -26,13 +26,13 @@ public class AdminController {
 	private final GraspStockPrice graspStockPrice;
 
 	@PatchMapping("grapAndInserDateRangeStockPrice")
-	public ResponseEntity<GrapAndInserDateRangeStockPriceResponse> getStockShareholderStructure(
+	public ResponseEntity<String> getStockShareholderStructure(
 			@RequestBody GrapAndInserDateRangeStockPriceRequest request) {
 		CompletableFuture.runAsync(() -> {
 			graspHistoryStockPrice.manualGrapRangeHistoryStockPrice(request.getDateRangeDto().getStartDate(),
 					request.getDateRangeDto().getEndDate(), request.getDateRangeDto().getStockType());
 		});
-		return ResponseEntity.ok(new GrapAndInserDateRangeStockPriceResponse());
+		return ResponseEntity.ok().build();
 	}
 
 	@PatchMapping("doGrepSecuritiesFirmsDayOperate")
