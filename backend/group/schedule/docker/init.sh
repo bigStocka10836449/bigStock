@@ -1,4 +1,11 @@
 #!/bin/bash
+
+# 啟動 Xvfb
+Xvfb :99 -screen 0 1536x816x24 &
+
+# 設置 DISPLAY 變量
+export DISPLAY=:99
+
 #${JAR_NAME} ${JAVA_COMMAND_STR} 為deployment傳進來的環境變數
 java -server ${JAVA_COMMAND_STR} -jar  /opt/bigstock/${JAR_NAME}
 while sleep 60; do

@@ -56,7 +56,8 @@ RUN wget -q -O /tmp/chromedriver.zip https://storage.googleapis.com/chrome-for-t
     && unzip /tmp/chromedriver.zip -d /usr/local/bin/ \
     && mv /usr/local/bin/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
     && rm -rf /tmp/chromedriver.zip /usr/local/bin/chromedriver-linux64
-
+# 以 root 用戶創建目錄並設置權限
+RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix    
 
 # 设置ChromeDriver的权限
 RUN chmod +x /usr/local/bin/chromedriver

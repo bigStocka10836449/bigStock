@@ -66,7 +66,7 @@ public class GraspHistoryStockPrice {
 	
 	public Date getLastTradeDate() {
 		Date currentDate = Calendar.getInstance().getTime();
-		return stockInfoService.getStockCodeByStockType("0").stream().map(stockCode -> {
+		return stockInfoService.getStockCodeByStockType("0").stream().limit(1).map(stockCode -> {
 			try {
 				return ChromeDriverUtils
 						.getTpexStockHistory(currentDate, currentDate, manualDateRangeTpexBaseurl, stockCode).stream()
