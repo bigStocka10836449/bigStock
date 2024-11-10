@@ -5,7 +5,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URISyntaxException;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -26,8 +25,9 @@ import org.springframework.web.client.RestClientException;
 
 import com.bigstock.schedule.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.entity.SecuritiesFirmsDayOperate;
-import com.bigstock.sharedComponent.entity.StockExchangeDetail;
+import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
+import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockExchangeDetailService;
 import com.bigstock.sharedComponent.service.StockInfoService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -75,6 +75,8 @@ public class GraspStockPrice {
 	
 	private final StockExchangeDetailService stockExchangeDetailService;
 	
+	private final StockDayPriceService stockDayPriceService;
+	
 	private final RedissonClient redissonClient;
 	
 	private static final String GRASPSTOCK_REDIS_ENABLE_KEY = "bstock:schedule:GraspStock:enable";
@@ -93,24 +95,18 @@ public class GraspStockPrice {
 	}
 	
 	// 每天下午5點更新
+	@PostConstruct
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
+	// 每周日早上8点触发更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
-	public void graspTpexStockPrice() throws RestClientException, URISyntaxException, JsonMappingException,
-			JsonProcessingException, InterruptedException {
+	public void updateShareholderStructure() throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
-		Calendar startCalendar = Calendar.getInstance();
-		Date currentDate = startCalendar.getTime();
-		graspHistoryStockPrice.manualGrapRangeHistoryStockPrice(currentDate, currentDate, "0");
-		log.info("finsh sync stockDayPrice");
-	}
-
-	
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
-	public void graspTwseTpexStockPrice() throws RestClientException, URISyntaxException, JsonMappingException,
-			JsonProcessingException, InterruptedException {
-		// 先抓DB裡面全部的代號資料
-		Calendar startCalendar = Calendar.getInstance();
-		Date currentDate = startCalendar.getTime();
-		graspHistoryStockPrice.manualGrapRangeHistoryStockPrice(currentDate, currentDate, "1");
+		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
+		
+		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDate();
+		List<StockDayPrice> stockTwseDayPrices =  ChromeDriverUtils.graspTwseDayPrice("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",tradeDate);
+		stockDayPriceService.saveAll(stockTpexDayPrices);
+		stockDayPriceService.saveAll(stockTwseDayPrices);
 		log.info("finsh sync stockDayPrice");
 	}
 //    @PostConstruct

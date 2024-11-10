@@ -786,103 +786,103 @@ public class ChromeDriverUtils {
 		driver.switchTo().parentFrame();
 	}
 
-//	public static List<StockDayPrice> graspTwseDayPrice(String url, Date tradeDate) throws InterruptedException,
-//			JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
-//		String jsonResponse = fetchApiData(url);
-//
-//		ObjectMapper objectMapper = new ObjectMapper();
-//		List<Map<String, String>> responseList = objectMapper
-//				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
-//				}).stream().filter(data -> {
-//					String code = data.get("Code").toString();
-//					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
-//				}).collect(Collectors.toList());
-//		LocalDate today = tradeDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-//
-//		// 設置本周第一天的日期
-//		LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
-//
-//		// 設置本周最後一天的日期
-//		LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
-//		// 獲取系統默認時區
-//		ZoneId zoneId = ZoneId.systemDefault();
-//
-//		// 獲取偏移量
-//		ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
-//
-//		// 將 LocalDate 轉換為 Date
-//		Date startOfWeeDate = Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
-//		Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
-//
-//		return responseList.stream().map(map -> {
-//			StockDayPrice stockDayPrice = new StockDayPrice();
-//			stockDayPrice.setStockCode(map.get("Code"));
-//			stockDayPrice.setOpeningPrice(map.get("OpeningPrice"));
-//			stockDayPrice.setClosingPrice(map.get("ClosingPrice"));
-//			stockDayPrice.setHighPrice(map.get("HighestPrice"));
-//			stockDayPrice.setLowPrice(map.get("LowestPrice"));
-//			stockDayPrice.setChange(map.get("Change").replace("+", ""));
-//			stockDayPrice.setTradingDay(tradeDate);
-//			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
-//			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
-//			stockDayPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
-//			return stockDayPrice;
-//		}).toList();
-//	}
+	public static List<StockDayPrice> graspTwseDayPrice(String url, Date tradeDate) throws InterruptedException,
+			JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
+		String jsonResponse = fetchApiData(url);
 
-//	public static List<StockDayPrice> graspTpexDayPrice(String url) throws InterruptedException, JsonMappingException,
-//			JsonProcessingException, RestClientException, URISyntaxException {
-//		String jsonResponse = fetchApiData("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
-//
-//		ObjectMapper objectMapper = new ObjectMapper();
-//		List<Map<String, String>> responseList = objectMapper
-//				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
-//				}).stream().filter(data -> {
-//					String code = data.get("SecuritiesCompanyCode").toString();
-//					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
-//				}).collect(Collectors.toList());
-//
-//		return responseList.stream().map(map -> {
-//			// 指定日期字符串格式
-//			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
-//
-//			String monthAndDate = map.get("Date").substring(map.get("Date").length() - 4);
-//			int year = Integer.parseInt(map.get("Date").replace(monthAndDate, "")) + 1911; // 民国转换为西元
-//			String standardDateString = year + "/" + monthAndDate.substring(0, 2) + "/" + monthAndDate.substring(2, 4);
-//
-//			// 解析标准日期字符串为 LocalDate 对象
-//			LocalDate localDate = LocalDate.parse(standardDateString, dateStringformatter);
-//			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
-//			LocalDate today = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-//
-//			// 設置本周第一天的日期
-//			LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
-//
-//			// 設置本周最後一天的日期
-//			LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
-//			// 獲取系統默認時區
-//			ZoneId zoneId = ZoneId.systemDefault();
-//
-//			// 獲取偏移量
-//			ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
-//
-//			// 將 LocalDate 轉換為 Date
-//			Date startOfWeeDate = Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
-//			Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
-//			StockDayPrice stockDayPrice = new StockDayPrice();
-//			stockDayPrice.setStockCode(map.get("SecuritiesCompanyCode"));
-//			stockDayPrice.setOpeningPrice(map.get("Open"));
-//			stockDayPrice.setClosingPrice(map.get("Close"));
-//			stockDayPrice.setHighPrice(map.get("High"));
-//			stockDayPrice.setLowPrice(map.get("Low"));
-//			stockDayPrice.setChange(map.get("Change"));
-//			stockDayPrice.setTradingDay(date);
-//			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
-//			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
-//			stockDayPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
-//			return stockDayPrice;
-//		}).toList();
-//	}
+		ObjectMapper objectMapper = new ObjectMapper();
+		List<Map<String, String>> responseList = objectMapper
+				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
+				}).stream().filter(data -> {
+					String code = data.get("Code").toString();
+					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
+				}).collect(Collectors.toList());
+		LocalDate today = tradeDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+
+		// 設置本周第一天的日期
+		LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
+
+		// 設置本周最後一天的日期
+		LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
+		// 獲取系統默認時區
+		ZoneId zoneId = ZoneId.systemDefault();
+
+		// 獲取偏移量
+		ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
+
+		// 將 LocalDate 轉換為 Date
+		Date startOfWeeDate = Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
+		Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
+
+		return responseList.stream().map(map -> {
+			StockDayPrice stockDayPrice = new StockDayPrice();
+			stockDayPrice.setStockCode(map.get("Code"));
+			stockDayPrice.setOpeningPrice(map.get("OpeningPrice"));
+			stockDayPrice.setClosingPrice(map.get("ClosingPrice"));
+			stockDayPrice.setHighPrice(map.get("HighestPrice"));
+			stockDayPrice.setLowPrice(map.get("LowestPrice"));
+			stockDayPrice.setChange(map.get("Change").replace("+", ""));
+			stockDayPrice.setTradingDate(tradeDate);
+			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
+			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
+			stockDayPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
+			return stockDayPrice;
+		}).toList();
+	}
+
+	public static List<StockDayPrice> graspTpexDayPrice(String url) throws InterruptedException, JsonMappingException,
+			JsonProcessingException, RestClientException, URISyntaxException {
+		String jsonResponse = fetchApiData("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
+
+		ObjectMapper objectMapper = new ObjectMapper();
+		List<Map<String, String>> responseList = objectMapper
+				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
+				}).stream().filter(data -> {
+					String code = data.get("SecuritiesCompanyCode").toString();
+					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
+				}).collect(Collectors.toList());
+
+		return responseList.stream().map(map -> {
+			// 指定日期字符串格式
+			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+
+			String monthAndDate = map.get("Date").substring(map.get("Date").length() - 4);
+			int year = Integer.parseInt(map.get("Date").replace(monthAndDate, "")) + 1911; // 民国转换为西元
+			String standardDateString = year + "/" + monthAndDate.substring(0, 2) + "/" + monthAndDate.substring(2, 4);
+
+			// 解析标准日期字符串为 LocalDate 对象
+			LocalDate localDate = LocalDate.parse(standardDateString, dateStringformatter);
+			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
+			LocalDate today = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+
+			// 設置本周第一天的日期
+			LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
+
+			// 設置本周最後一天的日期
+			LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
+			// 獲取系統默認時區
+			ZoneId zoneId = ZoneId.systemDefault();
+
+			// 獲取偏移量
+			ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
+
+			// 將 LocalDate 轉換為 Date
+			Date startOfWeeDate = Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
+			Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
+			StockDayPrice stockDayPrice = new StockDayPrice();
+			stockDayPrice.setStockCode(map.get("SecuritiesCompanyCode"));
+			stockDayPrice.setOpeningPrice(map.get("Open"));
+			stockDayPrice.setClosingPrice(map.get("Close"));
+			stockDayPrice.setHighPrice(map.get("High"));
+			stockDayPrice.setLowPrice(map.get("Low"));
+			stockDayPrice.setChange(map.get("Change"));
+			stockDayPrice.setTradingDate(date);
+			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
+			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
+			stockDayPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
+			return stockDayPrice;
+		}).toList();
+	}
 
 	public static List<Map<Integer, String>> graspShareholderStructureFromTDCCApi(String tdccOpenApiUrl)
 			throws JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
