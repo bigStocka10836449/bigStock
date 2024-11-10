@@ -22,6 +22,7 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
@@ -39,7 +40,7 @@ public enum CandlestickChartStrategy {
 	SCANTRADER("SCANTRADER", "https://scantrader.com/v2/stock/%1s") {
 
 		@Override
-		List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
+		public List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
 			String currentUrl = String.format(baseUrl, stockCode);
 			driver.get(currentUrl);
 			WebElement chartDiv = driver
@@ -84,7 +85,7 @@ public enum CandlestickChartStrategy {
 	ESTOCK("ESTOCK", "https://www.estock.com.tw/stock_info?stock_id=%1s") {
 
 		@Override
-		List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
+		public List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
 
 			String currentUrl = String.format(baseUrl, stockCode);
 			driver.get(currentUrl);
@@ -94,7 +95,7 @@ public enum CandlestickChartStrategy {
 			js.executeScript("arguments[0].focus();", canvas);
 			Actions actions = new Actions(driver);
 			List<StockExchangeDetail> stockExchangeDetails = Lists.newArrayList();
-			for (int index = 258; index <= 800; index++) {
+			for (int index = 258; index <= 880; index++) {
 				if (index == 258) {
 					actions.moveByOffset(258, 230).click().perform();
 				} else {
@@ -140,7 +141,7 @@ public enum CandlestickChartStrategy {
 
 	CNYES("CNYES", "https://www.cnyes.com/twstock/%1s") {
 		@Override
-		List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
+		public List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
 			String currentUrl = String.format(baseUrl, stockCode);
 			driver.get(currentUrl);
 
@@ -184,7 +185,7 @@ public enum CandlestickChartStrategy {
 
 	CMONY("CMONY", "https://www.cmoney.tw/finance/%1s/f00025") {
 		@Override
-		List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
+		public List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
 			String currentUrl = String.format(baseUrl, stockCode);
 			driver.get(currentUrl);
 
@@ -234,7 +235,7 @@ public enum CandlestickChartStrategy {
 	HISTOCK("HISTOCK", "https://histock.tw/stock/%1s") {
 
 		@Override
-		List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
+		public List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
 			String currentUrl = String.format(baseUrl, stockCode);
 			driver.get(currentUrl);
 			WebElement chartDiv = driver.findElement(By.xpath("//*[@id='LBlock_0']/div[3]/div"));
@@ -280,7 +281,7 @@ public enum CandlestickChartStrategy {
 	NSTOCK("NSTOCK", "https://www.nstock.tw/stock_info?stock_id=%1s") {
 
 		@Override
-		List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
+		public List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
 			String currentUrl = String.format(baseUrl, stockCode);
 			driver.get(currentUrl);
 			try {
@@ -321,7 +322,7 @@ public enum CandlestickChartStrategy {
 					stockExchangeDetail.setTradingDate(tradingDate);
 					stockExchangeDetail.setSeq(index);
 					stockExchangeDetails.add(stockExchangeDetail);
-				} catch (NoSuchElementException e) {
+				} catch (NoSuchElementException | StaleElementReferenceException e) {
 					continue;
 				}
 			}
@@ -332,7 +333,7 @@ public enum CandlestickChartStrategy {
 	INEWS("INEWS", "https://inews.setn.com/stock/individual/%1s") {
 
 		@Override
-		List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
+		public List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
 			String currentUrl = String.format(baseUrl, stockCode);
 			driver.get(currentUrl);
 			WebElement parentDiv = driver.findElement(By.xpath("//span[text()='價量明細']/parent::div"));
@@ -398,7 +399,7 @@ public enum CandlestickChartStrategy {
 	PCHOME("PCHOME", "https://pchome.megatime.com.tw/stock/sto0/ock3/sid/%1s.html") {
 
 		@Override
-		List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
+		public List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate) {
 			String currentUrl = String.format(baseUrl, stockCode);
 			driver.get(currentUrl);
 			// 找到表格中的 canvas 元素
@@ -484,7 +485,7 @@ public enum CandlestickChartStrategy {
 		}
 	};
 
-	abstract List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate);
+	public abstract List<StockExchangeDetail> executeStrategy(WebDriver driver, String stockCode, Date tradingDate);
 
 	String stragegyName;
 

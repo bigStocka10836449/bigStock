@@ -62,6 +62,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import com.bigstock.schedule.bstockenum.CandlestickChartStrategy;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockExchangeDetail;
 import com.bigstock.sharedComponent.entity.StockInfo;
@@ -158,19 +159,44 @@ public class ChromeDriverUtils {
 
 	public static void grepCanvas(String chromeDriverPath, List<String> stockCodes,
 			Date tradingDate, StockExchangeDetailService stockExchangeDetailService) throws InterruptedException {
-		ChromeDriverService service = new ChromeDriverService.Builder()
-				.usingDriverExecutable(new File(chromeDriverPath)).usingAnyFreePort().build();
-		ChromeOptions options = new ChromeOptions();
-		options.addArguments("--no-sandbox"); // 取消沙盒模式
-		options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
 //		   options.addArguments("--disable-notifications");
-		WebDriver driver = new ChromeDriver(service, options);
-		log.info("into grepCanvas");
-		driver.manage().window().maximize();
-		
-		
-	
-        
+
+		List<String> strategys = List.of( "ESTOCK", "SCANTRADER", "CNYES", "CMONY", "HISTOCK", "NSTOCK", "INEWS",
+				"PCHOME");	
+		AtomicInteger index = new AtomicInteger(0);
+		stockCodes.stream().forEach(stockCode ->{
+			ChromeDriverService service = new ChromeDriverService.Builder()
+					.usingDriverExecutable(new File(chromeDriverPath)).usingAnyFreePort().build();
+			ChromeOptions options = new ChromeOptions();
+			options.addArguments("--no-sandbox"); // 取消沙盒模式
+			options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
+			WebDriver driver = new ChromeDriver(service, options);
+			log.info("into grepCanvas");
+			driver.manage().window().maximize();
+			Date startTime = new Date();
+			int currentStrategy = index.getAndIncrement() %8;
+			CandlestickChartStrategy strategy =CandlestickChartStrategy.valueOfStrategy(strategys.get(currentStrategy));
+			try {
+			 List<StockExchangeDetail> stockExchangeDetails = strategy.executeStrategy(driver, stockCode, tradingDate);
+			 stockExchangeDetailService.saveAll(stockExchangeDetails);
+			} catch(Exception e) {
+				log.warn(e.getMessage(), e);
+			}
+			finally {
+				log.info("executeStrategy: {} cost {} ms", strategy.name(), new Date().getTime() - startTime.getTime());
+				try {
+					Thread.sleep(2000);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				try {
+				driver.quit();
+				} catch(Exception e) {
+					log.warn(e.getMessage(), e);
+				}
+			}
+		});
      
 
 	}
