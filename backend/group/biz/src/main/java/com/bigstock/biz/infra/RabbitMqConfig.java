@@ -78,35 +78,35 @@ public class RabbitMqConfig {
 	
 	
 	//--------------------------------個股每日交易明細---------------------------------
-	@Bean
-	public DirectExchange stockExchangeDetailExchange() {
-		return new DirectExchange("StockExchangeDetailExchange", true, false);
-	}
-
-	@Bean
-	public Queue stockExchangeDetailQueue() {
-		return QueueBuilder.durable("StockExchangeDetailQueue").build();
-	}
-
-	@Bean
-	public Binding stockExchangeDetailBinding() {
-		return BindingBuilder.bind(stockExchangeDetailQueue()).to(stockExchangeDetailExchange()).withQueueName();
-	}
-
-	@Bean
-	public DirectExchange stockExchangeDetailExchangeError() {
-		return new DirectExchange("StockExchangeDetailExchangeError", true, false);
-	}
-
-	@Bean
-	public Queue stockExchangeDetailQueueError() {
-		return QueueBuilder.durable("StockExchangeDetailQueueError").build();
-	}
-
-	@Bean
-	public Binding bindingStockExchangeDetailQueueError() {
-		return BindingBuilder.bind(stockExchangeDetailQueueError()).to(stockExchangeDetailExchangeError()).withQueueName();
-	}
+//	@Bean
+//	public DirectExchange stockExchangeDetailExchange() {
+//		return new DirectExchange("StockExchangeDetailExchange", true, false);
+//	}
+//
+//	@Bean
+//	public Queue stockExchangeDetailQueue() {
+//		return QueueBuilder.durable("StockExchangeDetailQueue").build();
+//	}
+//
+//	@Bean
+//	public Binding stockExchangeDetailBinding() {
+//		return BindingBuilder.bind(stockExchangeDetailQueue()).to(stockExchangeDetailExchange()).withQueueName();
+//	}
+//
+//	@Bean
+//	public DirectExchange stockExchangeDetailExchangeError() {
+//		return new DirectExchange("StockExchangeDetailExchangeError", true, false);
+//	}
+//
+//	@Bean
+//	public Queue stockExchangeDetailQueueError() {
+//		return QueueBuilder.durable("StockExchangeDetailQueueError").build();
+//	}
+//
+//	@Bean
+//	public Binding bindingStockExchangeDetailQueueError() {
+//		return BindingBuilder.bind(stockExchangeDetailQueueError()).to(stockExchangeDetailExchangeError()).withQueueName();
+//	}
 	
 	
 }

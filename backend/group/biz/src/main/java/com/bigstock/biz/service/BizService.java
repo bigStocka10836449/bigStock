@@ -1,5 +1,6 @@
 package com.bigstock.biz.service;
 
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.temporal.IsoFields;
 import java.util.Date;
@@ -44,7 +45,6 @@ public class BizService {
 	}
 
 	public SingleStockPriceVo getSingleStockPrice(String stockCode, Date searchDate) {
-
 		Optional<StockDayPrice> stockDayPriceOp = stockDayPriceService.findByStockCodeAndTradingDate(stockCode,
 				searchDate);
 		String highPrice = stockDayPriceOp.isPresent() ? stockDayPriceOp.get().getHighPrice() : "0.0";

@@ -67,28 +67,28 @@ public class GatewayController {
 		}
 	}
 
-	@Operation(summary = "個別股票價格", description = "")
-	@PostMapping("getStockExchangeDetail")
-	public ResponseEntity<String> getStockExchangeDetail(@RequestBody SingleStockPriceBizVo singleStockPriceBizVo) {
-		try {
-			CountDownLatch latch = new CountDownLatch(1);
-			String uuid = rabbitMqService.createConsumer(latch, "gatewayQueue", "gatewayExchange");
-			ObjectMapper objectMapper = new ObjectMapper();
-			objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd"));
-			String jsonMessage = objectMapper.writeValueAsString(singleStockPriceBizVo);
-			rabbitMqService.sendMessage(jsonMessage, "StockExchangeDetailExchange", "StockExchangeDetailQueue", uuid,
-					"gatewayExchange", "gatewayQueue");
-			latch.await(120, TimeUnit.SECONDS);
-			Optional<Object> mqResultOp = Optional.ofNullable(rabbitMqService.getValueFromTmpStoredReceivedData(uuid));
-			if (mqResultOp.isEmpty()) {
-				return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-			}
-			return ResponseEntity.ok(mqResultOp.get().toString());
-		} catch (InterruptedException | IOException | TimeoutException e) {
-			log.error(e.getMessage(), e);
-			return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-		}
-	}
+//	@Operation(summary = "個別股票價格", description = "")
+//	@PostMapping("getStockExchangeDetail")
+//	public ResponseEntity<String> getStockExchangeDetail(@RequestBody SingleStockPriceBizVo singleStockPriceBizVo) {
+//		try {
+//			CountDownLatch latch = new CountDownLatch(1);
+//			String uuid = rabbitMqService.createConsumer(latch, "gatewayQueue", "gatewayExchange");
+//			ObjectMapper objectMapper = new ObjectMapper();
+//			objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd"));
+//			String jsonMessage = objectMapper.writeValueAsString(singleStockPriceBizVo);
+//			rabbitMqService.sendMessage(jsonMessage, "StockExchangeDetailExchange", "StockExchangeDetailQueue", uuid,
+//					"gatewayExchange", "gatewayQueue");
+//			latch.await(120, TimeUnit.SECONDS);
+//			Optional<Object> mqResultOp = Optional.ofNullable(rabbitMqService.getValueFromTmpStoredReceivedData(uuid));
+//			if (mqResultOp.isEmpty()) {
+//				return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+//			}
+//			return ResponseEntity.ok(mqResultOp.get().toString());
+//		} catch (InterruptedException | IOException | TimeoutException e) {
+//			log.error(e.getMessage(), e);
+//			return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+//		}
+//	}
 	
 //	@NewSpan("stockShareholderStructure")
 	@Operation(summary = "持股大戶連續2個星期增加的股票查詢", description = "")

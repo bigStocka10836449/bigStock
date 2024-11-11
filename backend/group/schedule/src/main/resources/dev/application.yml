@@ -50,10 +50,10 @@ schedule:
     scheduling:
       cron:
         expression: 
-          grasp-stock-price: "0 0 17 ? * *"
-          grasp-securitiesfirms-dayoperate: "0 19 * * * *"
-          update-shareholder-structure: "0 8 * * * *"
-          update-stock-info: "0 0 8 ? * SAT"
+          grasp-stock-price: "0 */30 * * * *"
+          grasp-securitiesfirms-dayoperate: "0 */30 * * * *"
+          update-shareholder-structure: "0 */30 * * * *"
+          update-stock-info: "0 */30 * * * *"
   chromeDriverPath:
     windows: 
       active: false	

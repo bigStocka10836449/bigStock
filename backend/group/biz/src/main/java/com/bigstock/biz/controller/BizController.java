@@ -37,11 +37,11 @@ public class BizController {
 		return ResponseEntity.ok(bizService.getStockShareholderStructure(stockCode, 52));
 	}
 
-	@Operation(summary = "個股買賣日報表", description = "")
-	@GetMapping("stockShareholderStructure/{stockCode}/{tradingDate}")
-	public ResponseEntity<List<SecuritiesFirmsDayOperate>> getSecuritiesFirmsDayOperate(
-			@PathVariable("stockCode") String stockCode, @PathVariable("tradingDate") Date tradingDate) {
-		return ResponseEntity.ok(securitiesFirmsDayOperateService.getByStockCodeAndTradingDate(stockCode, tradingDate));
-	}
+//	@Operation(summary = "個股買賣日報表", description = "")
+//	@GetMapping("stockShareholderStructure/{stockCode}/{tradingDate}")
+//	public ResponseEntity<List<SecuritiesFirmsDayOperate>> getSecuritiesFirmsDayOperate(
+//			@PathVariable("stockCode") String stockCode, @PathVariable("tradingDate") Date tradingDate) {
+//		return ResponseEntity.ok(securitiesFirmsDayOperateService.getByStockCodeAndTradingDate(stockCode, tradingDate));
+//	}
 	
 }

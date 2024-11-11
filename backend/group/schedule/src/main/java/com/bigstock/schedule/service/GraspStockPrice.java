@@ -77,10 +77,10 @@ public class GraspStockPrice {
 	
 	private final StockDayPriceService stockDayPriceService;
 	
-	private final RedissonClient redissonClient;
-	
-	private static final String GRASPSTOCK_REDIS_ENABLE_KEY = "bstock:schedule:GraspStock:enable";
-	private static final String GRASPSTOCK_REDIS_ENABLE_IS_SHUTDOWN_KEY = "bstock:schedule:GraspStock:isSutDown";
+//	private final RedissonClient redissonClient;
+//	
+//	private static final String GRASPSTOCK_REDIS_ENABLE_KEY = "bstock:schedule:GraspStock:enable";
+//	private static final String GRASPSTOCK_REDIS_ENABLE_IS_SHUTDOWN_KEY = "bstock:schedule:GraspStock:isSutDown";
 
 	
 	
@@ -111,133 +111,133 @@ public class GraspStockPrice {
 	}
 //    @PostConstruct
 //	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-securitiesfirms-dayoperate}")
-	public void grepSecuritiesFirmsDayOperate() throws InterruptedException, RestClientException, URISyntaxException,
-			UnsupportedAudioFileException, IOException, LineUnavailableException, JavaLayerException {
-        RBucket<Boolean> graspStockEnableKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_KEY);
-        RBucket<Boolean> graspStockIsSutDownKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_IS_SHUTDOWN_KEY);
-        Boolean graspStockEnable = graspStockEnableKeyBucket.get();
-        File downloadPathFolder = new File(downloadPath);
-        if(ObjectUtils.isEmpty(graspStockEnable) || Boolean.FALSE.equals(graspStockEnable)) {
-        	graspStockEnableKeyBucket.set(Boolean.TRUE);
-        	graspStockIsSutDownKeyBucket.set(Boolean.FALSE);
-			if(!downloadPathFolder.exists()) {
-				downloadPathFolder.mkdirs();
-			}
-			try {
-				doGrepSecuritiesFirmsDayOperate(downloadPathFolder, graspStockEnableKeyBucket,
-						graspStockIsSutDownKeyBucket, Lists.newArrayList());
-			} catch (Exception e) {
-				log.warn(e.getMessage(), e);
-			} finally {
-				graspStockEnableKeyBucket.set(Boolean.FALSE);
-				graspStockIsSutDownKeyBucket.set(Boolean.TRUE);
-			}
-        } else {
-        	return;
-        }
-	}
+//	public void grepSecuritiesFirmsDayOperate() throws InterruptedException, RestClientException, URISyntaxException,
+//			UnsupportedAudioFileException, IOException, LineUnavailableException, JavaLayerException {
+//        RBucket<Boolean> graspStockEnableKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_KEY);
+//        RBucket<Boolean> graspStockIsSutDownKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_IS_SHUTDOWN_KEY);
+//        Boolean graspStockEnable = graspStockEnableKeyBucket.get();
+//        File downloadPathFolder = new File(downloadPath);
+//        if(ObjectUtils.isEmpty(graspStockEnable) || Boolean.FALSE.equals(graspStockEnable)) {
+//        	graspStockEnableKeyBucket.set(Boolean.TRUE);
+//        	graspStockIsSutDownKeyBucket.set(Boolean.FALSE);
+//			if(!downloadPathFolder.exists()) {
+//				downloadPathFolder.mkdirs();
+//			}
+//			try {
+//				doGrepSecuritiesFirmsDayOperate(downloadPathFolder, graspStockEnableKeyBucket,
+//						graspStockIsSutDownKeyBucket, Lists.newArrayList());
+//			} catch (Exception e) {
+//				log.warn(e.getMessage(), e);
+//			} finally {
+//				graspStockEnableKeyBucket.set(Boolean.FALSE);
+//				graspStockIsSutDownKeyBucket.set(Boolean.TRUE);
+//			}
+//        } else {
+//        	return;
+//        }
+//	}
 
     //手動重跑抓取買賣日報表資訊，執行外框
-	public void tryRedoGrepSecuritiesFirmsDayOperate() throws JsonMappingException, JsonProcessingException,
-			RestClientException, InterruptedException, URISyntaxException {
-		RBucket<Boolean> graspStockEnableKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_KEY);
-		RBucket<Boolean> graspStockIsSutDownKeyBucket = redissonClient
-				.getBucket(GRASPSTOCK_REDIS_ENABLE_IS_SHUTDOWN_KEY);
-		File downloadPathFolder = new File(downloadPath);
-		if (!(Boolean.FALSE.equals(graspStockEnableKeyBucket.get())
-				&& Boolean.TRUE.equals(graspStockIsSutDownKeyBucket.get()))) {
-			graspStockEnableKeyBucket.set(Boolean.FALSE);
-			while (Boolean.FALSE.equals(graspStockIsSutDownKeyBucket.get())) {
-				Thread.sleep(5000);
-			}
-		}
-		// 使用 CompletableFuture 啟動異步任務
-		CompletableFuture.runAsync(() -> {
-			try {
-				graspStockEnableKeyBucket.set(Boolean.TRUE);
-				graspStockIsSutDownKeyBucket.set(Boolean.FALSE);
-
-				if (!downloadPathFolder.exists()) {
-					downloadPathFolder.mkdirs();
-				}
-
-				List<String> finshedStockCodes = List.of(downloadPathFolder.listFiles()).stream().map(downloadFile -> {
-					String stockCode = removeFileExtension(downloadFile.getName());
-					return (stockCode.contains("_") ? stockCode.split("_")[0] : stockCode);
-				}).toList();
-
-				doGrepSecuritiesFirmsDayOperate(downloadPathFolder, graspStockEnableKeyBucket,
-						graspStockIsSutDownKeyBucket, finshedStockCodes);
-			} catch (Exception e) {
-				log.warn(e.getMessage(), e);
-			} finally {
-				graspStockEnableKeyBucket.set(Boolean.FALSE);
-				graspStockIsSutDownKeyBucket.set(Boolean.TRUE);
-			}
-		});
-	}
+//	public void tryRedoGrepSecuritiesFirmsDayOperate() throws JsonMappingException, JsonProcessingException,
+//			RestClientException, InterruptedException, URISyntaxException {
+//		RBucket<Boolean> graspStockEnableKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_KEY);
+//		RBucket<Boolean> graspStockIsSutDownKeyBucket = redissonClient
+//				.getBucket(GRASPSTOCK_REDIS_ENABLE_IS_SHUTDOWN_KEY);
+//		File downloadPathFolder = new File(downloadPath);
+//		if (!(Boolean.FALSE.equals(graspStockEnableKeyBucket.get())
+//				&& Boolean.TRUE.equals(graspStockIsSutDownKeyBucket.get()))) {
+//			graspStockEnableKeyBucket.set(Boolean.FALSE);
+//			while (Boolean.FALSE.equals(graspStockIsSutDownKeyBucket.get())) {
+//				Thread.sleep(5000);
+//			}
+//		}
+//		// 使用 CompletableFuture 啟動異步任務
+//		CompletableFuture.runAsync(() -> {
+//			try {
+//				graspStockEnableKeyBucket.set(Boolean.TRUE);
+//				graspStockIsSutDownKeyBucket.set(Boolean.FALSE);
+//
+//				if (!downloadPathFolder.exists()) {
+//					downloadPathFolder.mkdirs();
+//				}
+//
+//				List<String> finshedStockCodes = List.of(downloadPathFolder.listFiles()).stream().map(downloadFile -> {
+//					String stockCode = removeFileExtension(downloadFile.getName());
+//					return (stockCode.contains("_") ? stockCode.split("_")[0] : stockCode);
+//				}).toList();
+//
+//				doGrepSecuritiesFirmsDayOperate(downloadPathFolder, graspStockEnableKeyBucket,
+//						graspStockIsSutDownKeyBucket, finshedStockCodes);
+//			} catch (Exception e) {
+//				log.warn(e.getMessage(), e);
+//			} finally {
+//				graspStockEnableKeyBucket.set(Boolean.FALSE);
+//				graspStockIsSutDownKeyBucket.set(Boolean.TRUE);
+//			}
+//		});
+//	}
     
-	//執行買賣日報表抓取流程
-    private void doGrepSecuritiesFirmsDayOperate(File downloadPathFolder, RBucket<Boolean> graspStockEnableKeyBucket, RBucket<Boolean> graspStockIsSutDownKeyBucket, List<String> filterStockCodes) throws InterruptedException, JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
-    	//------過濾如果真的執行retry的時候，要把已經抓下來的stockCode排除掉
-    	List<String> TPEXStockCodes = stockInfoService.findByStockType("0").stream()
-				.filter(stockInfo -> !filterStockCodes.contains(stockInfo.getStockCode()))
-				.map(stockInfo -> stockInfo.getStockCode()).toList();
-		List<String> TESEtockCodes = stockInfoService.findByStockType("1").stream()
-				.filter(stockInfo -> !filterStockCodes.contains(stockInfo.getStockCode()))
-				.map(stockInfo -> stockInfo.getStockCode()).toList();
-    	log.info("exec grepSecuritiesFirmsDayOperate");
-    	//執行TPEX的買賣日報表抓取
-    	ChromeDriverUtils.grepTPEXsecuritiesFirmsDayOperate(downloadPath,
-    			windowsActive ? windowsChromeDriverPath : linuxChromeDriverPath, TPEXStockCodes, credentialsPath, graspStockEnableKeyBucket);
-    	//如果有發現redis的flag改變的時候，要結束
-    	if(Boolean.FALSE.equals(graspStockEnableKeyBucket.get())) {
-    		return;
-    	}
-    	//執行TWSE的買賣日報表抓取
-    	ChromeDriverUtils.grepTWSESsecuritiesFirmsDayOperate(downloadPath,
-    			windowsActive ? windowsChromeDriverPath : linuxChromeDriverPath, TESEtockCodes, bpythonUrl, graspStockEnableKeyBucket);
-    	//如果有發現redis的flag改變的時候，要結束
-    	if(Boolean.FALSE.equals(graspStockEnableKeyBucket.get())) {
-    		return;
-    	}
-    	//抓取最新的交易日期
-//    	List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
-//    			.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
-    	Date tradeDate = graspHistoryStockPrice.getLastTradeDate();
-    	List.of(downloadPathFolder.listFiles()).stream().filter(downloadFile -> downloadFile.getName().contains(".csv")).forEach(downloadFile -> {
-    		// 讀取CSV文件
-    		CSVReader reader = null;
-    		List<JSONObject> jsonArray = Lists.newArrayList();
-    		List<String[]> csvData = Lists.newArrayList();
-    		try {
-    			reader = new CSVReader(new InputStreamReader(new FileInputStream(downloadFile), "Big5"));
-    			csvData = reader.readAll();
-    			reader.close();
-    		} catch (IOException | CsvException e) {
-    			log.info(e.getMessage(),e);
-    			return;
-    		}
-    		
-    		jsonArray = convertTESECSVtoJSON(csvData);
-    		List<SecuritiesFirmsDayOperate> securitiesFirmsDayOperates = jsonArray.stream().map(jsb -> {
-    			SecuritiesFirmsDayOperate securitiesFirmsDayOperate = new SecuritiesFirmsDayOperate();
-    			String stockCode = removeFileExtension(downloadFile.getName());
-    			securitiesFirmsDayOperate.setPrice(jsb.getString("價格"));
-    			securitiesFirmsDayOperate.setSeq(jsb.getInt("序號"));
-    			securitiesFirmsDayOperate.setStockCode(stockCode.contains("_") ? stockCode.split("_")[0] : stockCode);
-    			securitiesFirmsDayOperate.setSecuritiesFirms(jsb.getString("券商"));
-    			securitiesFirmsDayOperate
-    			.setStockBuyAmount(Long.valueOf(jsb.getString("買進股數").trim().replace(",", "")));
-    			securitiesFirmsDayOperate.setTradingDate(tradeDate);
-    			securitiesFirmsDayOperate.setStockSellAmount(Long.valueOf(jsb.getString("賣出股數").trim().replace(",", "")));
-    			return securitiesFirmsDayOperate;
-    		}).sorted((x1, x2) -> x1.getSeq().compareTo(x2.getSeq())).toList();
-    		securitiesFirmsDayOperateService.insertAll(securitiesFirmsDayOperates);
-    	});
-    	//若當日的買賣日報表都已經抓完，則資料夾清空
-    	downloadPathFolder.delete();
-    }
+//	//執行買賣日報表抓取流程
+//    private void doGrepSecuritiesFirmsDayOperate(File downloadPathFolder, RBucket<Boolean> graspStockEnableKeyBucket, RBucket<Boolean> graspStockIsSutDownKeyBucket, List<String> filterStockCodes) throws InterruptedException, JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
+//    	//------過濾如果真的執行retry的時候，要把已經抓下來的stockCode排除掉
+//    	List<String> TPEXStockCodes = stockInfoService.findByStockType("0").stream()
+//				.filter(stockInfo -> !filterStockCodes.contains(stockInfo.getStockCode()))
+//				.map(stockInfo -> stockInfo.getStockCode()).toList();
+//		List<String> TESEtockCodes = stockInfoService.findByStockType("1").stream()
+//				.filter(stockInfo -> !filterStockCodes.contains(stockInfo.getStockCode()))
+//				.map(stockInfo -> stockInfo.getStockCode()).toList();
+//    	log.info("exec grepSecuritiesFirmsDayOperate");
+//    	//執行TPEX的買賣日報表抓取
+//    	ChromeDriverUtils.grepTPEXsecuritiesFirmsDayOperate(downloadPath,
+//    			windowsActive ? windowsChromeDriverPath : linuxChromeDriverPath, TPEXStockCodes, credentialsPath, graspStockEnableKeyBucket);
+//    	//如果有發現redis的flag改變的時候，要結束
+//    	if(Boolean.FALSE.equals(graspStockEnableKeyBucket.get())) {
+//    		return;
+//    	}
+//    	//執行TWSE的買賣日報表抓取
+//    	ChromeDriverUtils.grepTWSESsecuritiesFirmsDayOperate(downloadPath,
+//    			windowsActive ? windowsChromeDriverPath : linuxChromeDriverPath, TESEtockCodes, bpythonUrl, graspStockEnableKeyBucket);
+//    	//如果有發現redis的flag改變的時候，要結束
+//    	if(Boolean.FALSE.equals(graspStockEnableKeyBucket.get())) {
+//    		return;
+//    	}
+//    	//抓取最新的交易日期
+////    	List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
+////    			.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
+//    	Date tradeDate = graspHistoryStockPrice.getLastTradeDate();
+//    	List.of(downloadPathFolder.listFiles()).stream().filter(downloadFile -> downloadFile.getName().contains(".csv")).forEach(downloadFile -> {
+//    		// 讀取CSV文件
+//    		CSVReader reader = null;
+//    		List<JSONObject> jsonArray = Lists.newArrayList();
+//    		List<String[]> csvData = Lists.newArrayList();
+//    		try {
+//    			reader = new CSVReader(new InputStreamReader(new FileInputStream(downloadFile), "Big5"));
+//    			csvData = reader.readAll();
+//    			reader.close();
+//    		} catch (IOException | CsvException e) {
+//    			log.info(e.getMessage(),e);
+//    			return;
+//    		}
+//    		
+//    		jsonArray = convertTESECSVtoJSON(csvData);
+//    		List<SecuritiesFirmsDayOperate> securitiesFirmsDayOperates = jsonArray.stream().map(jsb -> {
+//    			SecuritiesFirmsDayOperate securitiesFirmsDayOperate = new SecuritiesFirmsDayOperate();
+//    			String stockCode = removeFileExtension(downloadFile.getName());
+//    			securitiesFirmsDayOperate.setPrice(jsb.getString("價格"));
+//    			securitiesFirmsDayOperate.setSeq(jsb.getInt("序號"));
+//    			securitiesFirmsDayOperate.setStockCode(stockCode.contains("_") ? stockCode.split("_")[0] : stockCode);
+//    			securitiesFirmsDayOperate.setSecuritiesFirms(jsb.getString("券商"));
+//    			securitiesFirmsDayOperate
+//    			.setStockBuyAmount(Long.valueOf(jsb.getString("買進股數").trim().replace(",", "")));
+//    			securitiesFirmsDayOperate.setTradingDate(tradeDate);
+//    			securitiesFirmsDayOperate.setStockSellAmount(Long.valueOf(jsb.getString("賣出股數").trim().replace(",", "")));
+//    			return securitiesFirmsDayOperate;
+//    		}).sorted((x1, x2) -> x1.getSeq().compareTo(x2.getSeq())).toList();
+//    		securitiesFirmsDayOperateService.insertAll(securitiesFirmsDayOperates);
+//    	});
+//    	//若當日的買賣日報表都已經抓完，則資料夾清空
+//    	downloadPathFolder.delete();
+//    }
     
     
     //把買賣日報表的csv轉成bean
