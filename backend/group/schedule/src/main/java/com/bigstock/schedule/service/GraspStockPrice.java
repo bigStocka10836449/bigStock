@@ -103,7 +103,7 @@ public class GraspStockPrice {
 		// 先抓DB裡面全部的代號資料
 		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
 		
-		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDate();
+		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
 		List<StockDayPrice> stockTwseDayPrices =  ChromeDriverUtils.graspTwseDayPrice("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",tradeDate);
 		stockDayPriceService.saveAll(stockTpexDayPrices);
 		stockDayPriceService.saveAll(stockTwseDayPrices);

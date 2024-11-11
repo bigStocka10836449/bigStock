@@ -95,11 +95,11 @@ public class ShareholderStructureService {
 			List<StockDayPrice> stockDayPrices = stockDayPriceRepository.findThisWeekStockDayPrices(data.getStockCode(),
 					data.getWeekOfYear());
 	        Optional<StockDayPrice> minTradingDatePrice = stockDayPrices.stream()
-	                .min(Comparator.comparing(StockDayPrice::getTradingDate));
+	                .min(Comparator.comparing(StockDayPrice::getTradingDay));
 
 	        // 找到最大的 tradingDate 的 StockDayPrice 对象
 	        Optional<StockDayPrice> maxTradingDatePrice = stockDayPrices.stream()
-	                .max(Comparator.comparing(StockDayPrice::getTradingDate));
+	                .max(Comparator.comparing(StockDayPrice::getTradingDay));
 	        data.setClosingPrice(maxTradingDatePrice.isPresent() ? maxTradingDatePrice.get().getClosingPrice() : "0.0");
 	        data.setOpeningPrice(minTradingDatePrice.isPresent() ? minTradingDatePrice.get().getOpeningPrice() : "0.0");
 		});

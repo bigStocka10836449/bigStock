@@ -70,7 +70,7 @@ public class GraspHistoryStockPrice {
 			try {
 				return ChromeDriverUtils
 						.getTpexStockHistory(currentDate, currentDate, manualDateRangeTpexBaseurl, stockCode).stream()
-						.map(stockDayPrice -> stockDayPrice.getTradingDate()).toList();
+						.map(stockDayPrice -> stockDayPrice.getTradingDay()).toList();
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}

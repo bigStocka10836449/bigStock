@@ -822,7 +822,7 @@ public class ChromeDriverUtils {
 			stockDayPrice.setHighPrice(map.get("HighestPrice"));
 			stockDayPrice.setLowPrice(map.get("LowestPrice"));
 			stockDayPrice.setChange(map.get("Change").replace("+", ""));
-			stockDayPrice.setTradingDate(tradeDate);
+			stockDayPrice.setTradingDay(tradeDate);
 			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
 			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
 			stockDayPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
@@ -876,7 +876,7 @@ public class ChromeDriverUtils {
 			stockDayPrice.setHighPrice(map.get("High"));
 			stockDayPrice.setLowPrice(map.get("Low"));
 			stockDayPrice.setChange(map.get("Change"));
-			stockDayPrice.setTradingDate(date);
+			stockDayPrice.setTradingDay(date);
 			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
 			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
 			stockDayPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
@@ -1029,7 +1029,7 @@ public class ChromeDriverUtils {
 				Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
 
 				// 定义日期格式
-				stockPrice.setTradingDate(tradingDate);
+				stockPrice.setTradingDay(tradingDate);
 				stockPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
 				stockPrice.setStockCode(stockCode);
 				stockPrice.setStartOfWeekDate(startOfWeeDate);
@@ -1118,7 +1118,7 @@ public class ChromeDriverUtils {
 				Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
 
 				// 定义日期格式
-				stockPrice.setTradingDate(tradingDate);
+				stockPrice.setTradingDay(tradingDate);
 				stockPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
 				stockPrice.setStockCode(stockCode);
 				stockPrice.setStartOfWeekDate(startOfWeeDate);
