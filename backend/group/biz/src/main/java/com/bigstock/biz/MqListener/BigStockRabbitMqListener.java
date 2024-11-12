@@ -84,10 +84,10 @@ public class BigStockRabbitMqListener {
 				messageProperties.getMessageProperties().setHeader("UUID", uuid);
 				return messageProperties;
 			};
-			SingleStockPriceVo vo = bizService.getSingleStockPrice(singleStockPriceBizVo.getStockCode(),
-					singleStockPriceBizVo.getSearchDate());
+			List<SingleStockPriceVo> vos = bizService.getSingleStockPrices(singleStockPriceBizVo.getStockCode(),
+					singleStockPriceBizVo.getSearchStartDate(), singleStockPriceBizVo.getSearchEndDate());
 			
-			String voString = objectMapper.writeValueAsString(vo);
+			String voString = objectMapper.writeValueAsString(vos);
 			rabbitTemplate.convertAndSend(sendExchangeName, uuid, voString, messagePostProcessor,
 					new CorrelationData());
 //		rabbitTemplate.convertAndSend("sendExchange", message, message,new CorrelationData());
@@ -125,31 +125,31 @@ public class BigStockRabbitMqListener {
 	}
 	
 	
-	@RabbitListener(bindings = @QueueBinding(value = @Queue(value = "StockExchangeDetailQueue"), exchange = @Exchange(value = "StockExchangeDetailExchange", type = ExchangeTypes.DIRECT), // 这里指定交换机类型为
-			// TOPIC
-			key = "StockExchangeDetailQueue" // 这里指定 routing key
-	), ackMode = "AUTO")
-	public void stockExchangeDetailListener(@Payload String jsonMessage,
-			@Header(name = "UUID", required = false) String uuid,
-			@Header(name = "sendQueueName", required = false) String sendQueueName,
-			@Header(name = "sendExchangeName", required = false) String sendExchangeName)
-			throws URISyntaxException, JsonMappingException, JsonProcessingException {
-		try {
-			ObjectMapper objectMapper = new ObjectMapper();
-			SingleStockPriceBizVo singleStockPriceBizVo = objectMapper.readValue(jsonMessage,
-					SingleStockPriceBizVo.class);
-			MessagePostProcessor messagePostProcessor = messageProperties -> {
-				messageProperties.getMessageProperties().setHeader("UUID", uuid);
-				return messageProperties;
-			};
-			 List<StockExchangeDetail> vos = bizService.getStockExchangeDetail(singleStockPriceBizVo.getStockCode(), singleStockPriceBizVo.getSearchDate());
-			String voString = objectMapper.writeValueAsString(vos);
-			rabbitTemplate.convertAndSend(sendExchangeName, uuid, voString, messagePostProcessor,
-					new CorrelationData());
-		} catch (Exception e) {
-			//這裡應該也要給mq處理
-			log.error(e.getMessage(),e);
-			rabbitTemplate.convertAndSend("StockExchangeDetailExchangeError", "StockExchangeDetailExchangeError", jsonMessage);
-		}
-	}
+//	@RabbitListener(bindings = @QueueBinding(value = @Queue(value = "StockExchangeDetailQueue"), exchange = @Exchange(value = "StockExchangeDetailExchange", type = ExchangeTypes.DIRECT), // 这里指定交换机类型为
+//			// TOPIC
+//			key = "StockExchangeDetailQueue" // 这里指定 routing key
+//	), ackMode = "AUTO")
+//	public void stockExchangeDetailListener(@Payload String jsonMessage,
+//			@Header(name = "UUID", required = false) String uuid,
+//			@Header(name = "sendQueueName", required = false) String sendQueueName,
+//			@Header(name = "sendExchangeName", required = false) String sendExchangeName)
+//			throws URISyntaxException, JsonMappingException, JsonProcessingException {
+//		try {
+//			ObjectMapper objectMapper = new ObjectMapper();
+//			SingleStockPriceBizVo singleStockPriceBizVo = objectMapper.readValue(jsonMessage,
+//					SingleStockPriceBizVo.class);
+//			MessagePostProcessor messagePostProcessor = messageProperties -> {
+//				messageProperties.getMessageProperties().setHeader("UUID", uuid);
+//				return messageProperties;
+//			};
+//			 List<StockExchangeDetail> vos = bizService.getStockExchangeDetail(singleStockPriceBizVo.getStockCode(), singleStockPriceBizVo.getSearchDate());
+//			String voString = objectMapper.writeValueAsString(vos);
+//			rabbitTemplate.convertAndSend(sendExchangeName, uuid, voString, messagePostProcessor,
+//					new CorrelationData());
+//		} catch (Exception e) {
+//			//這裡應該也要給mq處理
+//			log.error(e.getMessage(),e);
+//			rabbitTemplate.convertAndSend("StockExchangeDetailExchangeError", "StockExchangeDetailExchangeError", jsonMessage);
+//		}
+//	}
 }

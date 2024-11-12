@@ -4,6 +4,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.entity.StockDayPrice;
@@ -42,4 +43,10 @@ public class StockDayPriceService {
 	public Optional<StockDayPrice> findByStockCodeAndTradingDate(String stockCode, Date tradingDate){
 		return stockDayPriceRepository.findByStockCodeAndTradingDay(stockCode, tradingDate);
 	}
+
+	public List<StockDayPrice> findByStockCodeAndStartDateAndEndDate(@Param("stockCode") String stockCode,
+			@Param("startDate") Date startDate, @Param("endDate") Date endDate) {
+		return stockDayPriceRepository.findByStockCodeAndStartDateAndEndDate(stockCode, startDate, endDate);
+	}
+	
 }

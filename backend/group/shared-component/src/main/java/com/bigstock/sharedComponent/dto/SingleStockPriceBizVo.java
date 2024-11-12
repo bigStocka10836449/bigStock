@@ -10,6 +10,8 @@ public class SingleStockPriceBizVo {
 	
 	@Schema(name = "stockCode", description = "股票代號")
 	private String stockCode;
-	@Schema(name = "searchDate", description = "查詢日期")
-	private Date searchDate;
+	@Schema(name = "searchStartDate", description = "查詢起始日期")
+	private Date searchStartDate;
+	@Schema(name = "searchEndDate", description = "查詢結束日期")
+	private Date searchEndDate;
 }

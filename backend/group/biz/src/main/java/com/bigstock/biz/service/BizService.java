@@ -44,6 +44,24 @@ public class BizService {
 		 }
 	}
 
+	public List<SingleStockPriceVo> getSingleStockPrices(String stockCode, Date startDate, Date endDate){
+		List<StockDayPrice> stockDayPrices = stockDayPriceService.findByStockCodeAndStartDateAndEndDate(stockCode, startDate, endDate);
+		return stockDayPrices.stream().map(stockDayPrice ->{
+			String highPrice = stockDayPrice.getHighPrice() ;
+			String lowPrice = stockDayPrice.getLowPrice();
+			String openingPrice = stockDayPrice.getOpeningPrice();
+			String closingPrice = stockDayPrice.getClosingPrice();
+
+			SingleStockPriceVo vo = new SingleStockPriceVo();
+			vo.setClosingPrice(closingPrice);
+			vo.setOpeningPrice(openingPrice);
+			vo.setHighPrice(highPrice);
+			vo.setLowPrice(lowPrice);
+			vo.setStockCode(stockCode);
+			return vo;
+		}).toList();
+	}
+	
 	public SingleStockPriceVo getSingleStockPrice(String stockCode, Date searchDate) {
 		Optional<StockDayPrice> stockDayPriceOp = stockDayPriceService.findByStockCodeAndTradingDate(stockCode,
 				searchDate);

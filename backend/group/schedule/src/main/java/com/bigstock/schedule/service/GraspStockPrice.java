@@ -1,22 +1,10 @@
 package com.bigstock.schedule.service;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.URISyntaxException;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-
 import javax.annotation.PostConstruct;
-import javax.sound.sampled.LineUnavailableException;
-import javax.sound.sampled.UnsupportedAudioFileException;
-
-import org.apache.commons.lang3.ObjectUtils;
 import org.json.JSONObject;
-import org.redisson.api.RBucket;
-import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 
 import com.bigstock.schedule.utils.ChromeDriverUtils;
-import com.bigstock.sharedComponent.entity.SecuritiesFirmsDayOperate;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
@@ -33,11 +20,7 @@ import com.bigstock.sharedComponent.service.StockInfoService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.common.collect.Lists;
-import com.opencsv.CSVReader;
-import com.opencsv.exceptions.CsvException;
-
 import io.micrometer.common.util.StringUtils;
-import javazoom.jl.decoder.JavaLayerException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 

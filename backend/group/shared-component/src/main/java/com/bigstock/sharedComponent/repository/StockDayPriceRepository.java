@@ -20,4 +20,6 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 	
 	Optional<StockDayPrice> findByStockCodeAndTradingDay(String stockCode, Date tradingDay);
 	
+	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.stock_code =:stockCode and sdp.trading_day between :startDate and :endDate" , nativeQuery = true)
+	List<StockDayPrice> findByStockCodeAndStartDateAndEndDate(@Param("stockCode") String stockCode, @Param("startDate") Date startDate, @Param("endDate") Date endDate);
 }
