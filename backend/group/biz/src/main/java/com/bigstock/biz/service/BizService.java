@@ -51,12 +51,13 @@ public class BizService {
 			String lowPrice = stockDayPrice.getLowPrice();
 			String openingPrice = stockDayPrice.getOpeningPrice();
 			String closingPrice = stockDayPrice.getClosingPrice();
-
+			SimpleDateFormat sfd = new SimpleDateFormat("yyyy-MM-dd");
 			SingleStockPriceVo vo = new SingleStockPriceVo();
 			vo.setClosingPrice(closingPrice);
 			vo.setOpeningPrice(openingPrice);
 			vo.setHighPrice(highPrice);
 			vo.setLowPrice(lowPrice);
+			vo.setTradingDate(sfd.format(stockDayPrice.getTradingDay()));
 			vo.setStockCode(stockCode);
 			return vo;
 		}).toList();

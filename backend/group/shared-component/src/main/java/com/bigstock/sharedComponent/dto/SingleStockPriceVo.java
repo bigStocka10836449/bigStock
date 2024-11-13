@@ -21,6 +21,9 @@ public class SingleStockPriceVo {
 	@Schema(name = "最高價(周)", description = "", example = "")
 	private String highPrice;
 
-	@Schema(name = "最低價(周", description = "", example = "")
+	@Schema(name = "最低價(周)", description = "", example = "")
 	private String lowPrice;
+	
+	@Schema(name = "交易日", description = "", example = "")
+	private String tradingDate;
 }
