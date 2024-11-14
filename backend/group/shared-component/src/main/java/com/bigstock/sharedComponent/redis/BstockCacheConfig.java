@@ -55,6 +55,7 @@ public class BstockCacheConfig {
         Map<String, Duration> ttlMap = new HashMap<>();
         ttlMap.put("shortLivedCache", Duration.ofMinutes(120));
         ttlMap.put("longLivedCache", Duration.ofDays(7));
+        ttlMap.put("middleLivedCache", Duration.ofDays(1));
         ttlMap.put("defaultCache", Duration.ofMinutes(30));
 
         return new BstockRedisCacheManager(cacheWriter, defaultCacheConfig, redisTemplate, ttlMap);

@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 
 import com.bigstock.schedule.utils.ChromeDriverUtils;
@@ -78,15 +79,19 @@ public class GraspStockPrice {
 	}
 	
 	// 每天下午5點更新
-	@PostConstruct
 //	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 	// 每周日早上8点触发更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
-	public void updateShareholderStructure() throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException, InterruptedException {
+	@Transactional
+	public void updateStockDayPrice() throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
 		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
 		
 		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
+		boolean isExsits =stockDayPriceService.checkIsTradingDateIsExsits(tradeDate);
+		if(isExsits) {
+			return;
+		}
 		List<StockDayPrice> stockTwseDayPrices =  ChromeDriverUtils.graspTwseDayPrice("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",tradeDate);
 		stockDayPriceService.saveAll(stockTpexDayPrices);
 		stockDayPriceService.saveAll(stockTwseDayPrices);

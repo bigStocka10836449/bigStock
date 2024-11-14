@@ -18,6 +18,10 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 	List<StockDayPrice> findThisWeekStockDayPrices(@Param("stockCode") String stockCode,
 			@Param("weekOfYear") String weekOfYear);
 	
+	
+	@Query(value = "SELECT 1 FROM bstock.bstock.stock_day_price sdp WHERE sdp.trade_day =:tradingDay and sdp LIMIT 1", nativeQuery = true)
+	boolean checkIsTradingDateIsExsits(Date tradingDay);
+	
 	Optional<StockDayPrice> findByStockCodeAndTradingDay(String stockCode, Date tradingDay);
 	
 	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.stock_code =:stockCode and sdp.trading_day between :startDate and :endDate" , nativeQuery = true)
