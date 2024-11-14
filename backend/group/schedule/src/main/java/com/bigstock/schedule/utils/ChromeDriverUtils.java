@@ -34,19 +34,19 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
-import org.openqa.selenium.By;
-import org.openqa.selenium.Dimension;
-import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.TimeoutException;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeDriverService;
-import org.openqa.selenium.chrome.ChromeOptions;
-import org.openqa.selenium.interactions.Actions;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
+//import org.openqa.selenium.By;
+//import org.openqa.selenium.Dimension;
+//import org.openqa.selenium.JavascriptExecutor;
+//import org.openqa.selenium.OutputType;
+//import org.openqa.selenium.TimeoutException;
+//import org.openqa.selenium.WebDriver;
+//import org.openqa.selenium.WebElement;
+//import org.openqa.selenium.chrome.ChromeDriver;
+//import org.openqa.selenium.chrome.ChromeDriverService;
+//import org.openqa.selenium.chrome.ChromeOptions;
+//import org.openqa.selenium.interactions.Actions;
+//import org.openqa.selenium.support.ui.ExpectedConditions;
+//import org.openqa.selenium.support.ui.WebDriverWait;
 import org.redisson.api.RBucket;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -150,63 +150,29 @@ public class ChromeDriverUtils {
 	        return stockCodes.get(randomIndex);
 	    }
 
-	public static void grepCanvas(String chromeDriverPath, List<String> stockCodes,
-			Date tradingDate, StockExchangeDetailService stockExchangeDetailService) throws InterruptedException {
-		ChromeDriverService service = new ChromeDriverService.Builder()
-				.usingDriverExecutable(new File(chromeDriverPath)).usingAnyFreePort().build();
-		ChromeOptions options = new ChromeOptions();
-		options.addArguments("--no-sandbox"); // 取消沙盒模式
-		//options.addArguments("--headless"); // 設定無頭模式
-		options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
-		WebDriver driver = new ChromeDriver(service, options);
-		
-		driver.manage().window().maximize();
-		
-		//為鼓勵 123  啟點 400高
-		 driver.get("https://scantrader.com/v2/stock/6573");
-		 WebElement chartDiv = driver.findElement(By.xpath("//*[@id='__layout']/div/div/main/div/div/div/div[1]/section/div/div/div"));
-		   JavascriptExecutor js = (JavascriptExecutor) driver;
-		   js.executeScript("arguments[0].scrollIntoView(true);", chartDiv);
-		   js.executeScript("arguments[0].focus();", chartDiv);
-//		   Double x = (Double) js.executeScript("return arguments[0].getBoundingClientRect().left + window.scrollX;", chartDiv);
-//		      Double y = (Double) js.executeScript("return arguments[0].getBoundingClientRect().top + window.scrollY;", chartDiv);
-		      Actions actions = new Actions(driver);
-		      actions.moveByOffset(123, 400).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      actions.moveByOffset(1, 0).click().perform();
-		      
-		      
-		//cnyes 版本 565起點
-		
-//		 driver.get("https://www.cnyes.com/twstock/6573");
-//		 
-//		 WebElement chartDiv = driver.findElement(By.xpath("//*[@id='anue-ga-wrapper']/div[4]/div[2]/div[1]/div[1]/div[2]/div/div[2]/div[1]/div/div/div/div[2]/table/tr[1]/td[2]/div"));
+	 //爬蟲暫時取消不做
+//	public static void grepCanvas(String chromeDriverPath, List<String> stockCodes,
+//			Date tradingDate, StockExchangeDetailService stockExchangeDetailService) throws InterruptedException {
+//		ChromeDriverService service = new ChromeDriverService.Builder()
+//				.usingDriverExecutable(new File(chromeDriverPath)).usingAnyFreePort().build();
+//		ChromeOptions options = new ChromeOptions();
+//		options.addArguments("--no-sandbox"); // 取消沙盒模式
+//		//options.addArguments("--headless"); // 設定無頭模式
+//		options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
+//		WebDriver driver = new ChromeDriver(service, options);
+//		
+//		driver.manage().window().maximize();
+//		
+//		//為鼓勵 123  啟點 400高
+//		 driver.get("https://scantrader.com/v2/stock/6573");
+//		 WebElement chartDiv = driver.findElement(By.xpath("//*[@id='__layout']/div/div/main/div/div/div/div[1]/section/div/div/div"));
 //		   JavascriptExecutor js = (JavascriptExecutor) driver;
 //		   js.executeScript("arguments[0].scrollIntoView(true);", chartDiv);
 //		   js.executeScript("arguments[0].focus();", chartDiv);
-//		   Double x = (Double) js.executeScript("return arguments[0].getBoundingClientRect().left + window.scrollX;", chartDiv);
-//		      Double y = (Double) js.executeScript("return arguments[0].getBoundingClientRect().top + window.scrollY;", chartDiv);
+////		   Double x = (Double) js.executeScript("return arguments[0].getBoundingClientRect().left + window.scrollX;", chartDiv);
+////		      Double y = (Double) js.executeScript("return arguments[0].getBoundingClientRect().top + window.scrollY;", chartDiv);
 //		      Actions actions = new Actions(driver);
-//		      actions.moveByOffset(565, 200).click().perform();
+//		      actions.moveByOffset(123, 400).click().perform();
 //		      actions.moveByOffset(1, 0).click().perform();
 //		      actions.moveByOffset(1, 0).click().perform();
 //		      actions.moveByOffset(1, 0).click().perform();
@@ -214,301 +180,336 @@ public class ChromeDriverUtils {
 //		      actions.moveByOffset(1, 0).click().perform();
 //		      actions.moveByOffset(1, 0).click().perform();
 //		      actions.moveByOffset(1, 0).click().perform();
-		
-        // cmoney版本
-//        driver.get("https://www.cmoney.tw/finance/2330/f00025");
-//           // 找到表格中的 canvas 元素
-//         // 找到目标 div 元素
-//
-//        // Locate the <div> element with id "chart0"
-//        WebElement chartDiv = driver.findElement(By.id("chart0"));
-//
-//        // Get the location of the element
-//        // Use JavaScript to get the element's position relative to the entire page
-//        JavascriptExecutor js = (JavascriptExecutor) driver;
-//        js.executeScript("arguments[0].scrollIntoView(true);", chartDiv);
-//        js.executeScript("arguments[0].focus();", chartDiv);
-//        Dimension windowSize = driver.manage().window().getSize();
-//        int width = windowSize.getWidth();
-//        int height = windowSize.getHeight();
-//        
-//        Double x = (Double) js.executeScript("return arguments[0].getBoundingClientRect().left + window.scrollX;", chartDiv);
-//        Double y = (Double) js.executeScript("return arguments[0].getBoundingClientRect().top + window.scrollY;", chartDiv);
-//
-//           // 使用 Actions 模拟鼠标移动并点击
-//           Actions actions = new Actions(driver);
-//           //372  634
-//           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-//           for(int offset = 372 ; offset <= 634 ; offset++) {
-//        	   if(offset == 372) {
-//        		   actions.moveByOffset(offset, 40).click().perform();
-//        	   } else {
-//        		   actions.moveByOffset(1, 0).click().perform();
-//        	   }
-//        	   //
-////        	              // Now locate the element inside the iframe
-//        	              WebElement targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-//        	   //
-////        	              // Perform actions on the element (e.g., get text or click)
-//        	              String text = targetElement.getText();
-//        	              log.info(text);
-//           }
-//           actions.moveByOffset(1, 0).click().perform();
-//           actions.moveByOffset(1, 0).click().perform();
-//           actions.moveByOffset(1, 0).click().perform();
-//           actions.moveByOffset(1, 0).click().perform();
-//           actions.moveByOffset(1, 0).click().perform();
-//           actions.moveByOffset(1, 0).click().perform();
-//           actions.moveByOffset(1, 0).click().perform();
-//           actions.moveByOffset(1, 0).click().perform();
-//           actions.moveByOffset(1, 0).click().perform();
-//           actions.moveByOffset(1, 0).click().perform();
-//           actions.moveByOffset(1, 0).click().perform();
-//           actions.moveByOffset(1, 1).click().perform();
-//           actions.moveByOffset(1, 1).click().perform();
-//           actions.moveByOffset(1, 1).click().perform();
-//           actions.moveByOffset(1, 2).click().perform();
-//           actions.moveByOffset(1, 3).click().perform();
-//           actions.moveToElement(chartDiv, 20, 10).click().perform();
-//           String script = "var event = new MouseEvent('mouseover', { " +
-//                   "view: window, " +
-//                   "bubbles: true, " +
-//                   "cancelable: true " +
-//                   "}); " +
-//                   "arguments[0].dispatchEvent(event);";
-//           js.executeScript(script, chartDiv);
-//           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-//
-//           // Now locate the element inside the iframe
-//           WebElement targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-//
-//           // Perform actions on the element (e.g., get text or click)
-//           String text = targetElement.getText();
-//           driver.switchTo().parentFrame();
-//           actions.moveToElement(chartDiv, 25, 10).click().perform();
-//           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-//           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-//
-//           // Perform actions on the element (e.g., get text or click)
-//            text = targetElement.getText();
-//            driver.switchTo().parentFrame();
-//           actions.moveToElement(chartDiv, 25, 0).click().perform();
-//           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-//           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-//
-//           // Perform actions on the element (e.g., get text or click)
-//            text = targetElement.getText();
-//            driver.switchTo().parentFrame();
-//           actions.moveToElement(chartDiv, 25, 40).click().perform();
-//           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-//           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-//
-//           // Perform actions on the element (e.g., get text or click)
-//            text = targetElement.getText();
-//            driver.switchTo().parentFrame();
-//           actions.moveToElement(chartDiv, 30, 40).click().perform();
-//           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-//           
-//           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-//
-//           // Perform actions on the element (e.g., get text or click)
-//            text = targetElement.getText();
-//            driver.switchTo().parentFrame();
-//            actions.moveToElement(chartDiv, 70, 40).click().perform();
-//           
-//            driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-//            targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-//
-//            // Perform actions on the element (e.g., get text or click)
-//             text = targetElement.getText();
-//             driver.switchTo().parentFrame();
-//           actions.moveToElement(chartDiv, 80, 10).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      actions.moveByOffset(1, 0).click().perform();
+//		      
+//		      
+//		//cnyes 版本 565起點
 //		
-//           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-//           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-//
-//           // Perform actions on the element (e.g., get text or click)
-//            text = targetElement.getText();
-		
-		
-		
-		
-		
-		
-		
-//		String url = "https://pchome.megatime.com.tw/stock/sto0/ock3/sid"+getRandomStockCode(stockCodes)+".html";
-//		driver.get(url);
-//		// 找到表格中的 canvas 元素
-//		// 找到目标 div 元素
-//
+////		 driver.get("https://www.cnyes.com/twstock/6573");
+////		 
+////		 WebElement chartDiv = driver.findElement(By.xpath("//*[@id='anue-ga-wrapper']/div[4]/div[2]/div[1]/div[1]/div[2]/div/div[2]/div[1]/div/div/div/div[2]/table/tr[1]/td[2]/div"));
+////		   JavascriptExecutor js = (JavascriptExecutor) driver;
+////		   js.executeScript("arguments[0].scrollIntoView(true);", chartDiv);
+////		   js.executeScript("arguments[0].focus();", chartDiv);
+////		   Double x = (Double) js.executeScript("return arguments[0].getBoundingClientRect().left + window.scrollX;", chartDiv);
+////		      Double y = (Double) js.executeScript("return arguments[0].getBoundingClientRect().top + window.scrollY;", chartDiv);
+////		      Actions actions = new Actions(driver);
+////		      actions.moveByOffset(565, 200).click().perform();
+////		      actions.moveByOffset(1, 0).click().perform();
+////		      actions.moveByOffset(1, 0).click().perform();
+////		      actions.moveByOffset(1, 0).click().perform();
+////		      actions.moveByOffset(1, 0).click().perform();
+////		      actions.moveByOffset(1, 0).click().perform();
+////		      actions.moveByOffset(1, 0).click().perform();
+////		      actions.moveByOffset(1, 0).click().perform();
+//		
+//        // cmoney版本
+////        driver.get("https://www.cmoney.tw/finance/2330/f00025");
+////           // 找到表格中的 canvas 元素
+////         // 找到目标 div 元素
+////
+////        // Locate the <div> element with id "chart0"
+////        WebElement chartDiv = driver.findElement(By.id("chart0"));
+////
+////        // Get the location of the element
+////        // Use JavaScript to get the element's position relative to the entire page
+////        JavascriptExecutor js = (JavascriptExecutor) driver;
+////        js.executeScript("arguments[0].scrollIntoView(true);", chartDiv);
+////        js.executeScript("arguments[0].focus();", chartDiv);
+////        Dimension windowSize = driver.manage().window().getSize();
+////        int width = windowSize.getWidth();
+////        int height = windowSize.getHeight();
+////        
+////        Double x = (Double) js.executeScript("return arguments[0].getBoundingClientRect().left + window.scrollX;", chartDiv);
+////        Double y = (Double) js.executeScript("return arguments[0].getBoundingClientRect().top + window.scrollY;", chartDiv);
+////
+////           // 使用 Actions 模拟鼠标移动并点击
+////           Actions actions = new Actions(driver);
+////           //372  634
+////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
+////           for(int offset = 372 ; offset <= 634 ; offset++) {
+////        	   if(offset == 372) {
+////        		   actions.moveByOffset(offset, 40).click().perform();
+////        	   } else {
+////        		   actions.moveByOffset(1, 0).click().perform();
+////        	   }
+////        	   //
+//////        	              // Now locate the element inside the iframe
+////        	              WebElement targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
+////        	   //
+//////        	              // Perform actions on the element (e.g., get text or click)
+////        	              String text = targetElement.getText();
+////        	              log.info(text);
+////           }
+////           actions.moveByOffset(1, 0).click().perform();
+////           actions.moveByOffset(1, 0).click().perform();
+////           actions.moveByOffset(1, 0).click().perform();
+////           actions.moveByOffset(1, 0).click().perform();
+////           actions.moveByOffset(1, 0).click().perform();
+////           actions.moveByOffset(1, 0).click().perform();
+////           actions.moveByOffset(1, 0).click().perform();
+////           actions.moveByOffset(1, 0).click().perform();
+////           actions.moveByOffset(1, 0).click().perform();
+////           actions.moveByOffset(1, 0).click().perform();
+////           actions.moveByOffset(1, 0).click().perform();
+////           actions.moveByOffset(1, 1).click().perform();
+////           actions.moveByOffset(1, 1).click().perform();
+////           actions.moveByOffset(1, 1).click().perform();
+////           actions.moveByOffset(1, 2).click().perform();
+////           actions.moveByOffset(1, 3).click().perform();
+////           actions.moveToElement(chartDiv, 20, 10).click().perform();
+////           String script = "var event = new MouseEvent('mouseover', { " +
+////                   "view: window, " +
+////                   "bubbles: true, " +
+////                   "cancelable: true " +
+////                   "}); " +
+////                   "arguments[0].dispatchEvent(event);";
+////           js.executeScript(script, chartDiv);
+////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
+////
+////           // Now locate the element inside the iframe
+////           WebElement targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
+////
+////           // Perform actions on the element (e.g., get text or click)
+////           String text = targetElement.getText();
+////           driver.switchTo().parentFrame();
+////           actions.moveToElement(chartDiv, 25, 10).click().perform();
+////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
+////           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
+////
+////           // Perform actions on the element (e.g., get text or click)
+////            text = targetElement.getText();
+////            driver.switchTo().parentFrame();
+////           actions.moveToElement(chartDiv, 25, 0).click().perform();
+////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
+////           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
+////
+////           // Perform actions on the element (e.g., get text or click)
+////            text = targetElement.getText();
+////            driver.switchTo().parentFrame();
+////           actions.moveToElement(chartDiv, 25, 40).click().perform();
+////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
+////           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
+////
+////           // Perform actions on the element (e.g., get text or click)
+////            text = targetElement.getText();
+////            driver.switchTo().parentFrame();
+////           actions.moveToElement(chartDiv, 30, 40).click().perform();
+////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
+////           
+////           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
+////
+////           // Perform actions on the element (e.g., get text or click)
+////            text = targetElement.getText();
+////            driver.switchTo().parentFrame();
+////            actions.moveToElement(chartDiv, 70, 40).click().perform();
+////           
+////            driver.switchTo().frame("iframe_0"); // Use the id of the iframe
+////            targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
+////
+////            // Perform actions on the element (e.g., get text or click)
+////             text = targetElement.getText();
+////             driver.switchTo().parentFrame();
+////           actions.moveToElement(chartDiv, 80, 10).click().perform();
+////		
+////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
+////           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
+////
+////           // Perform actions on the element (e.g., get text or click)
+////            text = targetElement.getText();
+//		
+//		
+//		
+//		
+//		
+//		
+//		
+////		String url = "https://pchome.megatime.com.tw/stock/sto0/ock3/sid"+getRandomStockCode(stockCodes)+".html";
+////		driver.get(url);
+////		// 找到表格中的 canvas 元素
+////		// 找到目标 div 元素
+////
+////		//
+////		WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(15));
+////		try {
+////			WebElement fancybox = wait
+////					.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='fancybox-container-1']")));
+////			JavascriptExecutor js = (JavascriptExecutor) driver;
+////			js.executeScript("arguments[0].parentNode.removeChild(arguments[0]);", fancybox);
+////		} catch (Exception e) {
+////			log.error(e.getMessage(), e);
+////		}
+////		WebElement searchText = wait
+////				.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='search_text']")));
+////		searchText.clear();
+////		// 使用 JavaScript 清空 value
+////		searchText.sendKeys(Keys.CONTROL + "a");
+////		searchText.sendKeys(Keys.BACK_SPACE);
+////		searchText.sendKeys(stockCodes.get(0));
+////		WebElement inputButton = wait
+////				.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='srch']/input")));
+////		inputButton.click();
 //		//
-//		WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(15));
-//		try {
-//			WebElement fancybox = wait
-//					.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='fancybox-container-1']")));
-//			JavascriptExecutor js = (JavascriptExecutor) driver;
-//			js.executeScript("arguments[0].parentNode.removeChild(arguments[0]);", fancybox);
-//		} catch (Exception e) {
-//			log.error(e.getMessage(), e);
-//		}
-//		WebElement searchText = wait
-//				.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='search_text']")));
-//		searchText.clear();
-//		// 使用 JavaScript 清空 value
-//		searchText.sendKeys(Keys.CONTROL + "a");
-//		searchText.sendKeys(Keys.BACK_SPACE);
-//		searchText.sendKeys(stockCodes.get(0));
-//		WebElement inputButton = wait
-//				.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='srch']/input")));
-//		inputButton.click();
-		//
+////
+////		for (String stockCode : stockCodes) {
+////			Date oneStockCodeStartDate = new Date();
+////			boolean isExsits = stockExchangeDetailService.checkIsStockExchangeDetailExsits(stockCode, tradingDate);
+////			if(isExsits || stockCode.startsWith("00")) {
+////				continue;
+////			}
+////			wait = new WebDriverWait(driver, Duration.ofSeconds(15));
+////			searchText = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='search_text']")));
+////			searchText.clear();
+////			// 使用 JavaScript 清空 value
+////			searchText.sendKeys(Keys.CONTROL + "a");
+////			searchText.sendKeys(Keys.BACK_SPACE);
+////			searchText.sendKeys(stockCode);
+////			inputButton = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='srch']/input")));
+////			inputButton.click();
+////			WebElement candlestick = wait.until(ExpectedConditions
+////					.visibilityOfElementLocated(By.xpath("//*[@id='cont-area']/div/div[3]/div[3]/ul/li[1]/a")));
+////			candlestick.click();
+////			//
+////			WebElement operateDetail = wait.until(ExpectedConditions
+////					.visibilityOfElementLocated(By.xpath("//*[@id='cont-area']/div/div[3]/div[4]/ul/li[4]/a")));
+////			operateDetail.click();
+////
+//////			WebElement tbody = wait
+//////					.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='tb_chart']/tbody")));
+//////			List<WebElement> rows = tbody.findElements(By.tagName("tr"));
+////			// 從第二筆開始遍歷（排除掉第一筆資料）
+////			Date starParseTime = new Date();
+////			AtomicInteger uniqueSeqGenerator = new AtomicInteger(1);
+////			
+////			   // Get the entire HTML source of the page
+////            String pageSource = driver.getPageSource();
+////
+////            // Use Jsoup to parse the HTML content
+////            Document document = Jsoup.parse(pageSource);
+////
+////            // Now you can use Jsoup to efficiently parse and extract data
+////            Elements tablerows = document.select("#tb_chart tbody tr"); // Adjust the selector as needed
 //
-//		for (String stockCode : stockCodes) {
-//			Date oneStockCodeStartDate = new Date();
-//			boolean isExsits = stockExchangeDetailService.checkIsStockExchangeDetailExsits(stockCode, tradingDate);
-//			if(isExsits || stockCode.startsWith("00")) {
-//				continue;
-//			}
-//			wait = new WebDriverWait(driver, Duration.ofSeconds(15));
-//			searchText = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='search_text']")));
-//			searchText.clear();
-//			// 使用 JavaScript 清空 value
-//			searchText.sendKeys(Keys.CONTROL + "a");
-//			searchText.sendKeys(Keys.BACK_SPACE);
-//			searchText.sendKeys(stockCode);
-//			inputButton = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='srch']/input")));
-//			inputButton.click();
-//			WebElement candlestick = wait.until(ExpectedConditions
-//					.visibilityOfElementLocated(By.xpath("//*[@id='cont-area']/div/div[3]/div[3]/ul/li[1]/a")));
-//			candlestick.click();
-//			//
-//			WebElement operateDetail = wait.until(ExpectedConditions
-//					.visibilityOfElementLocated(By.xpath("//*[@id='cont-area']/div/div[3]/div[4]/ul/li[4]/a")));
-//			operateDetail.click();
 //
-////			WebElement tbody = wait
-////					.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='tb_chart']/tbody")));
-////			List<WebElement> rows = tbody.findElements(By.tagName("tr"));
-//			// 從第二筆開始遍歷（排除掉第一筆資料）
-//			Date starParseTime = new Date();
-//			AtomicInteger uniqueSeqGenerator = new AtomicInteger(1);
-//			
-//			   // Get the entire HTML source of the page
-//            String pageSource = driver.getPageSource();
+////            for (Element row : tablerows) {
+////                Elements cells = row.select("td");
+////                if (cells.size() >= 6) {
+////                    String exchangeTime = cells.get(0).text();
+////                    String exchangePrice = cells.get(3).text();
+////                    String exchangeQuantity = cells.get(5).text();
+////                    // Process the data as needed
+////                }
+////            }
+//            
+////            List<StockExchangeDetail> singleStockExchangeDetails = tablerows.stream().map(row ->{
+////            	  Elements cells = row.select("td");
+////				if (cells.size() >= 6) {
+////					String exchangeTime = cells.get(0).text(); // 第 4 個 td
+////					String exchangePrice = cells.get(3).text(); // 第 4 個 td
+////					String exchangeQuantity = cells.get(5).text(); // 第 6 個 td
+////					if("分量(張)".equals(exchangeQuantity) || "成交價".equals(exchangePrice) || "時間".equals(exchangeTime) ) {
+////						return null;
+////					}
+////					StockExchangeDetail stockExchangeDetail = new StockExchangeDetail();
+////					stockExchangeDetail.setStockCode(stockCode);
+////					stockExchangeDetail.setTradingDate(tradingDate);
+////				    // 生成唯一碼
+////				    int seq = uniqueSeqGenerator.getAndAdd(1);
+////					stockExchangeDetail.setExchangeQuantity(Integer.valueOf(exchangeQuantity));
+////					stockExchangeDetail.setSeq(seq);
+////					stockExchangeDetail.setExchangePrice(exchangePrice);
+////					stockExchangeDetail.setExchangeTime(exchangeTime);
+////					return stockExchangeDetail;
+////				} else {
+////				 return null;
+////				}
+////			}).filter(stockExchangeDetail -> Optional.ofNullable(stockExchangeDetail).isPresent()).toList();
+////			List<StockExchangeDetail> singleStockExchangeDetails = rows.parallelStream().map(row ->{
+////				List<WebElement> cells = row.findElements(By.tagName("td"));
+////				if (cells.size() >= 6) {
+////					String exchangeTime = cells.get(0).getText(); // 第 4 個 td
+////					String exchangePrice = cells.get(3).getText(); // 第 4 個 td
+////					String exchangeQuantity = cells.get(5).getText(); // 第 6 個 td
+////					if("分量(張)".equals(exchangeQuantity) || "成交價".equals(exchangePrice) || "時間".equals(exchangeTime) ) {
+////						return null;
+////					}
+////					StockExchangeDetail stockExchangeDetail = new StockExchangeDetail();
+////					stockExchangeDetail.setStockCode(stockCode);
+////					stockExchangeDetail.setTradingDate(tradingDate);
+////				    // 生成唯一碼
+////				    int seq = uniqueSeqGenerator.getAndAdd(1);
+////					stockExchangeDetail.setExchangeQuantity(Integer.valueOf(exchangeQuantity));
+////					stockExchangeDetail.setSeq(String.valueOf(seq));
+////					stockExchangeDetail.setExchangePrice(exchangePrice);
+////					stockExchangeDetail.setExchangeTime(exchangeTime);
+////					return stockExchangeDetail;
+////				} else {
+////				 return null;
+////				}
+////			}).filter(stockExchangeDetail -> Optional.ofNullable(stockExchangeDetail).isPresent()).toList();
+////			Date endParseTime = new Date();
+////			log.info("stockCode :{} parse stockExchangeDetail cost {} ms", stockCode, starParseTime.getTime() - endParseTime.getTime());
+////			stockExchangeDetailService.saveAll(singleStockExchangeDetails);
+////			for (int i = 1; i < rows.size(); i++) {
+////				WebElement row = rows.get(i);
+////				// 在當前的 tr 中找到所有的 td 元素
+////				List<WebElement> cells = row.findElements(By.tagName("td"));
+////				if (cells.size() >= 6) {
+////					String exchangeTime = cells.get(0).getText(); // 第 4 個 td
+////					String exchangePrice = cells.get(3).getText(); // 第 4 個 td
+////					String exchangeQuantity = cells.get(5).getText(); // 第 6 個 td
+////					StockExchangeDetail stockExchangeDetail = new StockExchangeDetail();
+////					stockExchangeDetail.setStockCode(stockCode);
+////					stockExchangeDetail.setTradingDate(tradingDate);
+////					stockExchangeDetail.setExchangeQuantity(Integer.valueOf(exchangeQuantity));
+////					stockExchangeDetail.setExchangePrice(exchangePrice);
+////					stockExchangeDetail.setExchangeTime(exchangeTime);
+////					stockExchangeDetails.add(stockExchangeDetail);
+////				} else {
+////					System.out.println("該行的 td 元素數量不足 6 個");
+////				}
+////			}
+////			int randomInterval = ThreadLocalRandom.current().nextInt(1, 8) * 1000;
+////			Thread.sleep(3000 + randomInterval);
+////			Date oneStockCodeEndTime = new Date();
+////			log.info(
+////					"stockCode {} , total cost {} ms to parse", stockCode, oneStockCodeEndTime.getTime() -oneStockCodeStartDate.getTime());
+////		}
 //
-//            // Use Jsoup to parse the HTML content
-//            Document document = Jsoup.parse(pageSource);
+////		return stockExchangeDetails;
+////				Point iframeLocation = iframeElement.getLocation();
+////		        int iframeX = iframeLocation.getX();
+////		        int iframeY = iframeLocation.getY();
+////
+////		        // 定义需要点击的坐标位置（假设是 iframe 中的相对坐标）
+////		        int targetXInsideIframe = 720;  // 这是相对于 iframe 的 X 坐标
+////		        int targetYInsideIframe = 150;  // 这是相对于 iframe 的 Y 坐标
+////		        // 计算 iframe 最右侧的 X 坐标
+////		        int iframeWidth = iframeElement.getSize().getWidth();  // iframe 的宽度
+////		        int iframeRightX = iframeX + iframeWidth;
+////		        // 计算相对于整个页面的 X 和 Y 坐标
+////		        int targetX = iframeX + targetXInsideIframe;
+////		        int targetY = iframeY + targetYInsideIframe;
+////
+////		        // 使用 Actions 模拟鼠标移动并点击
+////		        Actions actions = new Actions(driver);
+////		        actions.moveByOffset(targetX, targetY).click().perform();
+////		        actions.moveByOffset(iframeRightX-100, targetY).click().perform();
 //
-//            // Now you can use Jsoup to efficiently parse and extract data
-//            Elements tablerows = document.select("#tb_chart tbody tr"); // Adjust the selector as needed
-
-
-//            for (Element row : tablerows) {
-//                Elements cells = row.select("td");
-//                if (cells.size() >= 6) {
-//                    String exchangeTime = cells.get(0).text();
-//                    String exchangePrice = cells.get(3).text();
-//                    String exchangeQuantity = cells.get(5).text();
-//                    // Process the data as needed
-//                }
-//            }
-            
-//            List<StockExchangeDetail> singleStockExchangeDetails = tablerows.stream().map(row ->{
-//            	  Elements cells = row.select("td");
-//				if (cells.size() >= 6) {
-//					String exchangeTime = cells.get(0).text(); // 第 4 個 td
-//					String exchangePrice = cells.get(3).text(); // 第 4 個 td
-//					String exchangeQuantity = cells.get(5).text(); // 第 6 個 td
-//					if("分量(張)".equals(exchangeQuantity) || "成交價".equals(exchangePrice) || "時間".equals(exchangeTime) ) {
-//						return null;
-//					}
-//					StockExchangeDetail stockExchangeDetail = new StockExchangeDetail();
-//					stockExchangeDetail.setStockCode(stockCode);
-//					stockExchangeDetail.setTradingDate(tradingDate);
-//				    // 生成唯一碼
-//				    int seq = uniqueSeqGenerator.getAndAdd(1);
-//					stockExchangeDetail.setExchangeQuantity(Integer.valueOf(exchangeQuantity));
-//					stockExchangeDetail.setSeq(seq);
-//					stockExchangeDetail.setExchangePrice(exchangePrice);
-//					stockExchangeDetail.setExchangeTime(exchangeTime);
-//					return stockExchangeDetail;
-//				} else {
-//				 return null;
-//				}
-//			}).filter(stockExchangeDetail -> Optional.ofNullable(stockExchangeDetail).isPresent()).toList();
-//			List<StockExchangeDetail> singleStockExchangeDetails = rows.parallelStream().map(row ->{
-//				List<WebElement> cells = row.findElements(By.tagName("td"));
-//				if (cells.size() >= 6) {
-//					String exchangeTime = cells.get(0).getText(); // 第 4 個 td
-//					String exchangePrice = cells.get(3).getText(); // 第 4 個 td
-//					String exchangeQuantity = cells.get(5).getText(); // 第 6 個 td
-//					if("分量(張)".equals(exchangeQuantity) || "成交價".equals(exchangePrice) || "時間".equals(exchangeTime) ) {
-//						return null;
-//					}
-//					StockExchangeDetail stockExchangeDetail = new StockExchangeDetail();
-//					stockExchangeDetail.setStockCode(stockCode);
-//					stockExchangeDetail.setTradingDate(tradingDate);
-//				    // 生成唯一碼
-//				    int seq = uniqueSeqGenerator.getAndAdd(1);
-//					stockExchangeDetail.setExchangeQuantity(Integer.valueOf(exchangeQuantity));
-//					stockExchangeDetail.setSeq(String.valueOf(seq));
-//					stockExchangeDetail.setExchangePrice(exchangePrice);
-//					stockExchangeDetail.setExchangeTime(exchangeTime);
-//					return stockExchangeDetail;
-//				} else {
-//				 return null;
-//				}
-//			}).filter(stockExchangeDetail -> Optional.ofNullable(stockExchangeDetail).isPresent()).toList();
-//			Date endParseTime = new Date();
-//			log.info("stockCode :{} parse stockExchangeDetail cost {} ms", stockCode, starParseTime.getTime() - endParseTime.getTime());
-//			stockExchangeDetailService.saveAll(singleStockExchangeDetails);
-//			for (int i = 1; i < rows.size(); i++) {
-//				WebElement row = rows.get(i);
-//				// 在當前的 tr 中找到所有的 td 元素
-//				List<WebElement> cells = row.findElements(By.tagName("td"));
-//				if (cells.size() >= 6) {
-//					String exchangeTime = cells.get(0).getText(); // 第 4 個 td
-//					String exchangePrice = cells.get(3).getText(); // 第 4 個 td
-//					String exchangeQuantity = cells.get(5).getText(); // 第 6 個 td
-//					StockExchangeDetail stockExchangeDetail = new StockExchangeDetail();
-//					stockExchangeDetail.setStockCode(stockCode);
-//					stockExchangeDetail.setTradingDate(tradingDate);
-//					stockExchangeDetail.setExchangeQuantity(Integer.valueOf(exchangeQuantity));
-//					stockExchangeDetail.setExchangePrice(exchangePrice);
-//					stockExchangeDetail.setExchangeTime(exchangeTime);
-//					stockExchangeDetails.add(stockExchangeDetail);
-//				} else {
-//					System.out.println("該行的 td 元素數量不足 6 個");
-//				}
-//			}
-//			int randomInterval = ThreadLocalRandom.current().nextInt(1, 8) * 1000;
-//			Thread.sleep(3000 + randomInterval);
-//			Date oneStockCodeEndTime = new Date();
-//			log.info(
-//					"stockCode {} , total cost {} ms to parse", stockCode, oneStockCodeEndTime.getTime() -oneStockCodeStartDate.getTime());
-//		}
-
-//		return stockExchangeDetails;
-//				Point iframeLocation = iframeElement.getLocation();
-//		        int iframeX = iframeLocation.getX();
-//		        int iframeY = iframeLocation.getY();
-//
-//		        // 定义需要点击的坐标位置（假设是 iframe 中的相对坐标）
-//		        int targetXInsideIframe = 720;  // 这是相对于 iframe 的 X 坐标
-//		        int targetYInsideIframe = 150;  // 这是相对于 iframe 的 Y 坐标
-//		        // 计算 iframe 最右侧的 X 坐标
-//		        int iframeWidth = iframeElement.getSize().getWidth();  // iframe 的宽度
-//		        int iframeRightX = iframeX + iframeWidth;
-//		        // 计算相对于整个页面的 X 和 Y 坐标
-//		        int targetX = iframeX + targetXInsideIframe;
-//		        int targetY = iframeY + targetYInsideIframe;
-//
-//		        // 使用 Actions 模拟鼠标移动并点击
-//		        Actions actions = new Actions(driver);
-//		        actions.moveByOffset(targetX, targetY).click().perform();
-//		        actions.moveByOffset(iframeRightX-100, targetY).click().perform();
-
-	}
+//	}
 	
 //	public static void grepTWSESsecuritiesFirmsDayOperate(String downloadFilepath, String chromeDriverPath,
 //			List<String> twseStockCodes, String bpythonUrl, RBucket<Boolean> graspStockEnableKeyBucket)

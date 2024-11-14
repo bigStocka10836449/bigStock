@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.annotation.BigStockCacheableWithLock;
