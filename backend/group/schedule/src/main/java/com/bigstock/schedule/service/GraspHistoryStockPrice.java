@@ -41,7 +41,7 @@ public class GraspHistoryStockPrice {
 					log.info("sync stockCode: {} , startDate : {} , endDate: {}", stockCode, startDate, endDate);
 					stockDayPrices = ChromeDriverUtils.getTpexStockHistory(startDate, endDate, manualDateRangeTpexBaseurl, stockCode);
 					stockDayPriceService.saveAll(stockDayPrices);
-					Thread.sleep(3000);
+					Thread.sleep(8000);
 				} catch (Exception e) {
 					throw new RuntimeException(e);
 				} 
@@ -54,7 +54,7 @@ public class GraspHistoryStockPrice {
 					log.info("sync stockCode: {} , startDate : {} , endDate: {}", stockCode, startDate, endDate);
 					stockDayPrices = ChromeDriverUtils.getTwseStockHistory(startDate, endDate, manualDateRangeTwseBaseurl, stockCode);
 					stockDayPriceService.saveAll(stockDayPrices);
-					Thread.sleep(3000);
+					Thread.sleep(8000);
 				} catch (Exception e) {
 					log.warn(e.getMessage(), e);
 				} 

@@ -68,15 +68,16 @@ public class GraspStockPrice {
 
 	
 	
+	//爬蟲暫時不做，取消抓取蠟燭圖方法，帶未來真的規模擴大，再走實際正常串接作法
 //	@PostConstruct
-	public void grepCandlestickChart() throws InterruptedException, JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
-		Date tradeDate = graspHistoryStockPrice.getLastTradeDate();
-		List<String> stockCodes = ChromeDriverUtils
-				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2").stream().filter(stockInfo -> StringUtils.isNotBlank(stockInfo.getStockType()))
-				.filter(stockInfo -> List.of("1", "0").contains(stockInfo.getStockType()))
-				.map(stockInfo -> stockInfo.getStockCode()).toList();
-		ChromeDriverUtils.grepCanvas(windowsActive ? windowsChromeDriverPath : linuxChromeDriverPath, stockCodes, tradeDate, stockExchangeDetailService);
-	}
+//	public void grepCandlestickChart() throws InterruptedException, JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
+//		Date tradeDate = graspHistoryStockPrice.getLastTradeDate();
+//		List<String> stockCodes = ChromeDriverUtils
+//				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2").stream().filter(stockInfo -> StringUtils.isNotBlank(stockInfo.getStockType()))
+//				.filter(stockInfo -> List.of("1", "0").contains(stockInfo.getStockType()))
+//				.map(stockInfo -> stockInfo.getStockCode()).toList();
+//		ChromeDriverUtils.grepCanvas(windowsActive ? windowsChromeDriverPath : linuxChromeDriverPath, stockCodes, tradeDate, stockExchangeDetailService);
+//	}
 	
 	// 每天下午5點更新
 //	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
