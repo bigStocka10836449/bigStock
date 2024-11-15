@@ -1,10 +1,14 @@
 package com.bigstock.sharedComponent.service;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.aop.framework.AopContext;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.annotation.BigStockCacheableWithLock;
@@ -48,13 +52,24 @@ public class StockDayPriceService {
 		return stockDayPriceRepository.findByStockCodeAndTradingDay(stockCode, tradingDate);
 	}
 
+	@Cacheable(value = "middleLivedCache", key = "#p0 + '-' + #p1 + '-' + #p2")
+	public List<StockDayPrice> findByStockCodeAndStartDateAndEndDateCache(String stockCode,
+			 String startDate, String endDate) throws ParseException{
+		return getSelf().findByStockCodeAndStartDateAndEndDate(stockCode, startDate, endDate);
+	}
+	
 	@BigStockCacheableWithLock(value = "middleLivedCache", key = "#p0 + '-' + #p1 + '-' + #p2")
 	public List<StockDayPrice> findByStockCodeAndStartDateAndEndDate(String stockCode,
-			 Date startDate, Date endDate) {
-		return stockDayPriceRepository.findByStockCodeAndStartDateAndEndDate(stockCode, startDate, endDate);
+			 String startDate, String endDate) throws ParseException {
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+		return stockDayPriceRepository.findByStockCodeAndStartDateAndEndDate(stockCode, sdf.parse(startDate), sdf.parse(endDate));
 	}
 	
 	public boolean checkIsTradingDateIsExsits(Date tradingDay) {
 		return stockDayPriceRepository.checkIsTradingDateIsExsits(tradingDay);
+	}
+	
+	private StockDayPriceService getSelf() {
+		return (StockDayPriceService) AopContext.currentProxy();
 	}
 }

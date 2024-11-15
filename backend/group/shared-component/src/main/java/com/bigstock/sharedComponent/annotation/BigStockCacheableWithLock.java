@@ -13,4 +13,6 @@ public @interface BigStockCacheableWithLock {
 
 	String key();
 	
+	Class<?> type() default String.class;
+	
 }

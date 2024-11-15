@@ -1,5 +1,6 @@
 package com.bigstock.biz.service;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.temporal.IsoFields;
@@ -44,8 +45,9 @@ public class BizService {
 		 }
 	}
 
-	public List<SingleStockPriceVo> getSingleStockPrices(String stockCode, Date startDate, Date endDate){
-		List<StockDayPrice> stockDayPrices = stockDayPriceService.findByStockCodeAndStartDateAndEndDate(stockCode, startDate, endDate);
+	public List<SingleStockPriceVo> getSingleStockPrices(String stockCode, Date startDate, Date endDate) throws ParseException{
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+		List<StockDayPrice> stockDayPrices = stockDayPriceService.findByStockCodeAndStartDateAndEndDateCache(stockCode, sdf.format(startDate), sdf.format(endDate));
 		return stockDayPrices.stream().map(stockDayPrice ->{
 			String highPrice = stockDayPrice.getHighPrice() ;
 			String lowPrice = stockDayPrice.getLowPrice();
