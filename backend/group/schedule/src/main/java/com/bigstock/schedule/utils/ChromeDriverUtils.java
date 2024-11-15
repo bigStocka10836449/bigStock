@@ -96,50 +96,50 @@ public class ChromeDriverUtils {
 		initializeColumnNames();
 	}
 
-	public static String testConvertAudio(ByteString audioBytes, String credentialsPath) throws IOException {
-		// 設置憑證文件的路徑 (將此路徑替換為你的 credentials.json 憑證文件路徑)
-		String resultString = StringUtils.EMPTY;
-		try {
-			// 使用 GoogleCredentials 來加載憑證文件
-			GoogleCredentials credentials = GoogleCredentials.fromStream(new FileInputStream(credentialsPath));
-
-			// 設置 SpeechClient 並將憑證文件應用到 SpeechClient 設置中
-			SpeechSettings speechSettings = SpeechSettings.newBuilder()
-					.setCredentialsProvider(FixedCredentialsProvider.create(credentials)).build();
-
-			// 使用 SpeechClient 調用 API
-			try (SpeechClient speechClient = SpeechClient.create(speechSettings)) {
-
-				// 讀取音訊文件並轉換為 ByteString 格式
-
-				// 設置音訊配置
-				RecognitionConfig config = RecognitionConfig.newBuilder()
-						.setEncoding(RecognitionConfig.AudioEncoding.LINEAR16)
-						// 省略采样率，自动匹配音频文件的采样率
-						.setLanguageCode("en-US").build();
-
-				// 設置音訊數據
-				RecognitionAudio audio = RecognitionAudio.newBuilder().setContent(audioBytes).build();
-
-				// 調用 API 進行語音識別
-				RecognizeResponse response = speechClient.recognize(config, audio);
-
-				// 解析 API 返回的結果
-				List<SpeechRecognitionResult> results = response.getResultsList();
-
-				for (SpeechRecognitionResult result : results) {
-					SpeechRecognitionAlternative alternative = result.getAlternativesList().get(0);
-					log.debug("Transcription: %s%n", alternative.getTranscript());
-					resultString = alternative.getTranscript();
-				}
-			}
-
-		} catch (IOException e) {
-			throw e;
-		}
-		return resultString;
-
-	}
+//	public static String testConvertAudio(ByteString audioBytes, String credentialsPath) throws IOException {
+//		// 設置憑證文件的路徑 (將此路徑替換為你的 credentials.json 憑證文件路徑)
+//		String resultString = StringUtils.EMPTY;
+//		try {
+//			// 使用 GoogleCredentials 來加載憑證文件
+//			GoogleCredentials credentials = GoogleCredentials.fromStream(new FileInputStream(credentialsPath));
+//
+//			// 設置 SpeechClient 並將憑證文件應用到 SpeechClient 設置中
+//			SpeechSettings speechSettings = SpeechSettings.newBuilder()
+//					.setCredentialsProvider(FixedCredentialsProvider.create(credentials)).build();
+//
+//			// 使用 SpeechClient 調用 API
+//			try (SpeechClient speechClient = SpeechClient.create(speechSettings)) {
+//
+//				// 讀取音訊文件並轉換為 ByteString 格式
+//
+//				// 設置音訊配置
+//				RecognitionConfig config = RecognitionConfig.newBuilder()
+//						.setEncoding(RecognitionConfig.AudioEncoding.LINEAR16)
+//						// 省略采样率，自动匹配音频文件的采样率
+//						.setLanguageCode("en-US").build();
+//
+//				// 設置音訊數據
+//				RecognitionAudio audio = RecognitionAudio.newBuilder().setContent(audioBytes).build();
+//
+//				// 調用 API 進行語音識別
+//				RecognizeResponse response = speechClient.recognize(config, audio);
+//
+//				// 解析 API 返回的結果
+//				List<SpeechRecognitionResult> results = response.getResultsList();
+//
+//				for (SpeechRecognitionResult result : results) {
+//					SpeechRecognitionAlternative alternative = result.getAlternativesList().get(0);
+//					log.debug("Transcription: %s%n", alternative.getTranscript());
+//					resultString = alternative.getTranscript();
+//				}
+//			}
+//
+//		} catch (IOException e) {
+//			throw e;
+//		}
+//		return resultString;
+//
+//	}
 	
 	 public static String getRandomStockCode(List<String> stockCodes) {
 	        if (stockCodes == null || stockCodes.isEmpty()) {
