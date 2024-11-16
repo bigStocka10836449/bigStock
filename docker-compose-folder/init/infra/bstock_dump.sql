@@ -384,7 +384,7 @@ COMMENT ON COLUMN bstock.shareholder_structure.opening_price IS '開盤價(周)'
 
 CREATE TABLE bstock.stock_day_price (
     stock_code text,
-    trading_date date,
+    trading_day date,
     opening_price text,
     closing_price text,
     high_price text,
@@ -413,7 +413,7 @@ COMMENT ON COLUMN bstock.stock_day_price.stock_code IS '股票代號';
 -- Name: COLUMN stock_day_price.trading_date; Type: COMMENT; Schema: bstock; Owner: bstockuser
 --
 
-COMMENT ON COLUMN bstock.stock_day_price.trading_date IS '交易日';
+COMMENT ON COLUMN bstock.stock_day_price.trading_day IS '交易日';
 
 
 --
@@ -738,7 +738,7 @@ COPY bstock.shareholder_structure (week_of_year, count_date, closing_price, pric
 -- Data for Name: stock_day_price; Type: TABLE DATA; Schema: bstock; Owner: bstockuser
 --
 
-COPY bstock.stock_day_price (stock_code, trading_date, opening_price, closing_price, high_price, low_price, start_of_week_date, end_of_week_date, change, week_of_year) FROM stdin;
+COPY bstock.stock_day_price (stock_code, trading_day, opening_price, closing_price, high_price, low_price, start_of_week_date, end_of_week_date, change, week_of_year) FROM stdin;
 \.
 
 
@@ -8544,7 +8544,7 @@ ALTER TABLE ONLY bstock.shareholder_structure
 --
 
 ALTER TABLE ONLY bstock.stock_day_price
-    ADD CONSTRAINT stock_day_price_unique UNIQUE (stock_code, trading_date);
+    ADD CONSTRAINT stock_day_price_unique UNIQUE (stock_code, trading_day);
 
 
 --

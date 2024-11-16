@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
+import org.apache.commons.lang3.math.NumberUtils;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -66,7 +67,7 @@ public class StockDayPriceService {
 	}
 	
 	public boolean checkIsTradingDateIsExsits(Date tradingDay) {
-		return stockDayPriceRepository.checkIsTradingDateIsExsits(tradingDay);
+		return NumberUtils.INTEGER_TWO.equals(stockDayPriceRepository.checkIsTradingDateIsExsits(tradingDay));
 	}
 	
 	private StockDayPriceService getSelf() {
