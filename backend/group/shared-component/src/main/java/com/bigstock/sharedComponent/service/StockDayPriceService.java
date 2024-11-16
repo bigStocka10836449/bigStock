@@ -67,7 +67,7 @@ public class StockDayPriceService {
 	}
 	
 	public boolean checkIsTradingDateIsExsits(Date tradingDay) {
-		return NumberUtils.INTEGER_TWO.equals(stockDayPriceRepository.checkIsTradingDateIsExsits(tradingDay));
+		return NumberUtils.INTEGER_ONE.equals(stockDayPriceRepository.checkIsTradingDateIsExsits(tradingDay));
 	}
 	
 	private StockDayPriceService getSelf() {
