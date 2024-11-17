@@ -40,7 +40,7 @@ services:
         limits:
           memory: 2g
         reservations:
-          memory: 2g       
+          memory: 1g       
     networks:
       - big_stock_network      
   bigstock-auth:
@@ -78,9 +78,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2g
-        reservations:
-          memory: 2g    
+          memory: 1g
   bigstock-biz:
     build: ../../../biz/docker/
     restart: always 
@@ -115,8 +113,6 @@ services:
       resources:
         limits:
           memory: 2g
-        reservations:
-          memory: 2g     
   bigstock-schedule:
     build: ../../../schedule/docker/
     restart: always 
@@ -140,7 +136,7 @@ services:
       SPRING_RABBITMQ_USERNAME: admin
       SPRING_RABBITMQ_PASSWORD: rabbitmq  
       CHROME_DRIVER_LINUX_PATH: /usr/local/bin/chromedriver
-      JAVA_COMMAND_STR: -Xlog:gc+heap=trace:file=/opt/bigstock/logs/Xlog.log:time,uptimemillis,tid  -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -Dcatalina.home=/opt/bigstock -Xms1868M -Xmx1868M -Xss1M  -XX:MetaspaceSize=512m -XX:MaxMetaspaceSize=512m  -XX:MaxGCPauseMillis=10 -XX:InitiatingHeapOccupancyPercent=60 -XX:+UnlockExperimentalVMOptions -XX:MaxTenuringThreshold=10 -XX:G1NewSizePercent=3
+      JAVA_COMMAND_STR: -Xlog:gc+heap=trace:file=/opt/bigstock/logs/Xlog.log:time,uptimemillis,tid  -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -Dcatalina.home=/opt/bigstock -Xms1g -Xmx1g -Xss1M  -XX:MetaspaceSize=512m -XX:MaxMetaspaceSize=512m  -XX:MaxGCPauseMillis=10 -XX:InitiatingHeapOccupancyPercent=60 -XX:+UnlockExperimentalVMOptions -XX:MaxTenuringThreshold=10 -XX:G1NewSizePercent=3
       JAR_NAME: bigstock-schedule.jar  
       SCHEDULE_BPYTHON_URL: http://bigstock-python:8000/captcha/
       SCHEDULE_CREDENTIALS-PATHL: /opt/bigstock/google-api-cloud-speech-to-text.json
@@ -151,9 +147,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4g
-        reservations:
-          memory: 2g       
+          memory: 1g     
     networks:
       - big_stock_network       
     volumes:
