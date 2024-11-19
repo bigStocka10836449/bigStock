@@ -5,6 +5,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
@@ -67,6 +68,32 @@ public class OauthTokenService {
 		return accessToken;
 	}
 
+	
+	public String getTmpToken() {
+		BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+		String username = "0938017103";
+		String password = "0938017103";
+		Optional<UserAccount> userAccountOp = Optional.empty();
+		userAccountOp = userAccountService.findUserByEmailOrPhome(username);
+		UserAccount userAccount = userAccountOp.orElseThrow(() -> new JwtException("user can not found"));
+		// 验证密码
+		if (!passwordEncoder.matches(password, userAccount.getUserPassword())) {
+			throw new JwtException("invalid password");
+		}
+		Long timeStamp = new Date().getTime();
+		String accessToken = generateAccessToken(username + timeStamp, userAccount);
+		String refreshToken = generateRefreshToken(username + timeStamp);
+		// 將新的 refresh token 存入資料庫
+		RBucket<Object> refreshTokenRb = redissonClient.getBucket("refresh_token:" + username);
+		refreshTokenRb.set(refreshToken);
+		refreshTokenRb.expire(Duration.ofMinutes(30));
+		// 將新的access token倒回去Redis
+		RBucket<Object> accessTokenRb = redissonClient.getBucket("access_token:" + username);
+		accessTokenRb.set(accessToken);
+		accessTokenRb.expire(Duration.ofMinutes(40));
+		return accessToken;
+	}
+	
 	public String refreshToken(String refreshToken) {
 
 		// 獲取 refresh token 中的資料

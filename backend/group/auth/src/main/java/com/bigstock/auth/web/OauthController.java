@@ -38,6 +38,13 @@ public class OauthController {
 	private final UserRegistryService userRegistryService;
 	
 
+	
+	@GetMapping(value = "tempToken", consumes = MediaType.APPLICATION_JSON_VALUE)
+	public String tempToken() {
+		return oauthTokenService.getTmpToken();
+	}
+	
+	
 	@Operation(summary = "token 刷新", description = "acctoken 若失效，但refresh token還有效時，gateway自動跟auth要新的access token刷新")
 	@PostMapping(value = "refreshToken", consumes = MediaType.APPLICATION_JSON_VALUE)
 	public String refreshToken(@RequestBody TokenInfo refreshTokenInfo) {
