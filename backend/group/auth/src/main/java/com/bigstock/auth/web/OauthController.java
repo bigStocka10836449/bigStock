@@ -1,5 +1,8 @@
 package com.bigstock.auth.web;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -39,9 +42,12 @@ public class OauthController {
 	
 
 	
-	@GetMapping(value = "tempToken", consumes = MediaType.APPLICATION_JSON_VALUE)
-	public String tempToken() {
-		return oauthTokenService.getTmpToken();
+	@GetMapping(value = "tempToken")
+	public ResponseEntity<Object> tempToken() {
+	    String token = oauthTokenService.getTmpToken();
+	    Map<String, String> response = new HashMap<>();
+	    response.put("token", token);
+	    return ResponseEntity.ok(response);
 	}
 	
 	

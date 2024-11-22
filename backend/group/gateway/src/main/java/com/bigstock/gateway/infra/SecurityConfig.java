@@ -107,7 +107,7 @@ public class SecurityConfig {
 		            }
 
 					String[] publicPaths = { "/gateway/swagger/**", "/api/biz/swagger/**", "/auth/swagger/**",
-							"/webjars/**", "/actuator/health" };
+							"/webjars/**", "/actuator/health", "/auth/**", "/api/auth/**" };
 					exchanges.pathMatchers(HttpMethod.OPTIONS, publicPaths).permitAll();
 					exchanges.pathMatchers(HttpMethod.GET, publicPaths).permitAll();
 					exchanges.pathMatchers(HttpMethod.POST, "/auth/**", "/api/auth/**", "/webjars/**").permitAll();

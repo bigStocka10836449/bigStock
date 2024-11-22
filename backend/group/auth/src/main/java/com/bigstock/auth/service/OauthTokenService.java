@@ -84,11 +84,11 @@ public class OauthTokenService {
 		String accessToken = generateAccessToken(username + timeStamp, userAccount);
 		String refreshToken = generateRefreshToken(username + timeStamp);
 		// 將新的 refresh token 存入資料庫
-		RBucket<Object> refreshTokenRb = redissonClient.getBucket("refresh_token:" + username);
+		RBucket<Object> refreshTokenRb = redissonClient.getBucket("refresh_token:" + username + timeStamp);
 		refreshTokenRb.set(refreshToken);
 		refreshTokenRb.expire(Duration.ofMinutes(30));
 		// 將新的access token倒回去Redis
-		RBucket<Object> accessTokenRb = redissonClient.getBucket("access_token:" + username);
+		RBucket<Object> accessTokenRb = redissonClient.getBucket("access_token:" + username + timeStamp);
 		accessTokenRb.set(accessToken);
 		accessTokenRb.expire(Duration.ofMinutes(40));
 		return accessToken;
