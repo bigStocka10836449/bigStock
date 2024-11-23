@@ -66,7 +66,9 @@ schedule:
   tdccQryStockUrl: https://www.tdcc.com.tw/portal/zh/smWeb/qryStock
   overTheCounterUrl: https://mops.twse.com.tw/mops/web/t51sb01
   manual-date-range:
-    tpex-baseurl: https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock  
+    tpex-baseurl: https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock
+    search-start-date: 2024-05-05
+    search-end-date: 2024-10-05
      # date格式 yyyyMMdd 
     twse-baseurl: https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=%1s&stockNo=%2s&response=json&_=1730439477455
 management:

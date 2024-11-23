@@ -1044,7 +1044,7 @@ public class ChromeDriverUtils {
 			}).toList();
 			allStockDayPrices.addAll(singleMonthStockDayPrices);
 			startCalendar.add(Calendar.MONTH, 1);
-			Thread.sleep(5000);
+			Thread.sleep(15000);
 		}
 		return allStockDayPrices;
 	}
@@ -1133,7 +1133,7 @@ public class ChromeDriverUtils {
 			}).toList();
 			allStockDayPrices.addAll(singleMonthStockDayPrices);
 			startCalendar.add(Calendar.MONTH, 1);
-			Thread.sleep(3000);
+			Thread.sleep(15000);
 		}
 		return allStockDayPrices;
 	}
