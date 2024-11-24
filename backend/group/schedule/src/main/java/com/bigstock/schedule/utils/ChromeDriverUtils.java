@@ -989,6 +989,9 @@ public class ChromeDriverUtils {
 //			List<List<String>> stockPrices = (List<List<String>>) (responseList.get("tables")[0];
 			Map<String,Object> tables = (Map<String,Object>)((List<Object> )responseList.get("tables")).get(0);
 			// [111/08/01, 6, 647, 106.00, 107.00, 106.00, 107.00, 0.00, 11]
+			if("0".equals(tables.get("totalCount").toString())) {
+				continue;
+			}
 			List<StockDayPrice> singleMonthStockDayPrices = ((List<List<String>> )tables.get("data")).stream().map(data -> {
 				StockDayPrice stockPrice = new StockDayPrice();
 				String tradingDateStr = data.get(0);
@@ -1075,7 +1078,9 @@ public class ChromeDriverUtils {
 			Map<String, Object> responseList = objectMapper.readValue(jsonResponse,
 					new TypeReference<Map<String, Object>>() {
 					});
-
+			if(responseList.containsKey("total") && "0".equals(responseList.get("total").toString()) ) {
+				continue;
+			}
 			List<List<String>> stockPrices = (List<List<String>>) responseList.get("data");
 			// [111/08/01, 6, 647, 106.00, 107.00, 106.00, 107.00, 0.00, 11]
 			List<StockDayPrice> singleMonthStockDayPrices = stockPrices.stream().map(data -> {

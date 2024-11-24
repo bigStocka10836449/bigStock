@@ -64,7 +64,7 @@ public class GraspHistoryStockPrice {
 									.from(searchStartDate.atStartOfDay(ZoneId.systemDefault()).toInstant())),
 							sdf.format(
 									Date.from(searchEndDate.atStartOfDay(ZoneId.systemDefault()).toInstant())))
-							.size() > 40) {
+							.size() > 70) {
 						return;
 					}
 					log.info("sync stockCode: {} , startDate : {} , endDate: {}", stockCode, searchStartDate,
@@ -99,7 +99,7 @@ public class GraspHistoryStockPrice {
 											.from(searchStartDate.atStartOfDay(ZoneId.systemDefault()).toInstant())),
 									sdf.format(
 											Date.from(searchEndDate.atStartOfDay(ZoneId.systemDefault()).toInstant())))
-							.size() > 40) {
+							.size() > 70) {
 						return;
 					}
 					log.info("sync stockCode: {} , startDate : {} , endDate: {}", stockCode, searchStartDate,
