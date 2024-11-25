@@ -990,6 +990,8 @@ public class ChromeDriverUtils {
 			Map<String,Object> tables = (Map<String,Object>)((List<Object> )responseList.get("tables")).get(0);
 			// [111/08/01, 6, 647, 106.00, 107.00, 106.00, 107.00, 0.00, 11]
 			if("0".equals(tables.get("totalCount").toString())) {
+				Thread.sleep(15000);
+				startCalendar.add(Calendar.MONTH, 1);
 				continue;
 			}
 			List<StockDayPrice> singleMonthStockDayPrices = ((List<List<String>> )tables.get("data")).stream().map(data -> {
@@ -999,7 +1001,7 @@ public class ChromeDriverUtils {
 				String[] parts = tradingDateStr.split("/");
 				int innerTaiwanYear = Integer.parseInt(parts[0]); // 民国年份
 				int month = Integer.parseInt(parts[1]); // 月
-				int day = Integer.parseInt(parts[2]); // 日
+				int day = Integer.parseInt(parts[2].replaceAll("\\*", "")); // 日
 
 				// 将民国年份转换为公历年份
 				int year = innerTaiwanYear + 1911;
@@ -1079,6 +1081,8 @@ public class ChromeDriverUtils {
 					new TypeReference<Map<String, Object>>() {
 					});
 			if(responseList.containsKey("total") && "0".equals(responseList.get("total").toString()) ) {
+				Thread.sleep(15000);
+				startCalendar.add(Calendar.MONTH, 1);
 				continue;
 			}
 			List<List<String>> stockPrices = (List<List<String>>) responseList.get("data");
@@ -1090,7 +1094,7 @@ public class ChromeDriverUtils {
 				String[] parts = tradingDateStr.split("/");
 				int innerTaiwanYear = Integer.parseInt(parts[0]); // 民国年份
 				int month = Integer.parseInt(parts[1]); // 月
-				int day = Integer.parseInt(parts[2]); // 日
+				int day = Integer.parseInt(parts[2].replaceAll("\\*", "")); // 日
 
 				// 将民国年份转换为公历年份
 				int year = innerTaiwanYear + 1911;
