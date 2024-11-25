@@ -6,6 +6,7 @@ import java.time.ZoneId;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +16,7 @@ import com.bigstock.schedule.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockInfoService;
+import com.google.common.collect.Maps;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +47,7 @@ public class GraspHistoryStockPrice {
 	private static boolean manualGrapRangeHistoryStockPriceTESEFlag = false;
 
 	public void manualGrapRangeHistoryStockPrice(String stockType, boolean enableflag) {
-
+		Map<String,Boolean> innerRecordMap = Maps.newHashMap();
 		if ("0".equals(stockType)) {
 			if (manualGrapRangeHistoryStockPriceTPEXFlag && enableflag) {
 				return;
@@ -64,7 +66,7 @@ public class GraspHistoryStockPrice {
 									.from(searchStartDate.atStartOfDay(ZoneId.systemDefault()).toInstant())),
 							sdf.format(
 									Date.from(searchEndDate.atStartOfDay(ZoneId.systemDefault()).toInstant())))
-							.size() > 70) {
+							.size() > 70 || innerRecordMap.containsKey(stockCode)) {
 						return;
 					}
 					log.info("sync stockCode: {} , startDate : {} , endDate: {}", stockCode, searchStartDate,
@@ -77,6 +79,8 @@ public class GraspHistoryStockPrice {
 					Thread.sleep(8000);
 				} catch (Exception e) {
 					throw new RuntimeException(e);
+				} finally {
+					innerRecordMap.put(stockCode, true);
 				}
 			});
 			log.info("finsh TPEX StockCodePrice sync, startDate : {} , endDate: {}", searchStartDate, searchEndDate);
@@ -99,7 +103,7 @@ public class GraspHistoryStockPrice {
 											.from(searchStartDate.atStartOfDay(ZoneId.systemDefault()).toInstant())),
 									sdf.format(
 											Date.from(searchEndDate.atStartOfDay(ZoneId.systemDefault()).toInstant())))
-							.size() > 70) {
+							.size() > 70 || innerRecordMap.containsKey(stockCode)) {
 						return;
 					}
 					log.info("sync stockCode: {} , startDate : {} , endDate: {}", stockCode, searchStartDate,
@@ -112,6 +116,8 @@ public class GraspHistoryStockPrice {
 					Thread.sleep(8000);
 				} catch (Exception e) {
 					log.warn(e.getMessage(), e);
+				} finally {
+					innerRecordMap.put(stockCode, true);
 				}
 			});
 			log.info("finsh TWSE StockCodePrice sync, startDate : {} , endDate: {}", searchStartDate, searchEndDate);
