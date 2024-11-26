@@ -50,7 +50,7 @@ schedule:
     scheduling:
       cron:
         expression: 
-          grasp-stock-price: "0 */30 * * * *"
+          grasp-stock-price: "0 */40 * * * *"
           grasp-securitiesfirms-dayoperate: "0 */30 * * * *"
           update-shareholder-structure: "0 */30 * * * *"
           update-stock-info: "0 */30 * * * *"
