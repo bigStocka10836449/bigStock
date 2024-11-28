@@ -438,7 +438,7 @@ ALTER TABLE bstock.margin_trading_and_short_selling_info OWNER TO bstockuser;
 ALTER TABLE ONLY bstock.margin_trading_and_short_selling_info
     ADD CONSTRAINT margin_trading_and_short_selling_info_unique UNIQUE (trading_day, stock_code);
 
-
+CREATE INDEX margin_trading_and_short_selling_info_trading_day_idx ON bstock.margin_trading_and_short_selling_info USING btree (trading_day);
 --
 -- TOC entry 219 (class 1259 OID 16405)
 -- Name: stock_day_price; Type: TABLE; Schema: bstock; Owner: bstockuser
@@ -8668,7 +8668,7 @@ CREATE INDEX stock_day_price_week_of_year_idx ON bstock.stock_day_price USING bt
 --
 
 CREATE INDEX stock_exchange_detail_stock_code_idx ON bstock.stock_exchange_detail USING btree (stock_code, trading_date);
-
+CREATE INDEX stock_day_price_trading_day_idx ON bstock.stock_day_price USING btree (trading_day DESC);
 
 --
 -- TOC entry 3282 (class 1259 OID 16446)

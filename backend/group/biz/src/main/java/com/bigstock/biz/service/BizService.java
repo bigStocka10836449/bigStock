@@ -1,5 +1,7 @@
 package com.bigstock.biz.service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
@@ -9,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.dto.SingleStockPriceVo;
@@ -16,6 +19,7 @@ import com.bigstock.sharedComponent.dto.StructureContinueIncreaseVo;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockExchangeDetail;
+import com.bigstock.sharedComponent.service.MarginTradingAndShortSellingInfoService;
 import com.bigstock.sharedComponent.service.ShareholderStructureService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockExchangeDetailService;
@@ -31,6 +35,8 @@ public class BizService {
 	private final StockDayPriceService stockDayPriceService;
 	
 	private final StockExchangeDetailService stockExchangeDetailService;
+	
+	private final MarginTradingAndShortSellingInfoService marginTradingAndShortSellingInfoService;
 
 	public List<StockExchangeDetail> getStockExchangeDetail(String stockCode, Date tradeDate){
 		return stockExchangeDetailService.findByStockCodeAndTradingDateOrderBySeqAsc(stockCode, tradeDate);
@@ -43,6 +49,11 @@ public class BizService {
 		 } else {
 			 return shareholderStructures;
 		 }
+	}
+	
+	
+	public List<MarginTradingAndShortSellingInfo> getStockMarginTradingAndShortSelling(){
+		
 	}
 
 	public List<SingleStockPriceVo> getSingleStockPrices(String stockCode, Date startDate, Date endDate) throws ParseException{
@@ -61,6 +72,11 @@ public class BizService {
 			vo.setLowPrice(lowPrice);
 			vo.setTradingDate(sfd.format(stockDayPrice.getTradingDay()));
 			vo.setStockCode(stockCode);
+			String tradingVolume = stockDayPrice.getTradingVolume();
+			if(StringUtils.isNotBlank(tradingVolume)) {
+				new BigDecimal(tradingVolume).divide(new BigDecimal("1000"), 0, RoundingMode.HALF_UP);
+				vo.setTradingVolume(stockDayPrice.getTradingVolume());
+			}
 			return vo;
 		}).toList();
 	}

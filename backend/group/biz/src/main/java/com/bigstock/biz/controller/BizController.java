@@ -36,6 +36,14 @@ public class BizController {
 			@PathVariable("stockCode") String stockCode) {
 		return ResponseEntity.ok(bizService.getStockShareholderStructure(stockCode, 52));
 	}
+	
+	
+	@Operation(summary = "個別股票資券資訊(依照最後交易日抓取52個交易天的內容", description = "")
+	@GetMapping("stockShareholderStructure/{stockCode}")
+	public ResponseEntity<List<ShareholderStructure>> getStockMarginTradingAndShortSelling(
+			@PathVariable("stockCode") String stockCode) {
+		return ResponseEntity.ok(bizService.getStockShareholderStructure(stockCode, 52));
+	}
 
 //	@Operation(summary = "個股買賣日報表", description = "")
 //	@GetMapping("stockShareholderStructure/{stockCode}/{tradingDate}")
