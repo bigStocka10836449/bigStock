@@ -377,6 +377,68 @@ COMMENT ON COLUMN bstock.shareholder_structure.stock_total IS '總股數';
 COMMENT ON COLUMN bstock.shareholder_structure.opening_price IS '開盤價(周)';
 
 
+
+
+CREATE TABLE bstock.tmp_trade_volume_info (
+	stock_code text ,
+	trading_day date ,
+	trade_volume text 
+	
+);
+
+
+
+ALTER TABLE bstock.tmp_trade_volume_info OWNER TO bstockuser;
+
+ALTER TABLE ONLY bstock.tmp_trade_volume_info
+    ADD CONSTRAINT tmp_trade_volume_info_unique UNIQUE (stock_code, trading_day);
+
+
+
+
+CREATE TABLE bstock.margin_trading_and_short_selling_info (
+	trading_day date ,
+	stock_code text ,
+	margin_purchase_balance_previous_day text ,
+	margin_purchase text ,
+	margin_sales text ,
+	cash_redemption text ,
+	margin_purchase_balance text ,
+	margin_purchase_quota text ,
+	short_sale_balance_previous_day text ,
+	short_sale text ,
+	short_convering text ,
+	stock_redemption text ,
+	short_sale_balance text ,
+	short_sale_quota text ,
+	offsetting text 
+	
+);
+
+
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.margin_purchase_balance_previous_day IS '融資前日餘額';
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.margin_purchase IS '融資買進';
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.margin_sales IS '融資賣出';
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.cash_redemption IS '融資現金償還';
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.margin_purchase_balance IS '融資今日餘額';
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.margin_purchase_quota IS '融資限額';
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.short_sale_balance_previous_day IS '融券前日餘額';
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.short_sale IS '融券賣出';
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.short_convering IS '融券現券償還';
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.stock_redemption IS '融券股票償還';
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.short_sale_balance IS '融券今日餘額';
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.short_sale_quota IS '融券限額';
+COMMENT ON COLUMN bstock.margin_trading_and_short_selling_info.offsetting IS '資券互抵(資券的單沖)';
+
+
+
+
+ALTER TABLE bstock.margin_trading_and_short_selling_info OWNER TO bstockuser;
+
+ALTER TABLE ONLY bstock.margin_trading_and_short_selling_info
+    ADD CONSTRAINT margin_trading_and_short_selling_info_unique UNIQUE (trading_day, stock_code);
+
+
 --
 -- TOC entry 219 (class 1259 OID 16405)
 -- Name: stock_day_price; Type: TABLE; Schema: bstock; Owner: bstockuser
@@ -392,7 +454,8 @@ CREATE TABLE bstock.stock_day_price (
     start_of_week_date date,
     end_of_week_date date,
     change text,
-    week_of_year text
+    week_of_year text,
+    trading_volume text
 );
 
 
@@ -451,6 +514,8 @@ COMMENT ON COLUMN bstock.stock_day_price.high_price IS '最高價';
 
 COMMENT ON COLUMN bstock.stock_day_price.low_price IS '最低價';
 
+
+COMMENT ON COLUMN bstock.stock_day_price.trading_volume IS '成交量(股,數量會有些微落差)';
 
 --
 -- TOC entry 3478 (class 0 OID 0)

@@ -52,6 +52,9 @@ public class StockDayPrice {
 	@Column(name = "week_of_year")
 	private String weekOfYear;
 
+	@Column(name = "trading_volume")
+	private String tradingVolume;
+	
 	@Getter
 	@Setter
 	public static class StockDayPriceId implements Serializable {

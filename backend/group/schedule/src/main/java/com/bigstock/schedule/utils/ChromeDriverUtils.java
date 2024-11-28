@@ -2,17 +2,13 @@ package com.bigstock.schedule.utils;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -20,7 +16,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.IsoFields;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -31,23 +26,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
-//import org.openqa.selenium.By;
-//import org.openqa.selenium.Dimension;
-//import org.openqa.selenium.JavascriptExecutor;
-//import org.openqa.selenium.OutputType;
-//import org.openqa.selenium.TimeoutException;
-//import org.openqa.selenium.WebDriver;
-//import org.openqa.selenium.WebElement;
-//import org.openqa.selenium.chrome.ChromeDriver;
-//import org.openqa.selenium.chrome.ChromeDriverService;
-//import org.openqa.selenium.chrome.ChromeOptions;
-//import org.openqa.selenium.interactions.Actions;
-//import org.openqa.selenium.support.ui.ExpectedConditions;
-//import org.openqa.selenium.support.ui.WebDriverWait;
-import org.redisson.api.RBucket;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -57,9 +36,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockInfo;
-import com.bigstock.sharedComponent.service.StockExchangeDetailService;
+import com.bigstock.sharedComponent.entity.TradeVolumeInfo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -67,15 +47,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.PipeInput;
 import com.github.kokorin.jaffree.ffmpeg.PipeOutput;
-import com.google.api.gax.core.FixedCredentialsProvider;
-import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.speech.v1.RecognitionAudio;
-import com.google.cloud.speech.v1.RecognitionConfig;
-import com.google.cloud.speech.v1.RecognizeResponse;
-import com.google.cloud.speech.v1.SpeechClient;
-import com.google.cloud.speech.v1.SpeechRecognitionAlternative;
-import com.google.cloud.speech.v1.SpeechRecognitionResult;
-import com.google.cloud.speech.v1.SpeechSettings;
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 
@@ -140,17 +111,17 @@ public class ChromeDriverUtils {
 //		return resultString;
 //
 //	}
-	
-	 public static String getRandomStockCode(List<String> stockCodes) {
-	        if (stockCodes == null || stockCodes.isEmpty()) {
-	            throw new IllegalArgumentException("The stockCodes list cannot be null or empty");
-	        }
-	        Random random = new Random();
-	        int randomIndex = random.nextInt(stockCodes.size());
-	        return stockCodes.get(randomIndex);
-	    }
 
-	 //爬蟲暫時取消不做
+	public static String getRandomStockCode(List<String> stockCodes) {
+		if (stockCodes == null || stockCodes.isEmpty()) {
+			throw new IllegalArgumentException("The stockCodes list cannot be null or empty");
+		}
+		Random random = new Random();
+		int randomIndex = random.nextInt(stockCodes.size());
+		return stockCodes.get(randomIndex);
+	}
+
+	// 爬蟲暫時取消不做
 //	public static void grepCanvas(String chromeDriverPath, List<String> stockCodes,
 //			Date tradingDate, StockExchangeDetailService stockExchangeDetailService) throws InterruptedException {
 //		ChromeDriverService service = new ChromeDriverService.Builder()
@@ -510,7 +481,7 @@ public class ChromeDriverUtils {
 ////		        actions.moveByOffset(iframeRightX-100, targetY).click().perform();
 //
 //	}
-	
+
 //	public static void grepTWSESsecuritiesFirmsDayOperate(String downloadFilepath, String chromeDriverPath,
 //			List<String> twseStockCodes, String bpythonUrl, RBucket<Boolean> graspStockEnableKeyBucket)
 //			throws InterruptedException {
@@ -827,10 +798,138 @@ public class ChromeDriverUtils {
 			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
 			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
 			stockDayPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
+			stockDayPrice.setTradingVolume(map.get("TradeVolume"));
 			return stockDayPrice;
 		}).toList();
 	}
 
+	public static List<MarginTradingAndShortSellingInfo> graspTpexMarginTradingAndShortSellingInfo(String url)
+			throws InterruptedException, JsonMappingException, JsonProcessingException, RestClientException,
+			URISyntaxException {
+		String jsonResponse = fetchApiData(url);
+
+		ObjectMapper objectMapper = new ObjectMapper();
+		List<Map<String, String>> responseList = objectMapper
+				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
+				}).stream().filter(data -> {
+					String code = data.get("SecuritiesCompanyCode").toString();
+					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
+				}).collect(Collectors.toList());
+		return responseList.stream().map(map -> {
+			// 指定日期字符串格式
+			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+
+			String monthAndDate = map.get("Date").substring(map.get("Date").length() - 4);
+			int year = Integer.parseInt(map.get("Date").replace(monthAndDate, "")) + 1911; // 民国转换为西元
+			String standardDateString = year + "/" + monthAndDate.substring(0, 2) + "/" + monthAndDate.substring(2, 4);
+
+			// 解析标准日期字符串为 LocalDate 对象
+			LocalDate localDate = LocalDate.parse(standardDateString, dateStringformatter);
+			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
+
+			MarginTradingAndShortSellingInfo marginTradingAndShortSellingInfo = new MarginTradingAndShortSellingInfo();
+			marginTradingAndShortSellingInfo.setTradingDay(date);
+			marginTradingAndShortSellingInfo.setStockCode(map.get("SecuritiesCompanyCode"));
+			marginTradingAndShortSellingInfo
+					.setMarginPurchaseBalancePreviousDay(map.get("MarginPurchaseBalancePreviousDay"));
+			marginTradingAndShortSellingInfo.setMarginPurchase(map.get("MarginPurchase"));
+			marginTradingAndShortSellingInfo.setMarginSales(map.get("MarginSales"));
+			marginTradingAndShortSellingInfo.setCashRedemption(map.get("CashRedemption"));
+			marginTradingAndShortSellingInfo
+					.setMarginPurchaseBalance(map.get("MarginPurchaseBalance"));
+			marginTradingAndShortSellingInfo.setMarginPurchaseQuota(map.get("MarginPurchaseQuota"));
+			marginTradingAndShortSellingInfo
+					.setShortSaleBalancePreviousDay(map.get("ShortSaleBalancePreviousDay"));
+			marginTradingAndShortSellingInfo.setShortSale(map.get("ShortSale"));
+			marginTradingAndShortSellingInfo.setShortConvering(map.get("ShortConvering"));
+			marginTradingAndShortSellingInfo.setStockRedemption(map.get("StockRedemption"));
+			marginTradingAndShortSellingInfo.setShortSaleBalance(map.get("ShortSaleBalance"));
+			marginTradingAndShortSellingInfo.setShortSaleQuota(map.get("ShortSaleQuota"));
+			marginTradingAndShortSellingInfo.setOffsetting(map.get("Offsetting"));
+			return marginTradingAndShortSellingInfo;
+		}).toList();
+
+	}
+
+	public static List<MarginTradingAndShortSellingInfo> graspTwseMarginTradingAndShortSellingInfo(String url,
+			Date tradeDate) throws InterruptedException, JsonMappingException, JsonProcessingException,
+			RestClientException, URISyntaxException {
+		String jsonResponse = fetchApiData(url);
+
+		ObjectMapper objectMapper = new ObjectMapper();
+		List<Map<String, String>> responseList = objectMapper
+				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
+				}).stream().filter(data -> {
+					String code = data.get("股票名稱").toString();
+					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
+				}).collect(Collectors.toList());
+		return responseList.stream().map(map -> {
+			MarginTradingAndShortSellingInfo marginTradingAndShortSellingInfo = new MarginTradingAndShortSellingInfo();
+			marginTradingAndShortSellingInfo.setTradingDay(tradeDate);
+			marginTradingAndShortSellingInfo.setStockCode(map.get("股票代號"));
+			marginTradingAndShortSellingInfo
+					.setMarginPurchaseBalancePreviousDay(map.get("融資前日餘額"));
+			marginTradingAndShortSellingInfo.setMarginPurchase(map.get("融資買進"));
+			marginTradingAndShortSellingInfo.setMarginSales(map.get("融資賣出"));
+			marginTradingAndShortSellingInfo.setCashRedemption(map.get("融資現金償還"));
+			marginTradingAndShortSellingInfo
+					.setMarginPurchaseBalance(map.get("融資今日餘額"));
+			marginTradingAndShortSellingInfo.setMarginPurchaseQuota(map.get("融資限額"));
+			marginTradingAndShortSellingInfo
+					.setShortSaleBalancePreviousDay(map.get("融券前日餘額"));
+			marginTradingAndShortSellingInfo.setShortSale(map.get("融券買進"));
+			marginTradingAndShortSellingInfo.setShortConvering(map.get("融券賣出"));
+			marginTradingAndShortSellingInfo.setStockRedemption(map.get("融券現券償還"));
+			marginTradingAndShortSellingInfo.setShortSaleBalance(map.get("融資今日餘額"));
+			marginTradingAndShortSellingInfo.setShortSaleQuota(map.get("融券限額"));
+			marginTradingAndShortSellingInfo.setOffsetting(map.get("資券互抵"));
+			return marginTradingAndShortSellingInfo;
+		}).toList();
+	}
+
+	public static List<TradeVolumeInfo> graspTpexTtradeVolume(String url) throws InterruptedException,
+			JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
+		String jsonResponse = fetchApiData("https://www.tpex.org.tw/openapi/v1/tpex_volume_rank");
+
+		ObjectMapper objectMapper = new ObjectMapper();
+		List<Map<String, String>> responseList = objectMapper
+				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
+				}).stream().filter(data -> {
+					String code = data.get("SecuritiesCompanyCode").toString();
+					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
+				}).collect(Collectors.toList());
+
+		return responseList.stream().map(map -> {
+			// 指定日期字符串格式
+			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+
+			String monthAndDate = map.get("Date").substring(map.get("Date").length() - 4);
+			int year = Integer.parseInt(map.get("Date").replace(monthAndDate, "")) + 1911; // 民国转换为西元
+			String standardDateString = year + "/" + monthAndDate.substring(0, 2) + "/" + monthAndDate.substring(2, 4);
+
+			// 解析标准日期字符串为 LocalDate 对象
+			LocalDate localDate = LocalDate.parse(standardDateString, dateStringformatter);
+			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
+
+			TradeVolumeInfo tradeVolumeInfo = new TradeVolumeInfo();
+			tradeVolumeInfo.setStockCode(map.get("SecuritiesCompanyCode"));
+			tradeVolumeInfo.setTradingDay(date);
+			String tradingVolume = map.get("TradingVolume");
+			if (tradingVolume != null) {
+				try {
+					// Convert to number
+					int volumeNumber = Integer.parseInt(tradingVolume);
+
+					// Append "000" and set as string
+					tradeVolumeInfo.setTradeVolume(volumeNumber + "000");
+				} catch (NumberFormatException e) {
+					tradeVolumeInfo.setTradeVolume("000");
+				}
+			}
+			return tradeVolumeInfo;
+		}).toList();
+	}
+	
 	public static List<StockDayPrice> graspTpexDayPrice(String url) throws InterruptedException, JsonMappingException,
 			JsonProcessingException, RestClientException, URISyntaxException {
 		String jsonResponse = fetchApiData("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
@@ -885,6 +984,8 @@ public class ChromeDriverUtils {
 		}).toList();
 	}
 
+	
+	
 	public static List<Map<Integer, String>> graspShareholderStructureFromTDCCApi(String tdccOpenApiUrl)
 			throws JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
 		String jsonResponse = fetchApiData(tdccOpenApiUrl);
@@ -959,8 +1060,8 @@ public class ChromeDriverUtils {
 //	private static final String baseUrl = "https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=%1s&stkno=6272&_=17225";
 
 	public static List<StockDayPrice> getTpexStockHistory(Date startDate, Date endDate, String baseUrl,
-			String stockCode)
-			throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException, InterruptedException {
+			String stockCode) throws RestClientException, URISyntaxException, JsonMappingException,
+			JsonProcessingException, InterruptedException {
 		Calendar startCalendar = Calendar.getInstance();
 		startCalendar.setTime(startDate);
 		Calendar endCalendar = Calendar.getInstance();
@@ -975,10 +1076,10 @@ public class ChromeDriverUtils {
 		for (int index = 0; index < monthDiff; index++) {
 			SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd");
 			String formattedDate = dateFormat.format(startCalendar.getTime());
-			  Map<String, String> formParameters = new HashMap<>();
-		        formParameters.put("code", stockCode);
-		        formParameters.put("date", formattedDate);
-		        formParameters.put("response", "json");
+			Map<String, String> formParameters = new HashMap<>();
+			formParameters.put("code", stockCode);
+			formParameters.put("date", formattedDate);
+			formParameters.put("response", "json");
 			String jsonResponse = fetchApiData(baseUrl, formParameters);
 
 			ObjectMapper objectMapper = new ObjectMapper();
@@ -987,7 +1088,7 @@ public class ChromeDriverUtils {
 					});
 
 //			List<List<String>> stockPrices = (List<List<String>>) (responseList.get("tables")[0];
-			Map<String,Object> tables = (Map<String,Object>)((List<Object> )responseList.get("tables")).get(0);
+			Map<String, Object> tables = (Map<String, Object>) ((List<Object>) responseList.get("tables")).get(0);
 			// [111/08/01, 6, 647, 106.00, 107.00, 106.00, 107.00, 0.00, 11]
 			if("0".equals(tables.get("totalCount").toString())) {
 				Thread.sleep(15000);
@@ -1003,50 +1104,50 @@ public class ChromeDriverUtils {
 				int month = Integer.parseInt(parts[1]); // 月
 				int day = Integer.parseInt(parts[2].replaceAll("\\*", "")); // 日
 
-				// 将民国年份转换为公历年份
-				int year = innerTaiwanYear + 1911;
+						// 将民国年份转换为公历年份
+						int year = innerTaiwanYear + 1911;
 
-				// 构造公历日期字符串
-				String gregorianDateStr = year + "/" + month + "/" + day;
-				SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
-				Date tradingDate;
-				try {
-					tradingDate = sdf.parse(gregorianDateStr);
-				} catch (ParseException e) {
-					log.warn(e.getMessage(), e);
-					tradingDate = new Date();
-				}
+						// 构造公历日期字符串
+						String gregorianDateStr = year + "/" + month + "/" + day;
+						SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
+						Date tradingDate;
+						try {
+							tradingDate = sdf.parse(gregorianDateStr);
+						} catch (ParseException e) {
+							log.warn(e.getMessage(), e);
+							tradingDate = new Date();
+						}
 
-				LocalDate today = tradingDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+						LocalDate today = tradingDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 
-				// 設置本周第一天的日期
-				LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
+						// 設置本周第一天的日期
+						LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
 
-				// 設置本周最後一天的日期
-				LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
-				// 獲取系統默認時區
-				ZoneId zoneId = ZoneId.systemDefault();
+						// 設置本周最後一天的日期
+						LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
+						// 獲取系統默認時區
+						ZoneId zoneId = ZoneId.systemDefault();
 
-				// 獲取偏移量
-				ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
+						// 獲取偏移量
+						ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
 
-				// 將 LocalDate 轉換為 Date
-				Date startOfWeeDate = Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
-				Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
+						// 將 LocalDate 轉換為 Date
+						Date startOfWeeDate = Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
+						Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
 
-				// 定义日期格式
-				stockPrice.setTradingDay(tradingDate);
-				stockPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
-				stockPrice.setStockCode(stockCode);
-				stockPrice.setStartOfWeekDate(startOfWeeDate);
-				stockPrice.setEndOfWeekDate(endOfWeekDate);
-				stockPrice.setOpeningPrice(data.get(3));
-				stockPrice.setClosingPrice(data.get(6));
-				stockPrice.setHighPrice(data.get(4));
-				stockPrice.setLowPrice(data.get(5));
-				stockPrice.setChange(data.get(7).replace("+", ""));
-				return stockPrice;
-			}).toList();
+						// 定义日期格式
+						stockPrice.setTradingDay(tradingDate);
+						stockPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
+						stockPrice.setStockCode(stockCode);
+						stockPrice.setStartOfWeekDate(startOfWeeDate);
+						stockPrice.setEndOfWeekDate(endOfWeekDate);
+						stockPrice.setOpeningPrice(data.get(3));
+						stockPrice.setClosingPrice(data.get(6));
+						stockPrice.setHighPrice(data.get(4));
+						stockPrice.setLowPrice(data.get(5));
+						stockPrice.setChange(data.get(7).replace("+", ""));
+						return stockPrice;
+					}).toList();
 			allStockDayPrices.addAll(singleMonthStockDayPrices);
 			startCalendar.add(Calendar.MONTH, 1);
 			Thread.sleep(15000);
@@ -1055,8 +1156,8 @@ public class ChromeDriverUtils {
 	}
 
 	public static List<StockDayPrice> getTwseStockHistory(Date startDate, Date endDate, String baseUrl,
-			String stockCode)
-			throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException, InterruptedException {
+			String stockCode) throws RestClientException, URISyntaxException, JsonMappingException,
+			JsonProcessingException, InterruptedException {
 		Calendar startCalendar = Calendar.getInstance();
 		startCalendar.setTime(startDate);
 		Calendar endCalendar = Calendar.getInstance();
@@ -1156,38 +1257,40 @@ public class ChromeDriverUtils {
 		ResponseEntity<String> responseEntity = restTemplate.exchange(new URI(url), HttpMethod.GET, null, String.class);
 		return responseEntity.getBody();
 	}
-	
-	 private static String fetchApiData(String url,  Map<String, String> formParameters) throws URISyntaxException, RestClientException {
-	        RestTemplate restTemplate = new RestTemplate();
 
-	        // Set the default character encoding to UTF-8
-	        restTemplate.getMessageConverters().stream()
-	                .filter(converter -> converter instanceof org.springframework.http.converter.StringHttpMessageConverter)
-	                .forEach(converter -> ((org.springframework.http.converter.StringHttpMessageConverter) converter)
-	                        .setDefaultCharset(StandardCharsets.UTF_8));
-	        // Prepare form parameters
+	private static String fetchApiData(String url, Map<String, String> formParameters)
+			throws URISyntaxException, RestClientException {
+		RestTemplate restTemplate = new RestTemplate();
 
-	        // Set headers and form data
-	        HttpHeaders headers = new HttpHeaders();
-	        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+		// Set the default character encoding to UTF-8
+		restTemplate.getMessageConverters().stream()
+				.filter(converter -> converter instanceof org.springframework.http.converter.StringHttpMessageConverter)
+				.forEach(converter -> ((org.springframework.http.converter.StringHttpMessageConverter) converter)
+						.setDefaultCharset(StandardCharsets.UTF_8));
+		// Prepare form parameters
 
-	        // Build the form body
-	        StringBuilder formBody = new StringBuilder();
-	        formParameters.forEach((key, value) -> {
-	            if (formBody.length() > 0) {
-	                formBody.append("&");
-	            }
-	            formBody.append(key).append("=").append(value);
-	        });
+		// Set headers and form data
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
-	        // Create the request entity
-	        HttpEntity<String> requestEntity = new HttpEntity<>(formBody.toString(), headers);
+		// Build the form body
+		StringBuilder formBody = new StringBuilder();
+		formParameters.forEach((key, value) -> {
+			if (formBody.length() > 0) {
+				formBody.append("&");
+			}
+			formBody.append(key).append("=").append(value);
+		});
 
-	        // Perform the POST request
-	        ResponseEntity<String> responseEntity = restTemplate.exchange(new URI(url), HttpMethod.POST, requestEntity, String.class);
+		// Create the request entity
+		HttpEntity<String> requestEntity = new HttpEntity<>(formBody.toString(), headers);
 
-	        return responseEntity.getBody();
-	    }
+		// Perform the POST request
+		ResponseEntity<String> responseEntity = restTemplate.exchange(new URI(url), HttpMethod.POST, requestEntity,
+				String.class);
+
+		return responseEntity.getBody();
+	}
 
 	private static String decodeHtmlEntities(String input) {
 		Pattern pattern = Pattern.compile("&#(\\d+);");

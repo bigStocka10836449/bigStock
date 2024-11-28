@@ -3,7 +3,10 @@ package com.bigstock.schedule.service;
 import java.net.URISyntaxException;
 import java.util.Date;
 import java.util.List;
-import javax.annotation.PostConstruct;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.ObjectUtils;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -13,15 +16,20 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 
 import com.bigstock.schedule.utils.ChromeDriverUtils;
+import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
+import com.bigstock.sharedComponent.entity.TradeVolumeInfo;
+import com.bigstock.sharedComponent.service.MarginTradingAndShortSellingInfoService;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockExchangeDetailService;
 import com.bigstock.sharedComponent.service.StockInfoService;
+import com.bigstock.sharedComponent.service.TradeVolumeInfoService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.common.collect.Lists;
-import io.micrometer.common.util.StringUtils;
+
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -61,6 +69,10 @@ public class GraspStockPrice {
 	
 	private final StockDayPriceService stockDayPriceService;
 	
+	private final MarginTradingAndShortSellingInfoService marginTradingAndShortSellingInfoServices;
+	
+	private final TradeVolumeInfoService tradeVolumeInfoService;
+	
 //	private final RedissonClient redissonClient;
 //	
 //	private static final String GRASPSTOCK_REDIS_ENABLE_KEY = "bstock:schedule:GraspStock:enable";
@@ -86,12 +98,55 @@ public class GraspStockPrice {
 	@Transactional
 	public void updateStockDayPrice() throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
+		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
+				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
+
+//		
+		List<TradeVolumeInfo> stockTpexTradeVolumeInfos = ChromeDriverUtils
+				.graspTpexTtradeVolume("https://www.tpex.org.tw/openapi/v1/tpex_volume_rank");
+		Map<String, TradeVolumeInfo> stockTpexTradeVolumeInfosMap = stockTpexTradeVolumeInfos.stream()
+				.collect(Collectors.toMap(TradeVolumeInfo::getStockCode,
+						tradeVolumeInfo -> tradeVolumeInfo 
+				));
+		stockTpexDayPrices.stream().forEach(stockTpexDayPrice ->{
+			TradeVolumeInfo tradeVolumeInfo = stockTpexTradeVolumeInfosMap.get(stockTpexDayPrice.getStockCode());
+			if(ObjectUtils.isNotEmpty(tradeVolumeInfo)) {
+				stockTpexDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
+			}
+		});
+		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
+		List<StockDayPrice> stockTwseDayPrices = ChromeDriverUtils
+				.graspTwseDayPrice("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", tradeDate);
+		List<TradeVolumeInfo> twseTradeVolumeInfos = stockTwseDayPrices.stream().map(stockDayPrice -> {
+			TradeVolumeInfo tradeVolumeInfo = new TradeVolumeInfo();
+			tradeVolumeInfo.setTradingDay(stockDayPrice.getTradingDay());
+			tradeVolumeInfo.setStockCode(stockDayPrice.getStockCode());
+			tradeVolumeInfo.setTradeVolume(stockDayPrice.getTradingVolume());
+			return tradeVolumeInfo;
+		}).toList();
+		
+		stockDayPriceService.saveAll(stockTpexDayPrices);
+		stockDayPriceService.saveAll(stockTwseDayPrices);
+		tradeVolumeInfoService.saveAll(stockTpexTradeVolumeInfos);
+		tradeVolumeInfoService.saveAll(twseTradeVolumeInfos);
+		log.info("finsh sync stockDayPrice");
+	}
+	
+	
+	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}")
+	@Transactional
+//	@PostConstruct
+	public void updateMarginTradingAndShortSellingInfo() throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException, InterruptedException {
+		// 先抓DB裡面全部的代號資料
+		List<MarginTradingAndShortSellingInfo> stockTpexarginTradingAndShortSellingInfo = ChromeDriverUtils.graspTpexMarginTradingAndShortSellingInfo("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_margin_balance");
+		
 		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
 		
 		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
-		List<StockDayPrice> stockTwseDayPrices =  ChromeDriverUtils.graspTwseDayPrice("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",tradeDate);
-		stockDayPriceService.saveAll(stockTpexDayPrices);
-		stockDayPriceService.saveAll(stockTwseDayPrices);
+		
+		List<MarginTradingAndShortSellingInfo> stockTwseDayPrices =  ChromeDriverUtils.graspTwseMarginTradingAndShortSellingInfo("https://openapi.twse.com.tw/v1/exchangeReport/MI_MARGN",tradeDate);
+		marginTradingAndShortSellingInfoServices.saveAll(stockTpexarginTradingAndShortSellingInfo);
+		marginTradingAndShortSellingInfoServices.saveAll(stockTwseDayPrices);
 		log.info("finsh sync stockDayPrice");
 	}
 //    @PostConstruct
