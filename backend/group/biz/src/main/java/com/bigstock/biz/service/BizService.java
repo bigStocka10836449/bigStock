@@ -6,16 +6,21 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.temporal.IsoFields;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.dto.SingleStockPriceVo;
 import com.bigstock.sharedComponent.dto.StructureContinueIncreaseVo;
+import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockExchangeDetail;
@@ -52,8 +57,29 @@ public class BizService {
 	}
 	
 	
-	public List<MarginTradingAndShortSellingInfo> getStockMarginTradingAndShortSelling(){
-		
+	public List<MarginTradingAndShortSellingInfo> getStockMarginTradingAndShortSelling(String stockCode){
+		List<StockDayPrice> stockDayPrices = stockDayPriceService.findPreviousFiftyTowDaysBeforeLastestDayInfo("2330");
+		Date lastTradingDay = stockDayPrices.stream().findFirst().get().getTradingDay();
+		Date firstTradingDay = stockDayPrices.stream().sorted(Comparator.comparing(StockDayPrice::getTradingDay).reversed()).findFirst().get().getTradingDay();
+		List<MarginTradingAndShortSellingInfo> marginTradingAndShortSellingInfos = marginTradingAndShortSellingInfoService.findMarginTradingAndShortSellingInfoByDateRange(stockCode, lastTradingDay, firstTradingDay);
+		Set<Date> marginTradingDaysSet = marginTradingAndShortSellingInfos.stream()
+		        .map(MarginTradingAndShortSellingInfo::getTradingDay)
+		        .collect(Collectors.toSet());
+
+		List<MarginTradingAndShortSellingInfo> newInfos = stockDayPrices.stream()
+		        .filter(stockDayPrice -> !marginTradingDaysSet.contains(stockDayPrice.getTradingDay()))
+		        .map(stockDayPrice -> {
+		            MarginTradingAndShortSellingInfo newInfo = new MarginTradingAndShortSellingInfo();
+		            newInfo.setTradingDay(stockDayPrice.getTradingDay());
+		            return newInfo;
+		        })
+		        .collect(Collectors.toList());
+
+		if(CollectionUtils.isNotEmpty(newInfos)) {
+			marginTradingAndShortSellingInfos.addAll(newInfos);
+			marginTradingAndShortSellingInfos.sort(Comparator.comparing(MarginTradingAndShortSellingInfo::getTradingDay).reversed());
+		}
+		return marginTradingAndShortSellingInfos;
 	}
 
 	public List<SingleStockPriceVo> getSingleStockPrices(String stockCode, Date startDate, Date endDate) throws ParseException{

@@ -70,6 +70,11 @@ public class StockDayPriceService {
 		return NumberUtils.INTEGER_ONE.equals(stockDayPriceRepository.checkIsTradingDateIsExsits(tradingDay));
 	}
 	
+	public List<StockDayPrice> findPreviousFiftyTowDaysBeforeLastestDayInfo(String stockCode){
+		return stockDayPriceRepository.findPreviousFiftyTowDaysBeforeLastestDayInfo(stockCode);
+	}
+	
+	
 	private StockDayPriceService getSelf() {
 		return (StockDayPriceService) AopContext.currentProxy();
 	}

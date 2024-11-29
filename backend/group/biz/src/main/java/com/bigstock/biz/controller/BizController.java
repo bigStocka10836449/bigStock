@@ -1,7 +1,7 @@
 package com.bigstock.biz.controller;
 
-import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,8 +9,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.bigstock.biz.dto.MarginTradingAndShortSellingInfoVO;
 import com.bigstock.biz.service.BizService;
-import com.bigstock.sharedComponent.entity.SecuritiesFirmsDayOperate;
+import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
 
@@ -39,10 +40,13 @@ public class BizController {
 	
 	
 	@Operation(summary = "個別股票資券資訊(依照最後交易日抓取52個交易天的內容", description = "")
-	@GetMapping("stockShareholderStructure/{stockCode}")
-	public ResponseEntity<List<ShareholderStructure>> getStockMarginTradingAndShortSelling(
+	@GetMapping("stockMarginTradingAndShortSelling/{stockCode}")
+	public ResponseEntity<List<MarginTradingAndShortSellingInfoVO>> getStockMarginTradingAndShortSelling(
 			@PathVariable("stockCode") String stockCode) {
-		return ResponseEntity.ok(bizService.getStockShareholderStructure(stockCode, 52));
+		List<MarginTradingAndShortSellingInfoVO> MarginTradingAndShortSellingInfoVOs = bizService.getStockMarginTradingAndShortSelling(stockCode).stream()
+		            .map(MarginTradingAndShortSellingInfoVO::fromEntity) // 使用 VO 的轉換方法
+		            .collect(Collectors.toList());
+		return ResponseEntity.ok(MarginTradingAndShortSellingInfoVOs);
 	}
 
 //	@Operation(summary = "個股買賣日報表", description = "")

@@ -22,10 +22,10 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 	Optional<StockDayPrice> findLastestStockDayPriceByStockCode(@Param("stockCode") String stockCode);
 	
 	
-	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.stock_code ='2330' and sdp.trading_day <= ( "
+	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.stock_code = :stockCode and sdp.trading_day <= ( "
 			+ "select sdp1.trading_day from bstock.bstock.stock_day_price sdp1 order by sdp1.trading_day desc limit 1) "
-			+ "limit 52", nativeQuery = true)
-	List<StockDayPrice> findPreviousFiftyTowDaysBeforeLastestDayInfo();
+			+ "order by sdp.trading_day desc  limit 52", nativeQuery = true)
+	List<StockDayPrice> findPreviousFiftyTowDaysBeforeLastestDayInfo(@Param("stockCode") String stockCode);
 	
 	@Query(value = "SELECT 1 FROM bstock.bstock.stock_day_price sdp WHERE sdp.trading_day =:tradingDay  LIMIT 1", nativeQuery = true)
 	Integer checkIsTradingDateIsExsits(Date tradingDay);
