@@ -75,6 +75,9 @@ public class GraspHistoryStockPrice {
 							Date.from(searchStartDate.atStartOfDay(ZoneId.systemDefault()).toInstant()),
 							Date.from(searchEndDate.atStartOfDay(ZoneId.systemDefault()).toInstant()),
 							manualDateRangeTpexBaseurl, stockCode);
+					stockDayPrices.stream().forEach(stockDayPrice ->{
+						
+					});
 					stockDayPriceService.saveAll(stockDayPrices);
 					Thread.sleep(8000);
 				} catch (Exception e) {

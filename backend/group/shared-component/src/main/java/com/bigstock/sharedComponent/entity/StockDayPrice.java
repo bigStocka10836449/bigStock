@@ -49,11 +49,29 @@ public class StockDayPrice {
 	@Column(name = "change")
 	private String change;
 	
+	@Column(name = "change_rate")
+	private Double changeRate;
+	
 	@Column(name = "week_of_year")
 	private String weekOfYear;
 
 	@Column(name = "trading_volume")
 	private String tradingVolume;
+	
+	@Column(name = "lmit_up")
+	private String limitUp;
+	
+	@Column(name = "limit_down")
+	private String limitDown;
+	
+	@Column(name = "line_k_value")
+	private String lineKvalue;
+	
+	@Column(name = "line_d_value")
+	private String lineDvalue;
+	
+	@Column(name = "line_rsv_value")
+	private String lineRSVvalue;
 	
 	@Getter
 	@Setter

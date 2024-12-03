@@ -789,11 +789,11 @@ public class ChromeDriverUtils {
 		return responseList.stream().map(map -> {
 			StockDayPrice stockDayPrice = new StockDayPrice();
 			stockDayPrice.setStockCode(map.get("Code"));
-			stockDayPrice.setOpeningPrice(map.get("OpeningPrice"));
-			stockDayPrice.setClosingPrice(map.get("ClosingPrice"));
-			stockDayPrice.setHighPrice(map.get("HighestPrice"));
+			stockDayPrice.setOpeningPrice(map.get("OpeningPrice").replaceAll(",", ""));
+			stockDayPrice.setClosingPrice(map.get("ClosingPrice").replaceAll(",", ""));
+			stockDayPrice.setHighPrice(map.get("HighestPrice").replaceAll(",", ""));
 			stockDayPrice.setLowPrice(map.get("LowestPrice"));
-			stockDayPrice.setChange(map.get("Change").replace("+", ""));
+			stockDayPrice.setChange(map.get("Change").replace("+", "").replaceAll(",", ""));
 			stockDayPrice.setTradingDay(tradeDate);
 			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
 			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
@@ -971,11 +971,11 @@ public class ChromeDriverUtils {
 			Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
 			StockDayPrice stockDayPrice = new StockDayPrice();
 			stockDayPrice.setStockCode(map.get("SecuritiesCompanyCode"));
-			stockDayPrice.setOpeningPrice(map.get("Open"));
-			stockDayPrice.setClosingPrice(map.get("Close"));
-			stockDayPrice.setHighPrice(map.get("High"));
-			stockDayPrice.setLowPrice(map.get("Low"));
-			stockDayPrice.setChange(map.get("Change"));
+			stockDayPrice.setOpeningPrice(map.get("Open").replaceAll(",", ""));
+			stockDayPrice.setClosingPrice(map.get("Close").replaceAll(",", ""));
+			stockDayPrice.setHighPrice(map.get("High").replaceAll(",", ""));
+			stockDayPrice.setLowPrice(map.get("Low").replaceAll(",", ""));
+			stockDayPrice.setChange(map.get("Change").replace("+", "").replaceAll(",", ""));
 			stockDayPrice.setTradingDay(date);
 			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
 			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
@@ -1095,14 +1095,15 @@ public class ChromeDriverUtils {
 				startCalendar.add(Calendar.MONTH, 1);
 				continue;
 			}
-			List<StockDayPrice> singleMonthStockDayPrices = ((List<List<String>> )tables.get("data")).stream().map(data -> {
-				StockDayPrice stockPrice = new StockDayPrice();
-				String tradingDateStr = data.get(0);
-				// 拆分民国日期字符串
-				String[] parts = tradingDateStr.split("/");
-				int innerTaiwanYear = Integer.parseInt(parts[0]); // 民国年份
-				int month = Integer.parseInt(parts[1]); // 月
-				int day = Integer.parseInt(parts[2].replaceAll("\\*", "")); // 日
+			List<StockDayPrice> singleMonthStockDayPrices = ((List<List<String>>) tables.get("data")).stream()
+					.map(data -> {
+						StockDayPrice stockPrice = new StockDayPrice();
+						String tradingDateStr = data.get(0);
+						// 拆分民国日期字符串
+						String[] parts = tradingDateStr.split("/");
+						int innerTaiwanYear = Integer.parseInt(parts[0]); // 民国年份
+						int month = Integer.parseInt(parts[1]); // 月
+						int day = Integer.parseInt(parts[2].replaceAll("\\*", "")); // 日
 
 						// 将民国年份转换为公历年份
 						int year = innerTaiwanYear + 1911;
@@ -1141,11 +1142,12 @@ public class ChromeDriverUtils {
 						stockPrice.setStockCode(stockCode);
 						stockPrice.setStartOfWeekDate(startOfWeeDate);
 						stockPrice.setEndOfWeekDate(endOfWeekDate);
-						stockPrice.setOpeningPrice(data.get(3));
-						stockPrice.setClosingPrice(data.get(6));
-						stockPrice.setHighPrice(data.get(4));
-						stockPrice.setLowPrice(data.get(5));
-						stockPrice.setChange(data.get(7).replace("+", ""));
+						stockPrice.setOpeningPrice(data.get(3).replaceAll(",", ""));
+						stockPrice.setClosingPrice(data.get(6).replaceAll(",", ""));
+						stockPrice.setHighPrice(data.get(4).replaceAll(",", ""));
+						stockPrice.setLowPrice(data.get(5).replaceAll(",", ""));
+						stockPrice.setChange(data.get(7).replace("+", "").replaceAll(",", ""));
+					
 						return stockPrice;
 					}).toList();
 			allStockDayPrices.addAll(singleMonthStockDayPrices);
@@ -1234,11 +1236,12 @@ public class ChromeDriverUtils {
 				stockPrice.setStockCode(stockCode);
 				stockPrice.setStartOfWeekDate(startOfWeeDate);
 				stockPrice.setEndOfWeekDate(endOfWeekDate);
-				stockPrice.setOpeningPrice(data.get(3));
-				stockPrice.setClosingPrice(data.get(6));
-				stockPrice.setHighPrice(data.get(4));
-				stockPrice.setLowPrice(data.get(5));
-				stockPrice.setChange(data.get(7).replace("+", ""));
+				stockPrice.setOpeningPrice(data.get(3).replaceAll(",", ""));
+				stockPrice.setClosingPrice(data.get(6).replaceAll(",", ""));
+				stockPrice.setHighPrice(data.get(4).replaceAll(",", ""));
+				stockPrice.setLowPrice(data.get(5).replaceAll(",", ""));
+				stockPrice.setChange(data.get(7).replace("+", "").replaceAll(",", ""));
+				
 				return stockPrice;
 			}).toList();
 			allStockDayPrices.addAll(singleMonthStockDayPrices);
@@ -1347,6 +1350,52 @@ public class ChromeDriverUtils {
 		return ByteString.copyFrom(outputStream.toByteArray());
 	}
 
+	
+	// 計算漲停或跌停價
+	public static Double calculateLimitPrice(double closingPrice, boolean isUpper) {
+	    // 計算理論價格
+	    double limitPrice = closingPrice * (isUpper ? 1.10 : 0.90);
+	    // 根據 tick 單位調整
+	    double tickSize = getTickSize(limitPrice);
+
+	    double adjustedPrice;
+	    if (isUpper) {
+	        // 漲停：向下取最近的 tick 單位
+	        adjustedPrice = Math.floor(limitPrice / tickSize) * tickSize;
+	    } else {
+	        // 跌停：向上取最近的 tick 單位
+	        adjustedPrice = Math.ceil(limitPrice / tickSize) * tickSize;
+	    }
+
+	    // 格式化到小數點第 2 位
+	    return Double.valueOf(String.format("%.2f", adjustedPrice));
+	}
+
+	// 根據價格區間返回 tick 單位
+	public static double getTickSize(double price) {
+	    if (price >= 0 && price < 10) {
+	        return 0.01;
+	    } else if (price >= 10 && price < 50) {
+	        return 0.05;
+	    } else if (price >= 50 && price < 100) {
+	        return 0.1;
+	    } else if (price >= 100 && price < 500) {
+	        return 0.5;
+	    } else if (price >= 500 && price < 1000) {
+	        return 1.0;
+	    } else if (price >= 1000 && price < 2000) {
+	        return 5.0;
+	    } else if (price >= 2000 && price < 5000) {
+	        return 10.0;
+	    } else if (price >= 5000 && price < 10000) {
+	        return 50.0;
+	    } else if (price >= 10000) {
+	        return 100.0;
+	    } else {
+	        throw new IllegalArgumentException("無效的價格：" + price);
+	    }
+	}
+	
 	private static void initializeColumnNames() {
 		SHAREHOLDER_STRUCTURE_COLUMN_NAME.put(0, "周別");
 		SHAREHOLDER_STRUCTURE_COLUMN_NAME.put(1, "統計日期");

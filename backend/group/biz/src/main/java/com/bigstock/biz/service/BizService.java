@@ -85,17 +85,17 @@ public class BizService {
 	public List<SingleStockPriceVo> getSingleStockPrices(String stockCode, Date startDate, Date endDate) throws ParseException{
 		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 		List<StockDayPrice> stockDayPrices = stockDayPriceService.findByStockCodeAndStartDateAndEndDateCache(stockCode, sdf.format(startDate), sdf.format(endDate));
-		return stockDayPrices.stream().map(stockDayPrice ->{
+		return stockDayPrices.stream().sorted(Comparator.comparing(StockDayPrice::getTradingDay).reversed()).map(stockDayPrice ->{
 			String highPrice = stockDayPrice.getHighPrice() ;
 			String lowPrice = stockDayPrice.getLowPrice();
 			String openingPrice = stockDayPrice.getOpeningPrice();
 			String closingPrice = stockDayPrice.getClosingPrice();
 			SimpleDateFormat sfd = new SimpleDateFormat("yyyy-MM-dd");
 			SingleStockPriceVo vo = new SingleStockPriceVo();
-			vo.setClosingPrice(closingPrice);
-			vo.setOpeningPrice(openingPrice);
-			vo.setHighPrice(highPrice);
-			vo.setLowPrice(lowPrice);
+			vo.setClosingPrice(closingPrice.replaceAll(",", ""));
+			vo.setOpeningPrice(openingPrice.replaceAll(",", ""));
+			vo.setHighPrice(highPrice.replaceAll(",", ""));
+			vo.setLowPrice(lowPrice.replaceAll(",", ""));
 			vo.setTradingDate(sfd.format(stockDayPrice.getTradingDay()));
 			vo.setStockCode(stockCode);
 			String tradingVolume = stockDayPrice.getTradingVolume();
