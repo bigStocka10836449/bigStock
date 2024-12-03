@@ -18,6 +18,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
+import com.bigstock.sharedComponent.dto.DynamicFilterStockCodeVo;
 import com.bigstock.sharedComponent.dto.SingleStockPriceVo;
 import com.bigstock.sharedComponent.dto.StructureContinueIncreaseVo;
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
@@ -152,6 +153,10 @@ public class BizService {
 				}).toList();
 	}
 
+	public List<String> getMatchStockCodeByCondition(DynamicFilterStockCodeVo dynamicFilterStockCodeVo){
+		stockDayPriceService.
+	}
+	
 	private String findMaxWeek(LocalDate today, AtomicInteger weekOfYear) {
 		boolean checkResult = false;
 		while (!checkResult) {

@@ -92,11 +92,11 @@ public class GraspStockPrice {
 //	}
 
 	// 每天下午5點更新
-//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
+	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 	// 每周日早上8点触发更新
 //	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 //	@Transactional
-	@PostConstruct
+//	@PostConstruct
 	public void updateStockDayPrice() throws RestClientException, URISyntaxException, JsonMappingException,
 			JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
@@ -105,9 +105,6 @@ public class GraspStockPrice {
 
 //		   List<StockDayPrice> singleStockDayPrices = entry.getValue();
 
-		stockTpexDayPrices.stream().forEach(stockDayPrice -> {
-			calculateRSVValueAndLimitDownUp(stockDayPrice);
-		});
 
 		List<TradeVolumeInfo> stockTpexTradeVolumeInfos = ChromeDriverUtils
 				.graspTpexTtradeVolume("https://www.tpex.org.tw/openapi/v1/tpex_volume_rank");
@@ -127,11 +124,13 @@ public class GraspStockPrice {
 		stockDayPriceService.saveAll(stockTpexDayPrices);
 		stockTpexDayPrices.stream().forEach(stockTpexDayPrice -> {
 			calculateRSVValueAndLimitDownUp(stockTpexDayPrice);
+			TradeVolumeInfo tradeVolumeInfo = stockTpexTradeVolumeInfosMap.get(stockTpexDayPrice.getStockCode());
+			stockTpexDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
 		});
 		stockDayPriceService.saveAll(stockTpexDayPrices);
 		stockDayPriceService.saveAll(stockTwseDayPrices);
 		stockTwseDayPrices.stream().forEach(stockTwseDayPrice -> {
-			
+			calculateRSVValueAndLimitDownUp(stockTwseDayPrice);
 		});
 		stockDayPriceService.saveAll(stockTwseDayPrices);
 		tradeVolumeInfoService.saveAll(stockTpexTradeVolumeInfos);

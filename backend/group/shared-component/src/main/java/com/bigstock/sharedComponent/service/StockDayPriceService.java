@@ -89,7 +89,17 @@ public class StockDayPriceService {
 	public List<StockDayPrice> findByStockCodeAndTradingDayBeforEqualLimitNimeth(String stockCode, Date endDate) {
 		return stockDayPriceRepository.findByStockCodeAndTradingDayBeforEqualLimitNimeth(stockCode, endDate);
 	}
+	
+	public Integer checkIsTradingDateRangeContaineNotCalculate(@Param("stockCode") String stockCode,
+			@Param("startDate") Date startDate, @Param("endDate") Date endDate) {
+		return stockDayPriceRepository.checkIsTradingDateRangeContaineNotCalculate(stockCode, startDate, endDate);
+	}
 
+	public Optional<StockDayPrice> findLastestStockDayPrice(){
+		return stockDayPriceRepository.findLastestStockDayPrice();
+	}
+	
+	
 	private StockDayPriceService getSelf() {
 		return (StockDayPriceService) AopContext.currentProxy();
 	}
