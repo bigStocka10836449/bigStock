@@ -1,14 +1,13 @@
 package com.bigstock.schedule.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URISyntaxException;
+import java.text.ParseException;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -20,7 +19,6 @@ import org.springframework.web.client.RestClientException;
 import com.bigstock.schedule.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
-import com.bigstock.sharedComponent.entity.TradeVolumeInfo;
 import com.bigstock.sharedComponent.service.MarginTradingAndShortSellingInfoService;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
@@ -29,7 +27,6 @@ import com.bigstock.sharedComponent.service.StockInfoService;
 import com.bigstock.sharedComponent.service.TradeVolumeInfoService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.google.common.collect.Maps;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -92,50 +89,62 @@ public class GraspStockPrice {
 //	}
 
 	// 每天下午5點更新
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 	// 每周日早上8点触发更新
 //	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 //	@Transactional
-//	@PostConstruct
+	@PostConstruct
 	public void updateStockDayPrice() throws RestClientException, URISyntaxException, JsonMappingException,
 			JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
-		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
-				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
+//		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
+//				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
 
 //		   List<StockDayPrice> singleStockDayPrices = entry.getValue();
 
 
-		List<TradeVolumeInfo> stockTpexTradeVolumeInfos = ChromeDriverUtils
-				.graspTpexTtradeVolume("https://www.tpex.org.tw/openapi/v1/tpex_volume_rank");
-		Map<String, TradeVolumeInfo> stockTpexTradeVolumeInfosMap = stockTpexTradeVolumeInfos.stream()
-				.collect(Collectors.toMap(TradeVolumeInfo::getStockCode, tradeVolumeInfo -> tradeVolumeInfo));
-		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
-		List<StockDayPrice> stockTwseDayPrices = ChromeDriverUtils
-				.graspTwseDayPrice("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", tradeDate);
-		List<TradeVolumeInfo> twseTradeVolumeInfos = stockTwseDayPrices.stream().map(stockDayPrice -> {
-			TradeVolumeInfo tradeVolumeInfo = new TradeVolumeInfo();
-			tradeVolumeInfo.setTradingDay(stockDayPrice.getTradingDay());
-			tradeVolumeInfo.setStockCode(stockDayPrice.getStockCode());
-			tradeVolumeInfo.setTradeVolume(stockDayPrice.getTradingVolume());
-			return tradeVolumeInfo;
-		}).toList();
-
-		stockDayPriceService.saveAll(stockTpexDayPrices);
-		stockTpexDayPrices.stream().forEach(stockTpexDayPrice -> {
-			calculateRSVValueAndLimitDownUp(stockTpexDayPrice);
-			TradeVolumeInfo tradeVolumeInfo = stockTpexTradeVolumeInfosMap.get(stockTpexDayPrice.getStockCode());
-			stockTpexDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
-		});
-		stockDayPriceService.saveAll(stockTpexDayPrices);
-		stockDayPriceService.saveAll(stockTwseDayPrices);
-		stockTwseDayPrices.stream().forEach(stockTwseDayPrice -> {
-			calculateRSVValueAndLimitDownUp(stockTwseDayPrice);
-		});
-		stockDayPriceService.saveAll(stockTwseDayPrices);
-		tradeVolumeInfoService.saveAll(stockTpexTradeVolumeInfos);
-		tradeVolumeInfoService.saveAll(twseTradeVolumeInfos);
+//		List<TradeVolumeInfo> stockTpexTradeVolumeInfos = ChromeDriverUtils
+//				.graspTpexTtradeVolume("https://www.tpex.org.tw/openapi/v1/tpex_volume_rank");
+//		Map<String, TradeVolumeInfo> stockTpexTradeVolumeInfosMap = stockTpexTradeVolumeInfos.stream()
+//				.collect(Collectors.toMap(TradeVolumeInfo::getStockCode, tradeVolumeInfo -> tradeVolumeInfo));
+//		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
+//		List<StockDayPrice> stockTwseDayPrices = ChromeDriverUtils
+//				.graspTwseDayPrice("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", tradeDate);
+//		List<TradeVolumeInfo> twseTradeVolumeInfos = stockTwseDayPrices.stream().map(stockDayPrice -> {
+//			TradeVolumeInfo tradeVolumeInfo = new TradeVolumeInfo();
+//			tradeVolumeInfo.setTradingDay(stockDayPrice.getTradingDay());
+//			tradeVolumeInfo.setStockCode(stockDayPrice.getStockCode());
+//			tradeVolumeInfo.setTradeVolume(stockDayPrice.getTradingVolume());
+//			return tradeVolumeInfo;
+//		}).toList();
+//
+//		stockDayPriceService.saveAll(stockTpexDayPrices);
+//		stockTpexDayPrices.stream().forEach(stockTpexDayPrice -> {
+//			calculateRSVValueAndLimitDownUp(stockTpexDayPrice);
+//			TradeVolumeInfo tradeVolumeInfo = stockTpexTradeVolumeInfosMap.get(stockTpexDayPrice.getStockCode());
+//			stockTpexDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
+//		});
+//		stockDayPriceService.saveAll(stockTpexDayPrices);
+//		stockDayPriceService.saveAll(stockTwseDayPrices);
+//		stockTwseDayPrices.stream().forEach(stockTwseDayPrice -> {
+//			calculateRSVValueAndLimitDownUp(stockTwseDayPrice);
+//		});
+//		stockDayPriceService.saveAll(stockTwseDayPrices);
+//		tradeVolumeInfoService.saveAll(stockTpexTradeVolumeInfos);
+//		tradeVolumeInfoService.saveAll(twseTradeVolumeInfos);
 //		
+		List<String> stockCodes = stockDayPriceService.findListStockCode();
+		stockCodes.stream().forEach(stockCode ->{
+			try {
+				List<StockDayPrice> stockDayPrices	=stockDayPriceService.findByStockCodeAndStartDateAndEndDate(stockCode, "2024-10-01", "2024-12-04");
+				stockDayPrices.stream().forEach(stockDayPrice ->{
+					calculateRSVValueAndLimitDownUp(stockDayPrice);
+				});
+				stockDayPriceService.saveAll(stockDayPrices);
+			} catch (ParseException e) {
+				e.printStackTrace();
+			}
+		});
 //		List<StockDayPrice> stockDayPrices = 
 //		stockDayPriceService.findPreviousFiftyTowDaysBeforeLastestDayInfo("2330");
 //		
@@ -438,19 +447,19 @@ public class GraspStockPrice {
 		if(stockTwseDayPrice.getClosingPrice().equals("---") || stockTwseDayPrice.getClosingPrice().equals("----") || stockTwseDayPrice.getClosingPrice().equals("--")  ) {
 			return;
 		}
-		List<StockDayPrice> twelfthStockDayPrices = stockDayPriceService
-				.findByStockCodeAndTradingDayBeforEqualLimitNimeth(stockTwseDayPrice.getStockCode(),
+		List<StockDayPrice> twoFourtyStockDayPrices = stockDayPriceService
+				.findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(stockTwseDayPrice.getStockCode(),
 						stockTwseDayPrice.getTradingDay());
-		if (twelfthStockDayPrices.size() < 9) {
+		if (twoFourtyStockDayPrices.size() < 9) {
 			return; // 如果不满足条件，返回 null
 		}
 
 		int period = 9;
-		List<Double> closingPrices = twelfthStockDayPrices.stream().map(innerTwelfthStockDayPrice -> Double
+		List<Double> closingPrices = twoFourtyStockDayPrices.stream().map(innerTwelfthStockDayPrice -> Double
 				.valueOf(innerTwelfthStockDayPrice.getClosingPrice().replaceAll(",", ""))).toList();
-		List<Double> highPrices = twelfthStockDayPrices.stream().map(innerTwelfthStockDayPrice -> Double
+		List<Double> highPrices = twoFourtyStockDayPrices.stream().map(innerTwelfthStockDayPrice -> Double
 				.valueOf(innerTwelfthStockDayPrice.getHighPrice().replaceAll(",", ""))).toList();
-		List<Double> lowPrices = twelfthStockDayPrices.stream().map(innerTwelfthStockDayPrice -> Double
+		List<Double> lowPrices = twoFourtyStockDayPrices.stream().map(innerTwelfthStockDayPrice -> Double
 				.valueOf(innerTwelfthStockDayPrice.getLowPrice().replaceAll(",", ""))).toList();
 
 		double highestHigh = Double.MIN_VALUE;
@@ -463,14 +472,16 @@ public class GraspStockPrice {
 
 		double latestClosingPrice = closingPrices.get(0);
 		Double rsv = (latestClosingPrice - lowestLow) / (highestHigh - lowestLow) * 100.0;
-
-		Double previousK =  StringUtils.isNotBlank( twelfthStockDayPrices.get(1).getLineKvalue())  ? Double.valueOf(twelfthStockDayPrices.get(1).getLineKvalue())  : 50; // Default initial K value
-		Double previousD = StringUtils.isNotBlank( twelfthStockDayPrices.get(1).getLineDvalue())  ? Double.valueOf(twelfthStockDayPrices.get(1).getLineDvalue())  : 50;// Default initial D value
+		rsv = roundToThreeDecimalPlaces(rsv);
+		Double previousK =  StringUtils.isNotBlank( twoFourtyStockDayPrices.get(1).getLineKvalue())  ? Double.valueOf(twoFourtyStockDayPrices.get(1).getLineKvalue())  : 50; // Default initial K value
+		Double previousD = StringUtils.isNotBlank( twoFourtyStockDayPrices.get(1).getLineDvalue())  ? Double.valueOf(twoFourtyStockDayPrices.get(1).getLineDvalue())  : 50;// Default initial D value
 		double smoothingFactor = 1.0 / 3.0;
 
 		Double k = previousK * (1 - smoothingFactor) + rsv * smoothingFactor;
+		k = roundToThreeDecimalPlaces(k);
 		Double d = previousD * (1 - smoothingFactor) + k * smoothingFactor;
-
+		d =  roundToThreeDecimalPlaces(d);
+		
 		stockTwseDayPrice.setLineDvalue(d.toString());
 		stockTwseDayPrice.setLineKvalue(k.toString());
 		stockTwseDayPrice.setLineRSVvalue(rsv.toString());
@@ -511,5 +522,53 @@ public class GraspStockPrice {
 		Double rate = ((closingPrice - standarPrice) / standarPrice) * 100;
 		rate = Math.round(rate * 100.0) / 100.0;
 		stockTwseDayPrice.setChangeRate(rate);
+		
+		// 新增計算移動平均線 (MA) 的邏輯
+	    int[] maPeriods = {240, 120, 60, 20, 10, 5}; // 定義需要計算的移動平均線週期
+	    for (int maPeriod : maPeriods) {
+	        Double maValue = calculateMovingAverage(twoFourtyStockDayPrices, maPeriod);
+	        switch (maPeriod) {
+	            case 240:
+	                stockTwseDayPrice.setTwoFourtyDaysMa(maValue.toString()); // 設置 240 日 MA
+	                break;
+	            case 120:
+	                stockTwseDayPrice.setOneTwentyDaysMa(maValue.toString()); // 設置 120 日 MA
+	                break;
+	            case 60:
+	                stockTwseDayPrice.setSixtyDaysMa(maValue.toString()); // 設置 60 日 MA
+	                break;
+	            case 20:
+	                stockTwseDayPrice.setTwentyDaysMa(maValue.toString()); // 設置 20 日 MA
+	                break;
+	            case 10:
+	                stockTwseDayPrice.setTenDaysMa(maValue.toString()); // 設置 10 日 MA
+	                break;
+	            case 5:
+	                stockTwseDayPrice.setFiveDaysMa(maValue.toString()); // 設置 5 日 MA
+	                break;
+	        }
+	    }
+	}
+	
+	private double calculateMovingAverage(List<StockDayPrice> stockDayPrices, int period) {
+	    if (stockDayPrices.size() < period) {
+	        return 0.0; // 如果資料不足，返回 0
+	    }
+	    double average = stockDayPrices.stream()
+	            .limit(period)
+	            .mapToDouble(stockDayPrice -> Double.valueOf(stockDayPrice.getClosingPrice().replaceAll(",", "")))
+	            .average()
+	            .orElse(0.0);
+
+	    // 使用 BigDecimal 保留小數點第 4 位（四捨五入）
+	    return new BigDecimal(average)
+	            .setScale(4, RoundingMode.HALF_UP)
+	            .doubleValue();
+	}
+	
+	private double roundToThreeDecimalPlaces(double value) {
+	    return new BigDecimal(value)
+	            .setScale(3, RoundingMode.HALF_UP)
+	            .doubleValue();
 	}
 }

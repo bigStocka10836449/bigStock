@@ -73,6 +73,24 @@ public class StockDayPrice {
 	@Column(name = "line_rsv_value")
 	private String lineRSVvalue;
 	
+	@Column(name = "five_days_ma")
+	private String fiveDaysMa;
+	
+	@Column(name = "twenty_days_ma")
+	private String twentyDaysMa;
+	
+	@Column(name = "ten_days_ma")
+	private String tenDaysMa;
+	
+	@Column(name = "sixty_days_ma")
+	private String sixtyDaysMa;
+	
+	@Column(name = "one_twenty_days_ma")
+	private String oneTwentyDaysMa;
+	
+	@Column(name = "two_fourty_days_ma")
+	private String twoFourtyDaysMa;
+	
 	@Getter
 	@Setter
 	public static class StockDayPriceId implements Serializable {
