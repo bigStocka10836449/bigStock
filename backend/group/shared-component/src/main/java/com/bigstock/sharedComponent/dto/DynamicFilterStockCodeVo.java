@@ -11,4 +11,6 @@ public class DynamicFilterStockCodeVo {
 
 	List<DynamicFilterStockPriceCondition> conditions;
 	
+	Integer limit = 15;
+	
 }

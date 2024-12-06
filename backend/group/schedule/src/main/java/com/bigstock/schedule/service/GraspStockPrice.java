@@ -6,7 +6,9 @@ import java.net.URISyntaxException;
 import java.text.ParseException;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +21,7 @@ import org.springframework.web.client.RestClientException;
 import com.bigstock.schedule.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
+import com.bigstock.sharedComponent.entity.TradeVolumeInfo;
 import com.bigstock.sharedComponent.service.MarginTradingAndShortSellingInfoService;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
@@ -97,54 +100,54 @@ public class GraspStockPrice {
 	public void updateStockDayPrice() throws RestClientException, URISyntaxException, JsonMappingException,
 			JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
-//		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
-//				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
+		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
+				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
 
 //		   List<StockDayPrice> singleStockDayPrices = entry.getValue();
 
 
-//		List<TradeVolumeInfo> stockTpexTradeVolumeInfos = ChromeDriverUtils
-//				.graspTpexTtradeVolume("https://www.tpex.org.tw/openapi/v1/tpex_volume_rank");
-//		Map<String, TradeVolumeInfo> stockTpexTradeVolumeInfosMap = stockTpexTradeVolumeInfos.stream()
-//				.collect(Collectors.toMap(TradeVolumeInfo::getStockCode, tradeVolumeInfo -> tradeVolumeInfo));
-//		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
-//		List<StockDayPrice> stockTwseDayPrices = ChromeDriverUtils
-//				.graspTwseDayPrice("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", tradeDate);
-//		List<TradeVolumeInfo> twseTradeVolumeInfos = stockTwseDayPrices.stream().map(stockDayPrice -> {
-//			TradeVolumeInfo tradeVolumeInfo = new TradeVolumeInfo();
-//			tradeVolumeInfo.setTradingDay(stockDayPrice.getTradingDay());
-//			tradeVolumeInfo.setStockCode(stockDayPrice.getStockCode());
-//			tradeVolumeInfo.setTradeVolume(stockDayPrice.getTradingVolume());
-//			return tradeVolumeInfo;
-//		}).toList();
-//
-//		stockDayPriceService.saveAll(stockTpexDayPrices);
-//		stockTpexDayPrices.stream().forEach(stockTpexDayPrice -> {
-//			calculateRSVValueAndLimitDownUp(stockTpexDayPrice);
-//			TradeVolumeInfo tradeVolumeInfo = stockTpexTradeVolumeInfosMap.get(stockTpexDayPrice.getStockCode());
-//			stockTpexDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
-//		});
-//		stockDayPriceService.saveAll(stockTpexDayPrices);
-//		stockDayPriceService.saveAll(stockTwseDayPrices);
-//		stockTwseDayPrices.stream().forEach(stockTwseDayPrice -> {
-//			calculateRSVValueAndLimitDownUp(stockTwseDayPrice);
-//		});
-//		stockDayPriceService.saveAll(stockTwseDayPrices);
-//		tradeVolumeInfoService.saveAll(stockTpexTradeVolumeInfos);
-//		tradeVolumeInfoService.saveAll(twseTradeVolumeInfos);
-//		
-		List<String> stockCodes = stockDayPriceService.findListStockCode();
-		stockCodes.stream().forEach(stockCode ->{
-			try {
-				List<StockDayPrice> stockDayPrices	=stockDayPriceService.findByStockCodeAndStartDateAndEndDate(stockCode, "2024-10-01", "2024-12-04");
-				stockDayPrices.stream().forEach(stockDayPrice ->{
-					calculateRSVValueAndLimitDownUp(stockDayPrice);
-				});
-				stockDayPriceService.saveAll(stockDayPrices);
-			} catch (ParseException e) {
-				e.printStackTrace();
-			}
+		List<TradeVolumeInfo> stockTpexTradeVolumeInfos = ChromeDriverUtils
+				.graspTpexTtradeVolume("https://www.tpex.org.tw/openapi/v1/tpex_volume_rank");
+		Map<String, TradeVolumeInfo> stockTpexTradeVolumeInfosMap = stockTpexTradeVolumeInfos.stream()
+				.collect(Collectors.toMap(TradeVolumeInfo::getStockCode, tradeVolumeInfo -> tradeVolumeInfo));
+		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
+		List<StockDayPrice> stockTwseDayPrices = ChromeDriverUtils
+				.graspTwseDayPrice("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", tradeDate);
+		List<TradeVolumeInfo> twseTradeVolumeInfos = stockTwseDayPrices.stream().map(stockDayPrice -> {
+			TradeVolumeInfo tradeVolumeInfo = new TradeVolumeInfo();
+			tradeVolumeInfo.setTradingDay(stockDayPrice.getTradingDay());
+			tradeVolumeInfo.setStockCode(stockDayPrice.getStockCode());
+			tradeVolumeInfo.setTradeVolume(stockDayPrice.getTradingVolume());
+			return tradeVolumeInfo;
+		}).toList();
+
+		stockDayPriceService.saveAll(stockTpexDayPrices);
+		stockTpexDayPrices.stream().forEach(stockTpexDayPrice -> {
+			calculateRSVValueAndLimitDownUp(stockTpexDayPrice);
+			TradeVolumeInfo tradeVolumeInfo = stockTpexTradeVolumeInfosMap.get(stockTpexDayPrice.getStockCode());
+			stockTpexDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
 		});
+		stockDayPriceService.saveAll(stockTpexDayPrices);
+		stockDayPriceService.saveAll(stockTwseDayPrices);
+		stockTwseDayPrices.stream().forEach(stockTwseDayPrice -> {
+			calculateRSVValueAndLimitDownUp(stockTwseDayPrice);
+		});
+		stockDayPriceService.saveAll(stockTwseDayPrices);
+		tradeVolumeInfoService.saveAll(stockTpexTradeVolumeInfos);
+		tradeVolumeInfoService.saveAll(twseTradeVolumeInfos);
+		
+//		List<String> stockCodes = stockDayPriceService.findListStockCode();
+//		stockCodes.stream().forEach(stockCode ->{
+//			try {
+//				List<StockDayPrice> stockDayPrices	=stockDayPriceService.findByStockCodeAndStartDateAndEndDate(stockCode, "2024-10-01", "2024-12-04");
+//				stockDayPrices.stream().forEach(stockDayPrice ->{
+//					calculateRSVValueAndLimitDownUp(stockDayPrice);
+//				});
+//				stockDayPriceService.saveAll(stockDayPrices);
+//			} catch (ParseException e) {
+//				e.printStackTrace();
+//			}
+//		});
 //		List<StockDayPrice> stockDayPrices = 
 //		stockDayPriceService.findPreviousFiftyTowDaysBeforeLastestDayInfo("2330");
 //		
