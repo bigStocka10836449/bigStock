@@ -103,6 +103,10 @@ public class StockDayPriceService {
 		return stockDayPriceRepository.findClosingPriceReachLimitUpStockCodeByTradingDay(tradingDay);
 	}
 	
+	public List<StockDayPrice> findTodateReachLimitUp(Date endDate){
+		return stockDayPriceRepository.findTodateReachLimitUp(endDate);
+	}
+	
 	public List<String> findListStockCode(){
 		return stockDayPriceRepository.findListStockCode();
 	}

@@ -11,4 +11,5 @@ public class DynamicFilterStockPriceCondition {
 	String name;
 	List<String> value;
 	String operator;
+	String type;
 }
