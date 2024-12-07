@@ -14,7 +14,7 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 
 	List<StockDayPrice> findByStockCode(String stockCode);
 
-	@Query("select t from StockDayPrice t where t.tradingDay = :endDate and t.closingPrice = t.limitUp order by t.stockCode asc")
+	@Query("select t from StockDayPrice t where t.tradingDay = :endDate and CAST(t.closingPrice as double) = CAST(t.limitUp as double) and t.limitUp not like '%-%' and t.closingPrice != '' order by t.stockCode asc")
 	List<StockDayPrice> findTodateReachLimitUp(@Param("endDate") Date endDate);
 	
 	@Query("select t from StockDayPrice t where t.stockCode = :stockCode and t.weekOfYear = :weekOfYear order by t.tradingDay asc")
