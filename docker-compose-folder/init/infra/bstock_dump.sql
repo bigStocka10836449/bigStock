@@ -49,6 +49,52 @@ CREATE TABLE bstock.role_info (
 
 ALTER TABLE bstock.role_info OWNER TO bstockuser;
 
+
+CREATE TABLE bstock.tmp_ex_dividends_ex_right_info (
+	trading_day date NULL,
+	stock_code text NULL,
+	limit_up text NULL,
+	limit_down text NULL,
+	reference_price text NULL
+);
+
+ALTER TABLE bstock.tmp_ex_dividends_ex_right_info OWNER TO bstockuser;
+
+ALTER TABLE ONLY bstock.tmp_ex_dividends_ex_right_info
+    ADD CONSTRAINT tmp_ex_dividends_ex_right_info_unique UNIQUE (trading_day, stock_code);
+
+COMMENT ON TABLE bstock.tmp_ex_dividends_ex_right_info_unique IS '個股除權息資訊';    
+
+COMMENT ON COLUMN bstock.tmp_ex_dividends_ex_right_info_unique.reference_price IS '標準開盤價格';
+    
+
+CREATE TABLE bstock.stock_week_price (
+	stock_code text NULL,
+	weekofyear text NULL,
+	"year" int4 NULL,
+	"month" int4 NULL,
+	first_trading_day date NULL,
+	high_price text NULL,
+	low_price text NULL,
+	change_rate numeric NULL,
+	trading_volume int8 NULL,
+	line_k_value numeric NULL,
+	line_d_value numeric NULL,
+	line_rsv_value numeric NULL,
+	five_week_ma numeric NULL,
+	twenty_week_ma numeric NULL,
+	ten_week_ma numeric NULL,
+	sixty_week_ma numeric NULL,
+	one_twenty_days_ma numeric NULL,
+	two_fourty_days_ma numeric NULL,
+	opening_price numeric NULL
+);
+
+ALTER TABLE bstock.stock_week_price OWNER TO bstockuser;
+
+ALTER TABLE ONLY bstock.stock_week_price
+    ADD CONSTRAINT stock_week_price_unique UNIQUE UNIQUE (stock_code, year, weekofyear);
+
 --
 -- TOC entry 3445 (class 0 OID 0)
 -- Dependencies: 215
@@ -412,7 +458,6 @@ CREATE TABLE bstock.margin_trading_and_short_selling_info (
 	short_sale_balance text ,
 	short_sale_quota text ,
 	offsetting text 
-	
 );
 
 
@@ -438,7 +483,7 @@ ALTER TABLE bstock.margin_trading_and_short_selling_info OWNER TO bstockuser;
 ALTER TABLE ONLY bstock.margin_trading_and_short_selling_info
     ADD CONSTRAINT margin_trading_and_short_selling_info_unique UNIQUE (trading_day, stock_code);
 
-
+CREATE INDEX margin_trading_and_short_selling_info_trading_day_idx ON bstock.margin_trading_and_short_selling_info USING btree (trading_day);
 --
 -- TOC entry 219 (class 1259 OID 16405)
 -- Name: stock_day_price; Type: TABLE; Schema: bstock; Owner: bstockuser
@@ -8668,7 +8713,7 @@ CREATE INDEX stock_day_price_week_of_year_idx ON bstock.stock_day_price USING bt
 --
 
 CREATE INDEX stock_exchange_detail_stock_code_idx ON bstock.stock_exchange_detail USING btree (stock_code, trading_date);
-
+CREATE INDEX stock_day_price_trading_day_idx ON bstock.stock_day_price USING btree (trading_day DESC);
 
 --
 -- TOC entry 3282 (class 1259 OID 16446)

@@ -26,6 +26,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -39,6 +40,7 @@ import org.springframework.web.client.RestTemplate;
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockInfo;
+import com.bigstock.sharedComponent.entity.TmpExDividendsExRightInfo;
 import com.bigstock.sharedComponent.entity.TradeVolumeInfo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -48,6 +50,7 @@ import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.PipeInput;
 import com.github.kokorin.jaffree.ffmpeg.PipeOutput;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 
 import lombok.extern.slf4j.Slf4j;
@@ -67,6 +70,103 @@ public class ChromeDriverUtils {
 		initializeColumnNames();
 	}
 
+	
+	public static List<TmpExDividendsExRightInfo> grepTmpExDividendsExRightInfo(Date tradingMonth) throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException{
+		List<TmpExDividendsExRightInfo> allInfos = Lists.newArrayList();
+		ObjectMapper objectMapper = new ObjectMapper();
+		LocalDate today = tradingMonth.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+		DateTimeFormatter tpexDateFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+		 // 設置本月的第一天
+        LocalDate startOfMonth = today.withDayOfYear(122);
+
+        // 設置本月的最後一天
+        LocalDate endOfMonth = today.withDayOfMonth(today.lengthOfMonth());
+        //https://www.tpex.org.tw/www/zh-tw/bulletin/exDailyQ
+        Map<String, String> parameter = Maps.newHashMap();
+        parameter.put("startDate", startOfMonth.format(tpexDateFormatter));
+        parameter.put("endDate", endOfMonth.format(tpexDateFormatter));
+        parameter.put("response", "json");
+        String tpexResult = fetchApiData("https://www.tpex.org.tw/www/zh-tw/bulletin/exDailyQ", parameter);
+    	Map<String, Object> tpexResultMap = objectMapper.readValue(tpexResult,
+				new TypeReference<Map<String, Object>>() {
+				});
+		List<List<String>> tpexDatas = (List) ((Map<String, Object>) ((List) tpexResultMap.get("tables")).get(0))
+				.get("data");
+		List<TmpExDividendsExRightInfo> tpexInfos = tpexDatas.stream().map(entry -> {
+			String tradingDateStr = entry.get(0);
+			// 拆分民国日期字符串
+			String[] parts = tradingDateStr.split("/");
+			int innerTaiwanYear = Integer.parseInt(parts[0]); // 民国年份
+			int month = Integer.parseInt(parts[1]); // 月
+			int day = Integer.parseInt(parts[2].replaceAll("\\*", "")); // 日
+
+			// 将民国年份转换为公历年份
+			int year = innerTaiwanYear + 1911;
+
+			// 构造公历日期字符串
+			String gregorianDateStr = year + "/" + month + "/" + day;
+			SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
+			Date tradingDate;
+			try {
+				tradingDate = sdf.parse(gregorianDateStr);
+			} catch (ParseException e) {
+				log.warn(e.getMessage(), e);
+				tradingDate = new Date();
+			}
+			TmpExDividendsExRightInfo tmpExDividendsExRightInfo = new TmpExDividendsExRightInfo();
+			tmpExDividendsExRightInfo.setTradingDay(tradingDate);
+			tmpExDividendsExRightInfo.setLimitDown(entry.get(10));
+			tmpExDividendsExRightInfo.setLimitUp(entry.get(9));
+			tmpExDividendsExRightInfo.setStockCode(entry.get(1));
+			tmpExDividendsExRightInfo.setReferencePrice(entry.get(11));
+			return tmpExDividendsExRightInfo;
+		}).toList();
+		allInfos.addAll(tpexInfos);
+		//https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate=20241205&endDate=20241212&response=json&_=1733885812391
+		DateTimeFormatter twseDateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+		String teseUrl = String.format(
+				"https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate=%1s&endDate=%2s&response=json&_=1733885812391",
+				startOfMonth.format(twseDateFormatter), endOfMonth.format(twseDateFormatter));
+		String twseResult = fetchApiData(teseUrl);
+		Map<String, Object> twseResultMap = objectMapper.readValue(twseResult,
+				new TypeReference<Map<String, Object>>() {
+				});
+		if(twseResultMap.get("stat").equals("OK")) {
+			List<List<String>> twseDatas = (List) twseResultMap.get("data");
+			List<TmpExDividendsExRightInfo> twseInfos = twseDatas.stream().map(twseData ->{
+				String tradingDateStr = twseData.get(0).replace("年", "/").replace("月", "/").replace("日", StringUtils.EMPTY);
+				String[] parts = tradingDateStr.split("/");
+				int innerTaiwanYear = Integer.parseInt(parts[0]); // 民国年份
+				int month = Integer.parseInt(parts[1]); // 月
+				int day = Integer.parseInt(parts[2].replaceAll("\\*", "")); // 日
+
+				// 将民国年份转换为公历年份
+				int year = innerTaiwanYear + 1911;
+
+				// 构造公历日期字符串
+				String gregorianDateStr = year + "/" + month + "/" + day;
+				SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
+				Date tradingDate;
+				try {
+					tradingDate = sdf.parse(gregorianDateStr);
+				} catch (ParseException e) {
+					log.warn(e.getMessage(), e);
+					tradingDate = new Date();
+				}
+				TmpExDividendsExRightInfo tmpExDividendsExRightInfo = new TmpExDividendsExRightInfo();
+				tmpExDividendsExRightInfo.setTradingDay(tradingDate);
+				tmpExDividendsExRightInfo.setLimitUp(twseData.get(7));
+				tmpExDividendsExRightInfo.setLimitDown(twseData.get(8));
+				tmpExDividendsExRightInfo.setStockCode(twseData.get(1));
+				tmpExDividendsExRightInfo.setReferencePrice(twseData.get(9));
+				return tmpExDividendsExRightInfo;
+			}).toList();
+			allInfos.addAll(twseInfos);
+		}
+		return allInfos;
+	}
+	
+	
 //	public static String testConvertAudio(ByteString audioBytes, String credentialsPath) throws IOException {
 //		// 設置憑證文件的路徑 (將此路徑替換為你的 credentials.json 憑證文件路徑)
 //		String resultString = StringUtils.EMPTY;
@@ -789,11 +889,11 @@ public class ChromeDriverUtils {
 		return responseList.stream().map(map -> {
 			StockDayPrice stockDayPrice = new StockDayPrice();
 			stockDayPrice.setStockCode(map.get("Code"));
-			stockDayPrice.setOpeningPrice(map.get("OpeningPrice"));
-			stockDayPrice.setClosingPrice(map.get("ClosingPrice"));
-			stockDayPrice.setHighPrice(map.get("HighestPrice"));
+			stockDayPrice.setOpeningPrice(map.get("OpeningPrice").replaceAll(",", ""));
+			stockDayPrice.setClosingPrice(map.get("ClosingPrice").replaceAll(",", ""));
+			stockDayPrice.setHighPrice(map.get("HighestPrice").replaceAll(",", ""));
 			stockDayPrice.setLowPrice(map.get("LowestPrice"));
-			stockDayPrice.setChange(map.get("Change").replace("+", ""));
+			stockDayPrice.setChange(map.get("Change").replace("+", "").replaceAll(",", ""));
 			stockDayPrice.setTradingDay(tradeDate);
 			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
 			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
@@ -971,11 +1071,11 @@ public class ChromeDriverUtils {
 			Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
 			StockDayPrice stockDayPrice = new StockDayPrice();
 			stockDayPrice.setStockCode(map.get("SecuritiesCompanyCode"));
-			stockDayPrice.setOpeningPrice(map.get("Open"));
-			stockDayPrice.setClosingPrice(map.get("Close"));
-			stockDayPrice.setHighPrice(map.get("High"));
-			stockDayPrice.setLowPrice(map.get("Low"));
-			stockDayPrice.setChange(map.get("Change"));
+			stockDayPrice.setOpeningPrice(map.get("Open").replaceAll(",", ""));
+			stockDayPrice.setClosingPrice(map.get("Close").replaceAll(",", ""));
+			stockDayPrice.setHighPrice(map.get("High").replaceAll(",", ""));
+			stockDayPrice.setLowPrice(map.get("Low").replaceAll(",", ""));
+			stockDayPrice.setChange(map.get("Change").replace("+", "").replaceAll(",", ""));
 			stockDayPrice.setTradingDay(date);
 			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
 			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
@@ -1095,14 +1195,15 @@ public class ChromeDriverUtils {
 				startCalendar.add(Calendar.MONTH, 1);
 				continue;
 			}
-			List<StockDayPrice> singleMonthStockDayPrices = ((List<List<String>> )tables.get("data")).stream().map(data -> {
-				StockDayPrice stockPrice = new StockDayPrice();
-				String tradingDateStr = data.get(0);
-				// 拆分民国日期字符串
-				String[] parts = tradingDateStr.split("/");
-				int innerTaiwanYear = Integer.parseInt(parts[0]); // 民国年份
-				int month = Integer.parseInt(parts[1]); // 月
-				int day = Integer.parseInt(parts[2].replaceAll("\\*", "")); // 日
+			List<StockDayPrice> singleMonthStockDayPrices = ((List<List<String>>) tables.get("data")).stream()
+					.map(data -> {
+						StockDayPrice stockPrice = new StockDayPrice();
+						String tradingDateStr = data.get(0);
+						// 拆分民国日期字符串
+						String[] parts = tradingDateStr.split("/");
+						int innerTaiwanYear = Integer.parseInt(parts[0]); // 民国年份
+						int month = Integer.parseInt(parts[1]); // 月
+						int day = Integer.parseInt(parts[2].replaceAll("\\*", "")); // 日
 
 						// 将民国年份转换为公历年份
 						int year = innerTaiwanYear + 1911;
@@ -1141,11 +1242,12 @@ public class ChromeDriverUtils {
 						stockPrice.setStockCode(stockCode);
 						stockPrice.setStartOfWeekDate(startOfWeeDate);
 						stockPrice.setEndOfWeekDate(endOfWeekDate);
-						stockPrice.setOpeningPrice(data.get(3));
-						stockPrice.setClosingPrice(data.get(6));
-						stockPrice.setHighPrice(data.get(4));
-						stockPrice.setLowPrice(data.get(5));
-						stockPrice.setChange(data.get(7).replace("+", ""));
+						stockPrice.setOpeningPrice(data.get(3).replaceAll(",", ""));
+						stockPrice.setClosingPrice(data.get(6).replaceAll(",", ""));
+						stockPrice.setHighPrice(data.get(4).replaceAll(",", ""));
+						stockPrice.setLowPrice(data.get(5).replaceAll(",", ""));
+						stockPrice.setChange(data.get(7).replace("+", "").replaceAll(",", ""));
+					
 						return stockPrice;
 					}).toList();
 			allStockDayPrices.addAll(singleMonthStockDayPrices);
@@ -1234,11 +1336,12 @@ public class ChromeDriverUtils {
 				stockPrice.setStockCode(stockCode);
 				stockPrice.setStartOfWeekDate(startOfWeeDate);
 				stockPrice.setEndOfWeekDate(endOfWeekDate);
-				stockPrice.setOpeningPrice(data.get(3));
-				stockPrice.setClosingPrice(data.get(6));
-				stockPrice.setHighPrice(data.get(4));
-				stockPrice.setLowPrice(data.get(5));
-				stockPrice.setChange(data.get(7).replace("+", ""));
+				stockPrice.setOpeningPrice(data.get(3).replaceAll(",", ""));
+				stockPrice.setClosingPrice(data.get(6).replaceAll(",", ""));
+				stockPrice.setHighPrice(data.get(4).replaceAll(",", ""));
+				stockPrice.setLowPrice(data.get(5).replaceAll(",", ""));
+				stockPrice.setChange(data.get(7).replace("+", "").replaceAll(",", ""));
+				
 				return stockPrice;
 			}).toList();
 			allStockDayPrices.addAll(singleMonthStockDayPrices);
@@ -1347,6 +1450,52 @@ public class ChromeDriverUtils {
 		return ByteString.copyFrom(outputStream.toByteArray());
 	}
 
+	
+	// 計算漲停或跌停價
+	public static Double calculateLimitPrice(double closingPrice, boolean isUpper) {
+	    // 計算理論價格
+	    double limitPrice = closingPrice * (isUpper ? 1.10 : 0.90);
+	    // 根據 tick 單位調整
+	    double tickSize = getTickSize(limitPrice);
+
+	    double adjustedPrice;
+	    if (isUpper) {
+	        // 漲停：向下取最近的 tick 單位
+	        adjustedPrice = Math.floor(limitPrice / tickSize) * tickSize;
+	    } else {
+	        // 跌停：向上取最近的 tick 單位
+	        adjustedPrice = Math.ceil(limitPrice / tickSize) * tickSize;
+	    }
+
+	    // 格式化到小數點第 2 位
+	    return Double.valueOf(String.format("%.2f", adjustedPrice));
+	}
+
+	// 根據價格區間返回 tick 單位
+	public static double getTickSize(double price) {
+	    if (price >= 0 && price < 10) {
+	        return 0.01;
+	    } else if (price >= 10 && price < 50) {
+	        return 0.05;
+	    } else if (price >= 50 && price < 100) {
+	        return 0.1;
+	    } else if (price >= 100 && price < 500) {
+	        return 0.5;
+	    } else if (price >= 500 && price < 1000) {
+	        return 1.0;
+	    } else if (price >= 1000 && price < 2000) {
+	        return 5.0;
+	    } else if (price >= 2000 && price < 5000) {
+	        return 10.0;
+	    } else if (price >= 5000 && price < 10000) {
+	        return 50.0;
+	    } else if (price >= 10000) {
+	        return 100.0;
+	    } else {
+	        throw new IllegalArgumentException("無效的價格：" + price);
+	    }
+	}
+	
 	private static void initializeColumnNames() {
 		SHAREHOLDER_STRUCTURE_COLUMN_NAME.put(0, "周別");
 		SHAREHOLDER_STRUCTURE_COLUMN_NAME.put(1, "統計日期");

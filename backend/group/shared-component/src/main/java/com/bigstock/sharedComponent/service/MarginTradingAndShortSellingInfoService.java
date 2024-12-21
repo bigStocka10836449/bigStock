@@ -1,5 +1,6 @@
 package com.bigstock.sharedComponent.service;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,5 +38,9 @@ public class MarginTradingAndShortSellingInfoService {
     
     public List<MarginTradingAndShortSellingInfo> saveAll(List<MarginTradingAndShortSellingInfo> marginTradingAndShortSellingInfos){
     	return repository.saveAll(marginTradingAndShortSellingInfos);
+    }
+    
+    public List<MarginTradingAndShortSellingInfo> findMarginTradingAndShortSellingInfoByDateRange(String stockCode, Date firstDate, Date secondDate){
+    	return repository.findMarginTradingAndShortSellingInfoByDateRange(stockCode, firstDate, secondDate);
     }
 }
