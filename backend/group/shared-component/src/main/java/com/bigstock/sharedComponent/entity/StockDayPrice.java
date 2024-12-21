@@ -28,6 +28,9 @@ public class StockDayPrice {
 	@Column(name = "trading_day")
 	private Date tradingDay;
 
+	@Column(name = "month_of_year")
+	private String monthOfYear;
+	
 	@Column(name = "opening_price")
 	private String openingPrice;
 

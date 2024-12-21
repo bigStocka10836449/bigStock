@@ -14,7 +14,7 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 
 	List<StockDayPrice> findByStockCode(String stockCode);
 
-	@Query("select t from StockDayPrice t where t.tradingDay = :endDate and CAST(t.closingPrice as double) = CAST(t.limitUp as double) and t.limitUp not like '%-%' and t.closingPrice != '' order by t.stockCode asc")
+	@Query(value = "select t from StockDayPrice t where t.tradingDay = :endDate and CAST(t.closingPrice as double) = CAST(t.limitUp as double) and t.limitUp not like '%-%' and t.closingPrice != '' order by t.stockCode asc", nativeQuery = true)
 	List<StockDayPrice> findTodateReachLimitUp(@Param("endDate") Date endDate);
 	
 	@Query("select t from StockDayPrice t where t.stockCode = :stockCode and t.weekOfYear = :weekOfYear order by t.tradingDay asc")
@@ -38,11 +38,15 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 	@Query(value = "SELECT 1 FROM bstock.bstock.stock_day_price sdp  where sdp.stock_code =:stockCode and sdp.trading_day between :startDate and :endDate and sdp.line_rsv_value is null  LIMIT 1", nativeQuery = true)
 	Integer checkIsTradingDateRangeContaineNotCalculate(@Param("stockCode") String stockCode, @Param("startDate") Date startDate, @Param("endDate") Date endDate);
 	
-	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.stock_code = :stockCode and sdp.trading_day < :endDate AND sdp.change NOT LIKE '%X%' AND sdp.change NOT LIKE '%--%' AND sdp.change NOT LIKE '%除息%' and sdp.change not like '%除權%' and sdp.closing_price not like '%-%'  and sdp.closing_price != '' order by sdp.trading_day desc limit 1" , nativeQuery = true)
+	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.stock_code = :stockCode and sdp.trading_day < :endDate and sdp.closing_price not like '%-%' and TRIM(sdp.closing_price) != '' order by sdp.trading_day desc limit 1" , nativeQuery = true)
 	Optional<StockDayPrice> findByStockCodeAndTradingDayBeforLimitOne(@Param("stockCode") String stockCode, @Param("endDate") Date endDate);
 	
+	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.stock_code = :stockCode and sdp.trading_day < :endDate and sdp.closing_price not like '%-%' and TRIM(sdp.closing_price) != '' order by sdp.trading_day desc limit 1" , nativeQuery = true)
+	Optional<StockDayPrice> findByStockCodeAndTradingDayBeforeAndClosePriceIsValidLimitOne(@Param("stockCode") String stockCode, @Param("endDate") Date endDate);
 	
-	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.stock_code = :stockCode and sdp.trading_day <= :endDate AND sdp.change NOT LIKE '%X%' AND sdp.change NOT LIKE '%--%' AND sdp.change NOT LIKE '%除息%' and sdp.change not like '%除權%' and sdp.closing_price not like '%-%'  and sdp.closing_price != '' order by sdp.trading_day desc limit 240" , nativeQuery = true)
+	
+	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.stock_code = :stockCode and sdp.trading_day <= :endDate and sdp.closing_price not like '%-%' and TRIM(sdp.closing_price) != '' order by sdp.trading_day desc limit 240", 
+    nativeQuery = true)
 	List<StockDayPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(@Param("stockCode") String stockCode, @Param("endDate") Date endDate);
 	
 	
@@ -64,4 +68,10 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 	
 	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.stock_code =:stockCode and sdp.trading_day between :startDate and :endDate order by sdp.trading_day asc" , nativeQuery = true)
 	List<StockDayPrice> findByStockCodeAndStartDateAndEndDate(@Param("stockCode") String stockCode, @Param("startDate") Date startDate, @Param("endDate") Date endDate);
+
+	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.week_of_year =:weekOfYear " , nativeQuery = true)
+	List<StockDayPrice> findByWeekOfYear(@Param("weekOfYear") String weekOfYear);
+	
+	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.month_of_year =:monthOfYear " , nativeQuery = true)
+	List<StockDayPrice> findByMonthOfYear(@Param("monthOfYear") String monthOfYear);
 }

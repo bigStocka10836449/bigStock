@@ -22,7 +22,6 @@ import com.bigstock.sharedComponent.dto.DynamicFilterStockCodeVo;
 import com.bigstock.sharedComponent.dto.SingleStockPriceBizVo;
 import com.bigstock.sharedComponent.dto.SingleStockPriceVo;
 import com.bigstock.sharedComponent.dto.StructureContinueIncreaseVo;
-import com.bigstock.sharedComponent.entity.StockExchangeDetail;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

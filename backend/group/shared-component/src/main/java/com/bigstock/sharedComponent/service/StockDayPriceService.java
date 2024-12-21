@@ -90,6 +90,10 @@ public class StockDayPriceService {
 		return stockDayPriceRepository.findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(stockCode, endDate);
 	}
 	
+	public Optional<StockDayPrice> findByStockCodeAndTradingDayBeforeAndClosePriceIsValidLimitOne(String stockCode, Date endDate){
+		return stockDayPriceRepository.findByStockCodeAndTradingDayBeforeAndClosePriceIsValidLimitOne(stockCode, endDate);
+	}
+	
 	public Integer checkIsTradingDateRangeContaineNotCalculate(@Param("stockCode") String stockCode,
 			@Param("startDate") Date startDate, @Param("endDate") Date endDate) {
 		return stockDayPriceRepository.checkIsTradingDateRangeContaineNotCalculate(stockCode, startDate, endDate);
@@ -111,6 +115,13 @@ public class StockDayPriceService {
 		return stockDayPriceRepository.findListStockCode();
 	}
 	
+	public List<StockDayPrice> findByWeekOfYear(String weekOfYear){
+		return stockDayPriceRepository.findByWeekOfYear(weekOfYear);
+	}
+	
+	public List<StockDayPrice> findByMonthOfYear(String monthOfYear){
+		return stockDayPriceRepository.findByMonthOfYear(monthOfYear);
+	}
 	
 	private StockDayPriceService getSelf() {
 		return (StockDayPriceService) AopContext.currentProxy();
