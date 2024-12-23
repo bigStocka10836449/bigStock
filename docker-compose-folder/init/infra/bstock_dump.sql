@@ -68,6 +68,35 @@ COMMENT ON TABLE bstock.tmp_ex_dividends_ex_right_info_unique IS '個股除權�
 COMMENT ON COLUMN bstock.tmp_ex_dividends_ex_right_info_unique.reference_price IS '標準開盤價格';
     
 
+CREATE TABLE bstock.stock_month_price (
+	stock_code text NULL,
+	"year" varchar(4) NULL,
+	"month" int4 NULL,
+	first_trading_day date NULL,
+	high_price numeric NULL,
+	low_price numeric NULL,
+	change_rate numeric NULL,
+	trading_volume int8 NULL,
+	line_k_value numeric NULL,
+	line_d_value numeric NULL,
+	line_rsv_value numeric NULL,
+	five_week_ma numeric NULL,
+	twenty_week_ma numeric NULL,
+	ten_week_ma numeric NULL,
+	sixty_week_ma numeric NULL,
+	one_twenty_week_ma numeric NULL,
+	two_fourty_week_ma numeric NULL,
+	opening_price numeric NULL,
+	closing_price numeric NULL,
+	month_of_year text NULL,
+	CONSTRAINT stock_month_price_unique UNIQUE (stock_code, year, month)
+);
+
+ALTER TABLE bstock.stock_month_price OWNER TO bstockuser;
+ALTER TABLE ONLY bstock.stock_month_price
+    ADD CONSTRAINT stock_month_price_unique UNIQUE (stock_code, year, month);
+
+
 CREATE TABLE bstock.stock_week_price (
 	stock_code text NULL,
 	weekofyear text NULL,
@@ -87,7 +116,8 @@ CREATE TABLE bstock.stock_week_price (
 	sixty_week_ma numeric NULL,
 	one_twenty_days_ma numeric NULL,
 	two_fourty_days_ma numeric NULL,
-	opening_price numeric NULL
+	opening_price numeric NULL,
+	closing_price numeric NULL
 );
 
 ALTER TABLE bstock.stock_week_price OWNER TO bstockuser;
@@ -490,17 +520,30 @@ CREATE INDEX margin_trading_and_short_selling_info_trading_day_idx ON bstock.mar
 --
 
 CREATE TABLE bstock.stock_day_price (
-    stock_code text,
-    trading_day date,
-    opening_price text,
-    closing_price text,
-    high_price text,
-    low_price text,
-    start_of_week_date date,
-    end_of_week_date date,
-    change text,
-    week_of_year text,
-    trading_volume text
+stock_code text NULL,
+	trading_day date NULL,
+	opening_price text NULL,
+	closing_price text NULL,
+	high_price text NULL,
+	low_price text NULL,
+	start_of_week_date date NULL,
+	end_of_week_date date NULL,
+	"change" text NULL,
+	week_of_year text NULL,
+	trading_volume text NULL,
+	lmit_up text NULL,
+	limit_down text NULL,
+	change_rate text NULL,
+	line_k_value text NULL,
+	line_d_value text NULL,
+	line_rsv_value text NULL,
+	five_days_ma text NULL,
+	twenty_days_ma text NULL,
+	ten_days_ma text NULL,
+	sixty_days_ma text NULL,
+	one_twenty_days_ma varchar NULL,
+	two_fourty_days_ma varchar NULL,
+	month_of_year text NULL
 );
 
 
@@ -8714,7 +8757,8 @@ CREATE INDEX stock_day_price_week_of_year_idx ON bstock.stock_day_price USING bt
 
 CREATE INDEX stock_exchange_detail_stock_code_idx ON bstock.stock_exchange_detail USING btree (stock_code, trading_date);
 CREATE INDEX stock_day_price_trading_day_idx ON bstock.stock_day_price USING btree (trading_day DESC);
-
+CREATE INDEX stock_day_price_week_of_year_idx ON bstock.stock_day_price USING btree (week_of_year);
+CREATE INDEX stock_day_price_month_of_year_idx ON bstock.stock_day_price USING btree (month_of_year  DESC);
 --
 -- TOC entry 3282 (class 1259 OID 16446)
 -- Name: user_account_id_idx; Type: INDEX; Schema: bstock; Owner: bstockuser
