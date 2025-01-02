@@ -84,10 +84,11 @@ public class BigStockRabbitMqListener {
 				messageProperties.getMessageProperties().setHeader("UUID", uuid);
 				return messageProperties;
 			};
-			List<SingleStockPriceVo> vos = bizService.getSingleStockPrices(singleStockPriceBizVo.getStockCode(),
+			SingleStockPriceVo vo = bizService.getSingleStockPrices(singleStockPriceBizVo.getStockCode(),
 					singleStockPriceBizVo.getSearchStartDate(), singleStockPriceBizVo.getSearchEndDate());
 			
-			String voString = objectMapper.writeValueAsString(vos);
+			String voString =
+					objectMapper.writeValueAsString(vo);
 			rabbitTemplate.convertAndSend(sendExchangeName, uuid, voString, messagePostProcessor,
 					new CorrelationData());
 //		rabbitTemplate.convertAndSend("sendExchange", message, message,new CorrelationData());

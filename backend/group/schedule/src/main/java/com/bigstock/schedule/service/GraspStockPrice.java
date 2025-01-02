@@ -119,7 +119,7 @@ public class GraspStockPrice {
 	// 每周日早上8点触发更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 	@Transactional
-//	@PostConstruct
+	@PostConstruct
 	public void updateStockDayPrice() throws RestClientException, URISyntaxException, JsonMappingException,
 			JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
@@ -169,8 +169,10 @@ public class GraspStockPrice {
 			calculateRSVValueAndLimitDownUp(stockTpexDayPrice);
 			stockTpexDayPrice.setMonthOfYear((stockTpexDayPrice.getTradingDay().getYear() + 1900) + "W"
 					+ (stockTpexDayPrice.getTradingDay().getMonth() + 1));
-			TradeVolumeInfo tradeVolumeInfo = stockTpexTradeVolumeInfosMap.get(stockTpexDayPrice.getStockCode());
-			stockTpexDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
+			if (stockTpexTradeVolumeInfosMap.containsKey(stockTpexDayPrice.getStockCode())) {
+				TradeVolumeInfo tradeVolumeInfo = stockTpexTradeVolumeInfosMap.get(stockTpexDayPrice.getStockCode());
+				stockTpexDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
+			}
 		});
 		stockDayPriceService.saveAll(stockTpexDayPrices);
 		stockDayPriceService.saveAll(stockTwseDayPrices);
@@ -244,8 +246,8 @@ public class GraspStockPrice {
 
 		stockDayPriceService
 //		.findByStartDateAndEndDate(new Date("2024/05/01"), new Date("2024/12/20")).stream()
-		.findByMonthOfYear(stockTpexDayPrices.stream().findFirst().get().getMonthOfYear())
-				.stream().collect(Collectors.groupingBy(StockDayPrice::getStockCode)).entrySet().stream()
+				.findByMonthOfYear(stockTpexDayPrices.stream().findFirst().get().getMonthOfYear()).stream()
+				.collect(Collectors.groupingBy(StockDayPrice::getStockCode)).entrySet().stream()
 				.forEach(innerStockDayPrices -> {
 					List<StockMonthPrice> stockMonthPrices = innerStockDayPrices.getValue().stream()
 							.filter(innerStockDayPrice -> (!innerStockDayPrice.getOpeningPrice().contains("--")
@@ -253,7 +255,7 @@ public class GraspStockPrice {
 							.collect(Collectors.groupingBy(StockDayPrice::getMonthOfYear)).entrySet().stream()
 							.map(innerStockDayWeekInfos -> {
 								List<StockDayPrice> innerStockDayWeekInfo = innerStockDayWeekInfos.getValue().stream()
-										.sorted((x1, x2) -> x1.getWeekOfYear().compareTo(x2.getWeekOfYear())).toList();
+										.sorted((x1, x2) -> x1.getTradingDay().compareTo(x2.getTradingDay())).toList();
 								Date firstTradeDaye = innerStockDayWeekInfo.stream()
 										.sorted((x1, x2) -> x1.getTradingDay().compareTo(x2.getTradingDay())).toList()
 										.stream().findFirst().get().getTradingDay();
@@ -296,9 +298,11 @@ public class GraspStockPrice {
 				});
 
 		List<StockMonthPrice> stockMonthPrices = stockMonthPriceService
-//				.findByMmonthOfYear(stockWeekPrices.stream().findFirst().get().getYear() + "W" + stockWeekPrices.stream().findFirst().get().getMonth());
+				.findByMmonthOfYear(stockWeekPrices.stream().findFirst().get().getYear() + "M"
+						+ stockWeekPrices.stream().findFirst().get().getMonth())
 //				.findBySockCode("2330").stream()	.sorted((x1, x2) -> x1.getWeekOfYear().compareTo(x2.getWeekOfYear())).toList();
-				.findAll().stream().sorted((x1, x2) -> x1.getMonthOfYear().compareTo(x2.getMonthOfYear())).toList();
+//				.findAll()
+				.stream().sorted((x1, x2) -> x1.getMonthOfYear().compareTo(x2.getMonthOfYear())).toList();
 		stockMonthPrices.stream().forEach(stockMonthPrice -> {
 			calculateRSVValueAndLimitDownUp(stockMonthPrice);
 			stockMonthPriceService.save(stockMonthPrice);
@@ -796,22 +800,22 @@ public class GraspStockPrice {
 			BigDecimal maValue = calculateStockMonthPriceMovingAverage(twoFourtyStockMonthPrices, maPeriod);
 			switch (maPeriod) {
 			case 240:
-				stockMonthPrice.setTwoFourtyWeekMa(maValue); // 設置 240 日 MA
+				stockMonthPrice.setTwoFourtyMonthMa(maValue); // 設置 240 日 MA
 				break;
 			case 120:
-				stockMonthPrice.setOneTwentyWeekMa(maValue); // 設置 120 日 MA
+				stockMonthPrice.setOneTwentyMonthMa(maValue); // 設置 120 日 MA
 				break;
 			case 60:
-				stockMonthPrice.setSixtyWeekMa(maValue); // 設置 60 日 MA
+				stockMonthPrice.setSixtyMonthMa(maValue); // 設置 60 日 MA
 				break;
 			case 20:
-				stockMonthPrice.setTwentyWeekMa(maValue); // 設置 20 日 MA
+				stockMonthPrice.setTwentyMonthMa(maValue); // 設置 20 日 MA
 				break;
 			case 10:
-				stockMonthPrice.setTenWeekMa(maValue); // 設置 10 日 MA
+				stockMonthPrice.setTenMonthMa(maValue); // 設置 10 日 MA
 				break;
 			case 5:
-				stockMonthPrice.setFiveWeekMa(maValue); // 設置 5 日 MA
+				stockMonthPrice.setFiveMonthMa(maValue); // 設置 5 日 MA
 				break;
 			}
 		}

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
 
 public interface StockWeekPriceRepository extends JpaRepository<StockWeekPrice, StockWeekPrice.StockWeekPriceId>{
@@ -20,4 +21,9 @@ public interface StockWeekPriceRepository extends JpaRepository<StockWeekPrice, 
 	
 	@Query(value = "select swp.* from bstock.bstock.stock_week_price swp where swp.week_of_year = :weekOfYear", nativeQuery = true)
 	List<StockWeekPrice> findByWeekOfYear(@Param("weekOfYear")String weekOfYear);
+	
+	@Query(value = "select swp.* from bstock.bstock.stock_week_price swp where swp.stock_code = :stockCode and swp.week_of_year <= ( "
+			+ "select swp1.week_of_year  from bstock.bstock.stock_week_price swp1 order by swp1.week_of_year desc limit 1) "
+			+ "order by swp.week_of_year desc  limit :limit", nativeQuery = true)
+	List<StockWeekPrice> findStockCodeAndLimit(@Param("stockCode") String stockCode,@Param("limit") Integer limit);
 }

@@ -865,10 +865,12 @@ public class ChromeDriverUtils {
 		ObjectMapper objectMapper = new ObjectMapper();
 		List<Map<String, String>> responseList = objectMapper
 				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
-				}).stream().filter(data -> {
-					String code = data.get("Code").toString();
-					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
-				}).collect(Collectors.toList());
+				}).stream()
+//				.filter(data -> {
+//					String code = data.get("Code").toString();
+//					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
+//				})
+				.collect(Collectors.toList());
 		LocalDate today = tradeDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 
 		// 設置本周第一天的日期
@@ -897,7 +899,7 @@ public class ChromeDriverUtils {
 			stockDayPrice.setTradingDay(tradeDate);
 			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
 			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
-			stockDayPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
+			stockDayPrice.setWeekOfYear(endOfWeekLocalDate.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
 			stockDayPrice.setTradingVolume(map.get("TradeVolume"));
 			return stockDayPrice;
 		}).toList();
@@ -959,10 +961,12 @@ public class ChromeDriverUtils {
 		ObjectMapper objectMapper = new ObjectMapper();
 		List<Map<String, String>> responseList = objectMapper
 				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
-				}).stream().filter(data -> {
-					String code = data.get("股票名稱").toString();
-					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
-				}).collect(Collectors.toList());
+				}).stream()
+//				.filter(data -> {
+//					String code = data.get("股票名稱").toString();
+//					return (code.length() < 5 && !code.matches(".*[a-zA-Z].*"));
+//				})
+				.collect(Collectors.toList());
 		return responseList.stream().map(map -> {
 			MarginTradingAndShortSellingInfo marginTradingAndShortSellingInfo = new MarginTradingAndShortSellingInfo();
 			marginTradingAndShortSellingInfo.setTradingDay(tradeDate);
@@ -994,10 +998,12 @@ public class ChromeDriverUtils {
 		ObjectMapper objectMapper = new ObjectMapper();
 		List<Map<String, String>> responseList = objectMapper
 				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
-				}).stream().filter(data -> {
-					String code = data.get("SecuritiesCompanyCode").toString();
-					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
-				}).collect(Collectors.toList());
+				}).stream()
+//				.filter(data -> {
+//					String code = data.get("SecuritiesCompanyCode").toString();
+//					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
+//				})
+				.collect(Collectors.toList());
 
 		return responseList.stream().map(map -> {
 			// 指定日期字符串格式
@@ -1037,10 +1043,12 @@ public class ChromeDriverUtils {
 		ObjectMapper objectMapper = new ObjectMapper();
 		List<Map<String, String>> responseList = objectMapper
 				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
-				}).stream().filter(data -> {
-					String code = data.get("SecuritiesCompanyCode").toString();
-					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
-				}).collect(Collectors.toList());
+				}).stream()
+//				.filter(data -> {
+//					String code = data.get("SecuritiesCompanyCode").toString();
+//					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
+//				})
+				.collect(Collectors.toList());
 
 		return responseList.stream().map(map -> {
 			// 指定日期字符串格式
@@ -1079,7 +1087,7 @@ public class ChromeDriverUtils {
 			stockDayPrice.setTradingDay(date);
 			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
 			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
-			stockDayPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
+			stockDayPrice.setWeekOfYear(endOfWeekLocalDate.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
 			return stockDayPrice;
 		}).toList();
 	}
@@ -1093,10 +1101,12 @@ public class ChromeDriverUtils {
 		ObjectMapper objectMapper = new ObjectMapper();
 		List<Map<String, String>> responseList = objectMapper
 				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
-				}).stream().filter(data -> {
-					String code = data.get("證券代號").toString();
-					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
-				}).collect(Collectors.toList());
+				}).stream()
+//				.filter(data -> {
+//					String code = data.get("證券代號").toString();
+//					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
+//				})
+				.collect(Collectors.toList());
 
 		Map<String, List<Map<String, String>>> groupResponseMap = new HashMap<>();
 		for (Map<String, String> response : responseList) {
@@ -1139,7 +1149,9 @@ public class ChromeDriverUtils {
 		return responseList.stream().filter(data -> {
 			String code = data.get("證券代號").toString();
 			String market = data.get("市場別").toString();
-			return code.length() < 5 && !code.matches(".*[a-zA-Z].*") && !market.contains("（終止上市(櫃)、興櫃)");
+			return !market.contains("（終止上市(櫃)、興櫃)");
+//					code.length() < 5 && !code.matches(".*[a-zA-Z].*") &&
+//					!market.contains("（終止上市(櫃)、興櫃)");
 		}).map(data -> {
 			StockInfo stockInfo = new StockInfo();
 			String name = decodeHtmlEntities(data.get("證券名稱").toString());

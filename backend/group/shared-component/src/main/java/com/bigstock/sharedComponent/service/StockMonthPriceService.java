@@ -2,7 +2,6 @@ package com.bigstock.sharedComponent.service;
 
 import java.util.List;
 
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.entity.StockMonthPrice;
@@ -40,6 +39,11 @@ public class StockMonthPriceService {
 
 	public List<StockMonthPrice> findByMmonthOfYear(String monthOfYear) {
 		return repository.findByMmonthOfYear(monthOfYear);
+	}
+	
+	
+	public List<StockMonthPrice> findStockCodeAndLimit(String stockCode, Integer limit){
+		return repository.findStockCodeAndLimit(stockCode, limit);
 	}
 	
 	public List<StockMonthPrice> findAll(){

@@ -77,7 +77,7 @@ public class RabbitMqConfig {
 	}
 	
 	
-	//--------------------------------個股每日交易明細---------------------------------
+	//--------------------------------動態選股查詢---------------------------------
 	@Bean
 	public DirectExchange stockCodeFilterTypeExchange() {
 		return new DirectExchange("StockCodeFilterTypeExchange", true, false);

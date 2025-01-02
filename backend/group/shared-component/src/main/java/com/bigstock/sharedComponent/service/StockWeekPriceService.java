@@ -16,38 +16,42 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class StockWeekPriceService {
 
-    private final StockWeekPriceRepository repository;
+	private final StockWeekPriceRepository repository;
 
-    public List<StockWeekPrice> findAll() {
-        return repository.findAll();
-    }
+	public List<StockWeekPrice> findAll() {
+		return repository.findAll();
+	}
 
-    public Optional<StockWeekPrice> findById(StockWeekPriceId id) {
-        return repository.findById(id);
-    }
+	public Optional<StockWeekPrice> findById(StockWeekPriceId id) {
+		return repository.findById(id);
+	}
 
-    public StockWeekPrice save(StockWeekPrice stockWeekPrice) {
-        return repository.save(stockWeekPrice);
-    }
+	public StockWeekPrice save(StockWeekPrice stockWeekPrice) {
+		return repository.save(stockWeekPrice);
+	}
 
-    public List<StockWeekPrice> saveAll(List<StockWeekPrice> stockWeekPrices) {
-        return repository.saveAll(stockWeekPrices);
-    }
-    
-    public void deleteById(StockWeekPriceId id) {
-        repository.deleteById(id);
-    }
-    
-    public List<StockWeekPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(String stockCode, String weekOfYear){
-    	return repository.findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(stockCode, weekOfYear);
-    }
-    
-    public List<StockWeekPrice> findBySockCode(@Param("stockCode")String stockCode){
-    	return repository.findBySockCode(stockCode);
-    }
-    
-    public List<StockWeekPrice> findByWeekOfYear(String weekOfYear){
-    	return repository.findByWeekOfYear(weekOfYear);
-    }
+	public List<StockWeekPrice> saveAll(List<StockWeekPrice> stockWeekPrices) {
+		return repository.saveAll(stockWeekPrices);
+	}
+
+	public void deleteById(StockWeekPriceId id) {
+		repository.deleteById(id);
+	}
+
+	public List<StockWeekPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(String stockCode,
+			String weekOfYear) {
+		return repository.findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(stockCode, weekOfYear);
+	}
+
+	public List<StockWeekPrice> findBySockCode(@Param("stockCode") String stockCode) {
+		return repository.findBySockCode(stockCode);
+	}
+
+	public List<StockWeekPrice> findByWeekOfYear(String weekOfYear) {
+		return repository.findByWeekOfYear(weekOfYear);
+	}
+
+	public List<StockWeekPrice> findStockCodeAndLimit(String stockCode, Integer limit) {
+		return repository.findStockCodeAndLimit(stockCode, limit);
+	}
 }
-
