@@ -32,17 +32,17 @@ public class SingleStockDayPriceVo {
 	@Schema(name = "成交量(可能會有誤差)", description = "", example = "")
 	private String tradingVolume;
 	
-	private BigDecimal fiveDaysMa;
+	private BigDecimal fiveMa;
 	
-	private BigDecimal tenDaysMa;
+	private BigDecimal tenMa;
 	
-	private BigDecimal twentyDaysMa;
+	private BigDecimal twentyMa;
 	
-	private BigDecimal sixtyDaysMa;
+	private BigDecimal sixtyMa;
 	
-	private BigDecimal oneTwentyDaysMa;
+	private BigDecimal oneTwentyMa;
 	
-	private BigDecimal twoFourtyDaysMa;
+	private BigDecimal twoFourtyMa;
 	
 	private BigDecimal lineKvalue;
 	

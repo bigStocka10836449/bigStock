@@ -12,4 +12,5 @@ public class DynamicFilterStockPriceCondition {
 	List<String> value;
 	String operator;
 	String type;
+	Integer limit = 15;
 }

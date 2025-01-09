@@ -11,7 +11,6 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -28,6 +27,7 @@ import com.bigstock.sharedComponent.dto.SingleStockDayPriceVo;
 import com.bigstock.sharedComponent.dto.SingleStockMonthPriceVo;
 import com.bigstock.sharedComponent.dto.SingleStockPriceVo;
 import com.bigstock.sharedComponent.dto.SingleStockWeekPriceVo;
+import com.bigstock.sharedComponent.dto.StockInfoVo;
 import com.bigstock.sharedComponent.dto.StructureContinueIncreaseVo;
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
@@ -39,6 +39,7 @@ import com.bigstock.sharedComponent.service.MarginTradingAndShortSellingInfoServ
 import com.bigstock.sharedComponent.service.ShareholderStructureService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockExchangeDetailService;
+import com.bigstock.sharedComponent.service.StockInfoService;
 import com.bigstock.sharedComponent.service.StockMonthPriceService;
 import com.bigstock.sharedComponent.service.StockWeekPriceService;
 import com.google.common.collect.Lists;
@@ -62,6 +63,8 @@ public class BizService {
 	private final StockWeekPriceService stockWeekPriceService;
 
 	private final StockMonthPriceService stockMonthPriceService;
+
+	private final StockInfoService stockInfoService;
 
 	public List<StockExchangeDetail> getStockExchangeDetail(String stockCode, Date tradeDate) {
 		return stockExchangeDetailService.findByStockCodeAndTradingDateOrderBySeqAsc(stockCode, tradeDate);
@@ -135,22 +138,22 @@ public class BizService {
 						vo.setTradingVolume(new BigDecimal(tradingVolume)
 								.divide(new BigDecimal("1000"), 0, RoundingMode.HALF_UP).toString());
 					}
-					vo.setFiveDaysMa(ObjectUtils.isNotEmpty(stockDayPrice.getFiveDaysMa())
+					vo.setFiveMa(ObjectUtils.isNotEmpty(stockDayPrice.getFiveDaysMa())
 							? new BigDecimal(stockDayPrice.getFiveDaysMa())
 							: new BigDecimal(0));
-					vo.setTenDaysMa(ObjectUtils.isNotEmpty(stockDayPrice.getTenDaysMa())
+					vo.setTenMa(ObjectUtils.isNotEmpty(stockDayPrice.getTenDaysMa())
 							? new BigDecimal(stockDayPrice.getTenDaysMa())
 							: new BigDecimal(0));
-					vo.setTwentyDaysMa(ObjectUtils.isNotEmpty(stockDayPrice.getTwentyDaysMa())
+					vo.setTwentyMa(ObjectUtils.isNotEmpty(stockDayPrice.getTwentyDaysMa())
 							? new BigDecimal(stockDayPrice.getTwentyDaysMa())
 							: new BigDecimal(0));
-					vo.setSixtyDaysMa(ObjectUtils.isNotEmpty(stockDayPrice.getTwentyDaysMa())
+					vo.setSixtyMa(ObjectUtils.isNotEmpty(stockDayPrice.getTwentyDaysMa())
 							? new BigDecimal(stockDayPrice.getSixtyDaysMa())
 							: new BigDecimal(0));
-					vo.setOneTwentyDaysMa(ObjectUtils.isNotEmpty(stockDayPrice.getOneTwentyDaysMa())
+					vo.setOneTwentyMa(ObjectUtils.isNotEmpty(stockDayPrice.getOneTwentyDaysMa())
 							? new BigDecimal(stockDayPrice.getOneTwentyDaysMa())
 							: new BigDecimal(0));
-					vo.setTwoFourtyDaysMa(ObjectUtils.isNotEmpty(stockDayPrice.getTwoFourtyDaysMa())
+					vo.setTwoFourtyMa(ObjectUtils.isNotEmpty(stockDayPrice.getTwoFourtyDaysMa())
 							? new BigDecimal(stockDayPrice.getTwoFourtyDaysMa())
 							: new BigDecimal(0));
 					vo.setLineKvalue(ObjectUtils.isNotEmpty(stockDayPrice.getLineKvalue())
@@ -176,12 +179,10 @@ public class BizService {
 						vo.setTradingVolume(new BigDecimal(tradingVolume)
 								.divide(new BigDecimal("1000"), 0, RoundingMode.HALF_UP).toString());
 					}
-					vo.setFiveMa(
-							ObjectUtils.isNotEmpty(stockWeekPrice.getFiveWeekMa()) ? stockWeekPrice.getFiveWeekMa()
-									: new BigDecimal(0));
-					vo.setTenMa(
-							ObjectUtils.isNotEmpty(stockWeekPrice.getTenWeekMa()) ? stockWeekPrice.getTenWeekMa()
-									: new BigDecimal(0));
+					vo.setFiveMa(ObjectUtils.isNotEmpty(stockWeekPrice.getFiveWeekMa()) ? stockWeekPrice.getFiveWeekMa()
+							: new BigDecimal(0));
+					vo.setTenMa(ObjectUtils.isNotEmpty(stockWeekPrice.getTenWeekMa()) ? stockWeekPrice.getTenWeekMa()
+							: new BigDecimal(0));
 					vo.setTwentyMa(
 							ObjectUtils.isNotEmpty(stockWeekPrice.getTwentyWeekMa()) ? stockWeekPrice.getTenWeekMa()
 									: new BigDecimal(0));
@@ -203,10 +204,9 @@ public class BizService {
 					return vo;
 				}).toList();
 		List<SingleStockMonthPriceVo> singleStockMonthPriceVo = stockMonthPriceService
-				.findStockCodeAndLimit(stockCode, 240).stream().
-				sorted(Comparator
-					    .comparing(StockMonthPrice::getYear)
-					    .thenComparing(StockMonthPrice::getMonth)).map(stockMonthPrice -> {
+				.findStockCodeAndLimit(stockCode, 240).stream()
+				.sorted(Comparator.comparing(StockMonthPrice::getYear).thenComparing(StockMonthPrice::getMonth))
+				.map(stockMonthPrice -> {
 					SingleStockMonthPriceVo vo = new SingleStockMonthPriceVo();
 					vo.setClosingPrice(stockMonthPrice.getClosingPrice().toString());
 					vo.setOpeningPrice(stockMonthPrice.getOpeningPrice().toString());
@@ -280,7 +280,7 @@ public class BizService {
 				}).toList();
 	}
 
-	public List<String> getMatchStockCodeByCondition(DynamicFilterStockCodeVo dynamicFilterStockCodeVo) {
+	public List<StockInfoVo> getMatchStockCodeByCondition(DynamicFilterStockCodeVo dynamicFilterStockCodeVo) {
 		Map<String, List<DynamicFilterStockPriceCondition>> dynamicFilterStockPriceConditionsMap = dynamicFilterStockCodeVo
 				.getConditions().stream().collect(Collectors.groupingBy(DynamicFilterStockPriceCondition::getType));
 		List<StockDayPrice> stockDayPrices = stockDayPriceService.findPreviousFiftyTowDaysBeforeLastestDayInfo("2330");
@@ -293,21 +293,21 @@ public class BizService {
 						.get(0);
 				if (dynamicFilterStockPriceCondition.getValue().get(0).equals("20")) {
 					return stockDayPriceNativeQueryService.findKvalueUnderTwentyByDateRange(lastTradingDay,
-							dynamicFilterStockCodeVo.getLimit());
+							dynamicFilterStockPriceCondition.getLimit());
 				} else {
 					return stockDayPriceNativeQueryService.findKvalueUpperEightByDateRange(lastTradingDay,
-							dynamicFilterStockCodeVo.getLimit());
+							dynamicFilterStockPriceCondition.getLimit());
 				}
 			} else if ("change".equals(type)) {
 				return stockDayPriceNativeQueryService.findByDateRangeChangeRateOverFilter(lastTradingDay,
-						dynamicFilterStockCodeVo.getLimit(),
+						dynamicFilterStockPriceConditions.get(0).getLimit(),
 						dynamicFilterStockPriceConditions.get(0).getValue().get(0));
 			} else if ("limitUp".equals(type)) {
 				return stockDayPriceService.findTodateReachLimitUp(lastTradingDay).stream()
 						.map(stockDayPrice -> stockDayPrice.getStockCode()).toList();
 			} else if ("ma".equals(type)) {
 				return stockDayPriceNativeQueryService.findByDateRangeMaChangeFilter(dynamicFilterStockPriceConditions,
-						lastTradingDay, dynamicFilterStockCodeVo.getLimit());
+						lastTradingDay, dynamicFilterStockPriceConditions.get(0).getLimit());
 			} else {
 				return new ArrayList<String>(); // 返回空列表
 			}
@@ -317,7 +317,22 @@ public class BizService {
 					list1.retainAll(list2);
 					return list1;
 				}).orElse(new ArrayList<String>()); // 如果所有列表为空，则返回空列表
-		return matchStocks;
+
+		List<StockInfoVo> stockInfos = stockInfoService.findByIds(matchStocks).stream()
+				.filter(data -> StringUtils.isNotBlank(data.getStockType())).map(data -> {
+					StockInfoVo vo = new StockInfoVo();
+					vo.setStockCode(data.getStockCode());
+					vo.setStockName(data.getStockName());
+					switch (data.getStockType()) {
+					case "0" -> vo.setStockTypeName("上櫃");
+					case "1" -> vo.setStockTypeName("上市");
+					case "2" -> vo.setStockTypeName("興櫃");
+					default -> throw new RuntimeException("無法判斷個股上市櫃類型");
+					}
+					;
+					return vo;
+				}).toList();
+		return stockInfos;
 	}
 
 	private String findMaxWeek(LocalDate today, AtomicInteger weekOfYear) {

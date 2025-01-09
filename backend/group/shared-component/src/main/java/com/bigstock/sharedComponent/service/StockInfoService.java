@@ -31,6 +31,11 @@ public class StockInfoService {
 		return stockInfoRepository.findById(stockCode);
 	}
 	
+	public List<StockInfo> findByIds(List<String> ids){
+		return stockInfoRepository.findAllById(ids);
+	}
+	
+	
 	public List<String> getStockCodeByStockType(String stockType) {
 		return stockInfoRepository.getStockCodeByStockType(stockType);
 	}

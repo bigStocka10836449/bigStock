@@ -7,6 +7,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -72,6 +74,9 @@ public class GatewayController {
 	@PostMapping("StockCodeByFilter")
 	public ResponseEntity<String> getStockCodeByFilter(@RequestBody DynamicFilterStockCodeVo dynamicFilterStockCodeVo) {
 		try {
+			if(ObjectUtils.isEmpty(dynamicFilterStockCodeVo) || dynamicFilterStockCodeVo.getConditions().isEmpty()) {
+				return ResponseEntity.ok().build();
+			}
 			CountDownLatch latch = new CountDownLatch(1);
 			String uuid = rabbitMqService.createConsumer(latch, "gatewayQueue", "gatewayExchange");
 			ObjectMapper objectMapper = new ObjectMapper();

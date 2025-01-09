@@ -56,4 +56,5 @@ public class BizController {
 //		return ResponseEntity.ok(securitiesFirmsDayOperateService.getByStockCodeAndTradingDate(stockCode, tradingDate));
 //	}
 	
+	
 }
