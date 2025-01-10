@@ -314,8 +314,9 @@ public class BizService {
 		}).filter(list -> !list.isEmpty()) // 过滤掉空的列表
 				.reduce((list1, list2) -> {
 					// 计算交集
-					list1.retainAll(list2);
-					return list1;
+					List<String> mutableList = new ArrayList<>(list1);
+					mutableList.retainAll(list2);
+					return mutableList;
 				}).orElse(new ArrayList<String>()); // 如果所有列表为空，则返回空列表
 
 		List<StockInfoVo> stockInfos = stockInfoService.findByIds(matchStocks).stream()

@@ -14,7 +14,7 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 
 	List<StockDayPrice> findByStockCode(String stockCode);
 
-	@Query(value = "select t from StockDayPrice t where t.tradingDay = :endDate and CAST(t.closingPrice as double) = CAST(t.limitUp as double) and t.limitUp not like '%-%' and t.closingPrice != '' order by t.stockCode asc", nativeQuery = true)
+	@Query(value = "select t from StockDayPrice t where t.tradingDay = :endDate and CAST(t.closingPrice as double) = CAST(t.limitUp as double) and t.limitUp not like '%-%' and t.closingPrice != '' order by t.stockCode asc")
 	List<StockDayPrice> findTodateReachLimitUp(@Param("endDate") Date endDate);
 	
 	@Query("select t from StockDayPrice t where t.stockCode = :stockCode and t.weekOfYear = :weekOfYear order by t.tradingDay asc")
@@ -35,7 +35,7 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 	
 	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.stock_code = :stockCode and sdp.trading_day <= ( "
 			+ "select sdp1.trading_day from bstock.bstock.stock_day_price sdp1 order by sdp1.trading_day desc limit 1) "
-			+ "order by sdp.trading_day desc  limit :limit", nativeQuery = true)
+			+ " and sdp.closing_price not like '%-%' and trim(sdp.closing_price) != ''  order by sdp.trading_day desc  limit :limit", nativeQuery = true)
 	List<StockDayPrice> findStockCodeAndLimit(@Param("stockCode") String stockCode,@Param("limit") Integer limit);
 	
 	@Query(value = "SELECT 1 FROM bstock.bstock.stock_day_price sdp WHERE sdp.trading_day =:tradingDay  LIMIT 1", nativeQuery = true)
