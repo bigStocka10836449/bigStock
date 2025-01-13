@@ -5,6 +5,10 @@ server:
     key: classpath:jwt.pem
   registry-verify-url: ${SERVER_REGISTRY_VERIFY_RUL}
 spring:
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    enabled: true
   main: 
     web-application-type: reactive
     allow-bean-definition-overriding: true
