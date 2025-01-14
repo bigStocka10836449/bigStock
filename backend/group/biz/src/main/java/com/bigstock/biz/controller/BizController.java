@@ -40,7 +40,7 @@ public class BizController {
 	
 	
 	@Operation(summary = "個別股票資券資訊(依照最後交易日抓取52個交易天的內容", description = "")
-	@PostMapping("stockCodeFilterType")
+	@GetMapping("stockCodeMarginShortInfo/{stockCode}")
 	public ResponseEntity<List<MarginTradingAndShortSellingInfoVO>> getStockMarginTradingAndShortSelling(
 			@PathVariable("stockCode") String stockCode) {
 		List<MarginTradingAndShortSellingInfoVO> MarginTradingAndShortSellingInfoVOs = bizService.getStockMarginTradingAndShortSelling(stockCode).stream()

@@ -84,10 +84,10 @@ public class BizService {
 		List<StockDayPrice> stockDayPrices = stockDayPriceService.findPreviousFiftyTowDaysBeforeLastestDayInfo("2330");
 		Date lastTradingDay = stockDayPrices.stream().findFirst().get().getTradingDay();
 		Date firstTradingDay = stockDayPrices.stream()
-				.sorted(Comparator.comparing(StockDayPrice::getTradingDay).reversed()).findFirst().get()
+				.sorted(Comparator.comparing(StockDayPrice::getTradingDay)).findFirst().get()
 				.getTradingDay();
 		List<MarginTradingAndShortSellingInfo> marginTradingAndShortSellingInfos = marginTradingAndShortSellingInfoService
-				.findMarginTradingAndShortSellingInfoByDateRange(stockCode, lastTradingDay, firstTradingDay);
+				.findMarginTradingAndShortSellingInfoByDateRange(stockCode, firstTradingDay, lastTradingDay);
 		Set<Date> marginTradingDaysSet = marginTradingAndShortSellingInfos.stream()
 				.map(MarginTradingAndShortSellingInfo::getTradingDay).collect(Collectors.toSet());
 
