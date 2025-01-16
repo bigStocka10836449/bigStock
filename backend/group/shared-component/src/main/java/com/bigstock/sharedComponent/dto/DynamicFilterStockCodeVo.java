@@ -9,6 +9,7 @@ import lombok.Setter;
 @Setter
 public class DynamicFilterStockCodeVo {
 
+	String aspect;
 	List<DynamicFilterStockPriceCondition> conditions;
-	
+
 }

@@ -60,6 +60,10 @@ public class BizService {
 
 	private final StockDayPriceNativeQueryService stockDayPriceNativeQueryService;
 
+	private final StockDayPriceNativeQueryService stockWeekPriceNativeQueryService;
+
+	private final StockDayPriceNativeQueryService stockMonthPriceNativeQueryService;
+
 	private final StockWeekPriceService stockWeekPriceService;
 
 	private final StockMonthPriceService stockMonthPriceService;
@@ -83,9 +87,8 @@ public class BizService {
 	public List<MarginTradingAndShortSellingInfo> getStockMarginTradingAndShortSelling(String stockCode) {
 		List<StockDayPrice> stockDayPrices = stockDayPriceService.findPreviousFiftyTowDaysBeforeLastestDayInfo("2330");
 		Date lastTradingDay = stockDayPrices.stream().findFirst().get().getTradingDay();
-		Date firstTradingDay = stockDayPrices.stream()
-				.sorted(Comparator.comparing(StockDayPrice::getTradingDay)).findFirst().get()
-				.getTradingDay();
+		Date firstTradingDay = stockDayPrices.stream().sorted(Comparator.comparing(StockDayPrice::getTradingDay))
+				.findFirst().get().getTradingDay();
 		List<MarginTradingAndShortSellingInfo> marginTradingAndShortSellingInfos = marginTradingAndShortSellingInfoService
 				.findMarginTradingAndShortSellingInfoByDateRange(stockCode, firstTradingDay, lastTradingDay);
 		Set<Date> marginTradingDaysSet = marginTradingAndShortSellingInfos.stream()
@@ -280,60 +283,132 @@ public class BizService {
 				}).toList();
 	}
 
-	public List<StockInfoVo> getMatchStockCodeByCondition(DynamicFilterStockCodeVo dynamicFilterStockCodeVo) {
-		Map<String, List<DynamicFilterStockPriceCondition>> dynamicFilterStockPriceConditionsMap = dynamicFilterStockCodeVo
-				.getConditions().stream().collect(Collectors.groupingBy(DynamicFilterStockPriceCondition::getType));
-		List<StockDayPrice> stockDayPrices = stockDayPriceService.findPreviousFiftyTowDaysBeforeLastestDayInfo("2330");
-		Date lastTradingDay = stockDayPrices.stream().findFirst().get().getTradingDay();
-		List<String> matchStocks = dynamicFilterStockPriceConditionsMap.entrySet().stream().map(entry -> {
-			List<DynamicFilterStockPriceCondition> dynamicFilterStockPriceConditions = entry.getValue();
+	public List<StockInfoVo> getMatchStockCodeByCondition(List<DynamicFilterStockCodeVo> dynamicFilterStockCodeVos) {
+		return dynamicFilterStockCodeVos.stream().map(dynamicFilterStockCodeVo -> {
+			String aspect = dynamicFilterStockCodeVo.getAspect();
+
+			Map<String, List<DynamicFilterStockPriceCondition>> dynamicFilterStockPriceConditionsMap = dynamicFilterStockCodeVo
+					.getConditions().stream().collect(Collectors.groupingBy(DynamicFilterStockPriceCondition::getType));
+
+			List<StockDayPrice> stockDayPrices = stockDayPriceService
+					.findPreviousFiftyTowDaysBeforeLastestDayInfo("2330");
+			Date lastTradingDay = stockDayPrices.stream().findFirst().get().getTradingDay();
+
+			List<String> matchStocks = switch (aspect) {
+			case "daily" -> processDaily(dynamicFilterStockPriceConditionsMap, lastTradingDay);
+			case "monthly" -> processMonthly(dynamicFilterStockPriceConditionsMap, lastTradingDay);
+			case "weekly" -> processWeekly(dynamicFilterStockPriceConditionsMap, lastTradingDay);
+			default -> throw new RuntimeException("視角不存在");
+			};
+
+			return stockInfoService.findByIds(matchStocks).stream()
+					.filter(data -> StringUtils.isNotBlank(data.getStockType())).map(data -> {
+						StockInfoVo vo = new StockInfoVo();
+						vo.setStockCode(data.getStockCode());
+						vo.setStockName(data.getStockName());
+						switch (data.getStockType()) {
+						case "0" -> vo.setStockTypeName("上櫃");
+						case "1" -> vo.setStockTypeName("上市");
+						case "2" -> vo.setStockTypeName("興櫃");
+						default -> throw new RuntimeException("無法判斷個股上市櫃類型");
+						}
+						return vo;
+					}).toList();
+		}).reduce((list1, list2) -> {
+			List<StockInfoVo> mutableList = new ArrayList<>(list1);
+			mutableList.retainAll(list2);
+			return mutableList;
+		}).orElse(new ArrayList<StockInfoVo>());
+	}
+
+	private List<String> processDaily(Map<String, List<DynamicFilterStockPriceCondition>> conditionsMap,
+			Date lastTradingDay) {
+		return conditionsMap.entrySet().stream().map(entry -> {
 			String type = entry.getKey();
+			List<DynamicFilterStockPriceCondition> conditions = entry.getValue();
+
 			if ("kd".equals(type)) {
-				DynamicFilterStockPriceCondition dynamicFilterStockPriceCondition = dynamicFilterStockPriceConditions
-						.get(0);
-				if (dynamicFilterStockPriceCondition.getValue().get(0).equals("20")) {
+				DynamicFilterStockPriceCondition condition = conditions.get(0);
+				if (condition.getValue().get(0).equals("20")) {
 					return stockDayPriceNativeQueryService.findKvalueUnderTwentyByDateRange(lastTradingDay,
-							dynamicFilterStockPriceCondition.getLimit());
+							condition.getLimit());
 				} else {
 					return stockDayPriceNativeQueryService.findKvalueUpperEightByDateRange(lastTradingDay,
-							dynamicFilterStockPriceCondition.getLimit());
+							condition.getLimit());
 				}
 			} else if ("change".equals(type)) {
 				return stockDayPriceNativeQueryService.findByDateRangeChangeRateOverFilter(lastTradingDay,
-						dynamicFilterStockPriceConditions.get(0).getLimit(),
-						dynamicFilterStockPriceConditions.get(0).getValue().get(0));
+						conditions.get(0).getLimit(), conditions.get(0).getValue().get(0));
 			} else if ("limitUp".equals(type)) {
 				return stockDayPriceService.findTodateReachLimitUp(lastTradingDay).stream()
-						.map(stockDayPrice -> stockDayPrice.getStockCode()).toList();
+						.map(StockDayPrice::getStockCode).toList();
 			} else if ("ma".equals(type)) {
-				return stockDayPriceNativeQueryService.findByDateRangeMaChangeFilter(dynamicFilterStockPriceConditions,
-						lastTradingDay, dynamicFilterStockPriceConditions.get(0).getLimit());
+				return stockDayPriceNativeQueryService.findByDateRangeMaChangeFilter(conditions, lastTradingDay,
+						conditions.get(0).getLimit());
 			} else {
-				return new ArrayList<String>(); // 返回空列表
+				return new ArrayList<String>();
 			}
-		}).filter(list -> !list.isEmpty()) // 过滤掉空的列表
-				.reduce((list1, list2) -> {
-					// 计算交集
-					List<String> mutableList = new ArrayList<>(list1);
-					mutableList.retainAll(list2);
-					return mutableList;
-				}).orElse(new ArrayList<String>()); // 如果所有列表为空，则返回空列表
+		}).filter(list -> !list.isEmpty()).reduce((list1, list2) -> {
+			List<String> mutableList = new ArrayList<>(list1);
+			mutableList.retainAll(list2);
+			return mutableList;
+		}).orElse(new ArrayList<String>());
+	}
 
-		List<StockInfoVo> stockInfos = stockInfoService.findByIds(matchStocks).stream()
-				.filter(data -> StringUtils.isNotBlank(data.getStockType())).map(data -> {
-					StockInfoVo vo = new StockInfoVo();
-					vo.setStockCode(data.getStockCode());
-					vo.setStockName(data.getStockName());
-					switch (data.getStockType()) {
-					case "0" -> vo.setStockTypeName("上櫃");
-					case "1" -> vo.setStockTypeName("上市");
-					case "2" -> vo.setStockTypeName("興櫃");
-					default -> throw new RuntimeException("無法判斷個股上市櫃類型");
-					}
-					;
-					return vo;
-				}).toList();
-		return stockInfos;
+	private List<String> processMonthly(Map<String, List<DynamicFilterStockPriceCondition>> conditionsMap,
+			Date lastTradingDay) {
+		return conditionsMap.entrySet().stream().map(entry -> {
+			String type = entry.getKey();
+			List<DynamicFilterStockPriceCondition> conditions = entry.getValue();
+
+			if ("kd".equals(type)) {
+				DynamicFilterStockPriceCondition condition = conditions.get(0);
+				if (condition.getValue().get(0).equals("20")) {
+					return stockMonthPriceNativeQueryService.findKvalueUnderTwentyByDateRange(lastTradingDay,
+							condition.getLimit());
+				} else {
+					return stockMonthPriceNativeQueryService.findKvalueUpperEightByDateRange(lastTradingDay,
+							condition.getLimit());
+				}
+			} else if ("ma".equals(type)) {
+				return stockMonthPriceNativeQueryService.findByDateRangeMaChangeFilter(conditions, lastTradingDay,
+						conditions.get(0).getLimit());
+			} else {
+				return new ArrayList<String>();
+			}
+		}).filter(list -> !list.isEmpty()).reduce((list1, list2) -> {
+			List<String> mutableList = new ArrayList<>(list1);
+			mutableList.retainAll(list2);
+			return mutableList;
+		}).orElse(new ArrayList<String>());
+	}
+
+	private List<String> processWeekly(Map<String, List<DynamicFilterStockPriceCondition>> conditionsMap,
+			Date lastTradingDay) {
+		return conditionsMap.entrySet().stream().map(entry -> {
+			String type = entry.getKey();
+			List<DynamicFilterStockPriceCondition> conditions = entry.getValue();
+
+			if ("kd".equals(type)) {
+				DynamicFilterStockPriceCondition condition = conditions.get(0);
+				if (condition.getValue().get(0).equals("20")) {
+					return stockWeekPriceNativeQueryService.findKvalueUnderTwentyByDateRange(lastTradingDay,
+							condition.getLimit());
+				} else {
+					return stockWeekPriceNativeQueryService.findKvalueUpperEightByDateRange(lastTradingDay,
+							condition.getLimit());
+				}
+			} else if ("ma".equals(type)) {
+				return stockWeekPriceNativeQueryService.findByDateRangeMaChangeFilter(conditions, lastTradingDay,
+						conditions.get(0).getLimit());
+			} else {
+				return new ArrayList<String>();
+			}
+		}).filter(list -> !list.isEmpty()).reduce((list1, list2) -> {
+			List<String> mutableList = new ArrayList<>(list1);
+			mutableList.retainAll(list2);
+			return mutableList;
+		}).orElse(new ArrayList<String>());
 	}
 
 	private String findMaxWeek(LocalDate today, AtomicInteger weekOfYear) {

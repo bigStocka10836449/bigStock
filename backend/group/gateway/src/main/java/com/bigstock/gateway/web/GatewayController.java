@@ -2,6 +2,7 @@ package com.bigstock.gateway.web;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -72,16 +73,16 @@ public class GatewayController {
 
 	@Operation(summary = "依照查詢條件篩選符合的股票代碼", description = "")
 	@PostMapping("StockCodeByFilter")
-	public ResponseEntity<String> getStockCodeByFilter(@RequestBody DynamicFilterStockCodeVo dynamicFilterStockCodeVo) {
+	public ResponseEntity<String> getStockCodeByFilter(@RequestBody List<DynamicFilterStockCodeVo> dynamicFilterStockCodeVos) {
 		try {
-			if(ObjectUtils.isEmpty(dynamicFilterStockCodeVo) || dynamicFilterStockCodeVo.getConditions().isEmpty()) {
+			if(ObjectUtils.isEmpty(dynamicFilterStockCodeVos) || dynamicFilterStockCodeVos.get(0).getConditions().isEmpty()) {
 				return ResponseEntity.ok().build();
 			}
 			CountDownLatch latch = new CountDownLatch(1);
 			String uuid = rabbitMqService.createConsumer(latch, "gatewayQueue", "gatewayExchange");
 			ObjectMapper objectMapper = new ObjectMapper();
 			objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd"));
-			String jsonMessage = objectMapper.writeValueAsString(dynamicFilterStockCodeVo);
+			String jsonMessage = objectMapper.writeValueAsString(dynamicFilterStockCodeVos);
 			rabbitMqService.sendMessage(jsonMessage, "StockCodeFilterTypeExchange", "StockCodeFilterTypeQueue", uuid,
 					"gatewayExchange", "gatewayQueue");
 			latch.await(120, TimeUnit.SECONDS);

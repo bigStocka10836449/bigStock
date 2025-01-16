@@ -37,7 +37,7 @@ public class StockDayPriceNativeQueryService {
 			+ "AND SUM(CASE WHEN CAST(line_k_value AS NUMERIC) <= 20 THEN 1 ELSE 0 END) = COUNT(*) "
 			+ "ORDER BY ranked_data.stock_code, start_day ";
 
-	private static final String FIND_K_VALUE_CONTINUE_UNDER_EIGHTY_TEWNTY_BY_RANGE = "SELECT  " + "    stock_code, "
+	private static final String FIND_K_VALUE_CONTINUE_UPPER_EIGHTY_TEWNTY_BY_RANGE = "SELECT  " + "    stock_code, "
 			+ "    MAX(trading_day) AS start_day, " + "    MIN(trading_day) AS end_day, "
 			+ "    COUNT(*) AS total_days, "
 			+ "    SUM(CASE WHEN CAST(line_k_value AS NUMERIC) >= 80 THEN 1 ELSE 0 END) AS required_count " + "FROM ( "
@@ -109,7 +109,7 @@ public class StockDayPriceNativeQueryService {
 	}
 
 	public List<String> findKvalueUpperEightByDateRange(Date startDate, Integer limit) {
-		StringBuilder sb = new StringBuilder(FIND_K_VALUE_CONTINUE_UNDER_EIGHTY_TEWNTY_BY_RANGE);
+		StringBuilder sb = new StringBuilder(FIND_K_VALUE_CONTINUE_UPPER_EIGHTY_TEWNTY_BY_RANGE);
 		EntityManager em = entityManagerFactory.createEntityManager();
 		Query query = em.createNativeQuery(sb.toString(), Tuple.class);
 		query.setParameter("limit", limit);

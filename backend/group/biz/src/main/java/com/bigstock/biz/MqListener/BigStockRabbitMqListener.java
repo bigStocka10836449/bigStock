@@ -24,6 +24,7 @@ import com.bigstock.sharedComponent.dto.SingleStockPriceVo;
 import com.bigstock.sharedComponent.dto.StockInfoVo;
 import com.bigstock.sharedComponent.dto.StructureContinueIncreaseVo;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -138,13 +139,13 @@ public class BigStockRabbitMqListener {
 			throws URISyntaxException, JsonMappingException, JsonProcessingException {
 		try {
 			ObjectMapper objectMapper = new ObjectMapper();
-			DynamicFilterStockCodeVo singleStockPriceBizVo = objectMapper.readValue(jsonMessage,
-					DynamicFilterStockCodeVo.class);
+			List<DynamicFilterStockCodeVo> singleStockPriceBizVos = objectMapper.readValue(jsonMessage,
+					 new TypeReference<List<DynamicFilterStockCodeVo>>() {});
 			MessagePostProcessor messagePostProcessor = messageProperties -> {
 				messageProperties.getMessageProperties().setHeader("UUID", uuid);
 				return messageProperties;
 			};
-			List<StockInfoVo> vos = bizService.getMatchStockCodeByCondition(singleStockPriceBizVo);
+			List<StockInfoVo> vos = bizService.getMatchStockCodeByCondition(singleStockPriceBizVos);
 			String voString = objectMapper.writeValueAsString(vos);
 			rabbitTemplate.convertAndSend(sendExchangeName, uuid, voString, messagePostProcessor,
 					new CorrelationData());
