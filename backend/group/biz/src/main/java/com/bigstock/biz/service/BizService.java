@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -21,6 +22,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.biz.domain.StockDayPriceNativeQueryService;
+import com.bigstock.biz.domain.StockMonthPriceNativeQueryService;
+import com.bigstock.biz.domain.StockWeekPriceNativeQueryService;
 import com.bigstock.sharedComponent.dto.DynamicFilterStockCodeVo;
 import com.bigstock.sharedComponent.dto.DynamicFilterStockPriceCondition;
 import com.bigstock.sharedComponent.dto.SingleStockDayPriceVo;
@@ -50,6 +53,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class BizService {
 
+	private static final List<String> MA_TYPE = List.of("five_days_slope", "ten_days_slope", "twenty_days_slope",
+			"sixty_days_slope", "one_twenty_days_slope", "two_fourty_days_slope");
+
 	private final ShareholderStructureService shareholderStructureService;
 
 	private final StockDayPriceService stockDayPriceService;
@@ -60,9 +66,9 @@ public class BizService {
 
 	private final StockDayPriceNativeQueryService stockDayPriceNativeQueryService;
 
-	private final StockDayPriceNativeQueryService stockWeekPriceNativeQueryService;
+	private final StockWeekPriceNativeQueryService stockWeekPriceNativeQueryService;
 
-	private final StockDayPriceNativeQueryService stockMonthPriceNativeQueryService;
+	private final StockMonthPriceNativeQueryService stockMonthPriceNativeQueryService;
 
 	private final StockWeekPriceService stockWeekPriceService;
 
@@ -343,8 +349,52 @@ public class BizService {
 				return stockDayPriceService.findTodateReachLimitUp(lastTradingDay).stream()
 						.map(StockDayPrice::getStockCode).toList();
 			} else if ("ma".equals(type)) {
+				AtomicInteger fiveDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger tenDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger twentyDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger sixtyDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger oneTwentyDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger twoFourtyDaysSlopeLimit = new AtomicInteger(0);
+				MA_TYPE.stream().forEach(maTypeName -> {
+					conditions.stream().filter(condition -> condition.getName().equals(maTypeName)).forEach(condition -> {
+						switch (condition.getName()) {
+						case "five_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								fiveDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "ten_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								tenDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "twenty_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								twentyDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "sixty_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								sixtyDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "one_twenty_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								oneTwentyDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "two_fourty_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								twoFourtyDaysSlopeLimit.set(condition.getLimit());
+							}
+							;
+							break;
+						}
+					});
+				});
 				return stockDayPriceNativeQueryService.findByDateRangeMaChangeFilter(conditions, lastTradingDay,
-						conditions.get(0).getLimit());
+						fiveDaysSlopeLimit.get(), tenDaysSlopeLimit.get(), twentyDaysSlopeLimit.get(),
+						sixtyDaysSlopeLimit.get(), oneTwentyDaysSlopeLimit.get(), twoFourtyDaysSlopeLimit.get());
 			} else {
 				return new ArrayList<String>();
 			}
@@ -371,8 +421,52 @@ public class BizService {
 							condition.getLimit());
 				}
 			} else if ("ma".equals(type)) {
+				AtomicInteger fiveDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger tenDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger twentyDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger sixtyDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger oneTwentyDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger twoFourtyDaysSlopeLimit = new AtomicInteger(0);
+				MA_TYPE.stream().forEach(maTypeName -> {
+					conditions.stream().filter(condition -> condition.getName().equals(maTypeName)).forEach(condition -> {
+						switch (condition.getName()) {
+						case "five_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								fiveDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "ten_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								tenDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "twenty_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								twentyDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "sixty_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								sixtyDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "one_twenty_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								oneTwentyDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "two_fourty_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								twoFourtyDaysSlopeLimit.set(condition.getLimit());
+							}
+							;
+							break;
+						}
+					});
+				});
 				return stockMonthPriceNativeQueryService.findByDateRangeMaChangeFilter(conditions, lastTradingDay,
-						conditions.get(0).getLimit());
+						fiveDaysSlopeLimit.get(), tenDaysSlopeLimit.get(), twentyDaysSlopeLimit.get(),
+						sixtyDaysSlopeLimit.get(), oneTwentyDaysSlopeLimit.get(), twoFourtyDaysSlopeLimit.get());
 			} else {
 				return new ArrayList<String>();
 			}
@@ -399,8 +493,52 @@ public class BizService {
 							condition.getLimit());
 				}
 			} else if ("ma".equals(type)) {
+				AtomicInteger fiveDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger tenDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger twentyDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger sixtyDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger oneTwentyDaysSlopeLimit = new AtomicInteger(0);
+				AtomicInteger twoFourtyDaysSlopeLimit = new AtomicInteger(0);
+				MA_TYPE.stream().forEach(maTypeName -> {
+					conditions.stream().filter(condition -> condition.getName().equals(maTypeName)).forEach(condition -> {
+						switch (condition.getName()) {
+						case "five_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								fiveDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "ten_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								tenDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "twenty_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								twentyDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "sixty_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								sixtyDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "one_twenty_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								oneTwentyDaysSlopeLimit.set(condition.getLimit());
+							}
+							break;
+						case "two_fourty_ma_slope":
+							if (ObjectUtils.isNotEmpty(condition.getLimit())) {
+								twoFourtyDaysSlopeLimit.set(condition.getLimit());
+							}
+							;
+							break;
+						}
+					});
+				});
 				return stockWeekPriceNativeQueryService.findByDateRangeMaChangeFilter(conditions, lastTradingDay,
-						conditions.get(0).getLimit());
+						fiveDaysSlopeLimit.get(), tenDaysSlopeLimit.get(), twentyDaysSlopeLimit.get(),
+						sixtyDaysSlopeLimit.get(), oneTwentyDaysSlopeLimit.get(), twoFourtyDaysSlopeLimit.get());
 			} else {
 				return new ArrayList<String>();
 			}

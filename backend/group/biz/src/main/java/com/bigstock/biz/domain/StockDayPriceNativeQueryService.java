@@ -64,29 +64,29 @@ public class StockDayPriceNativeQueryService {
 	private static final String FIND_DATE_RANGE_MA_TREND_QUERY = "SELECT *  " + "FROM ( " + "    SELECT   "
 			+ "        stock_code,  " + "        MIN(trading_day) AS first_day,  "
 			+ "        MAX(trading_day) AS last_day,  " + "        CASE   "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(five_days_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :limit THEN CAST(five_days_ma AS NUMERIC) END) = 0 THEN 'flat' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(five_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :limit THEN CAST(five_days_ma AS NUMERIC) END) > 1 THEN 'up' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(five_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :limit THEN CAST(five_days_ma AS NUMERIC) END) < 1 THEN 'down' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(five_days_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :fiveDaysSlopeLimit THEN CAST(five_days_ma AS NUMERIC) END) = 0 THEN 'flat' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(five_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :fiveDaysSlopeLimit THEN CAST(five_days_ma AS NUMERIC) END) > 1 THEN 'up' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(five_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :fiveDaysSlopeLimit THEN CAST(five_days_ma AS NUMERIC) END) < 1 THEN 'down' "
 			+ "            ELSE 'flat' " + "        END AS five_days_slope,  " + "        CASE   "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(ten_days_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :limit THEN CAST(ten_days_ma AS NUMERIC) END) = 0 THEN 'flat' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(ten_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :limit THEN CAST(ten_days_ma AS NUMERIC) END) > 1 THEN 'up' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(ten_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :limit THEN CAST(ten_days_ma AS NUMERIC) END) < 1 THEN 'down' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(ten_days_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :tenDaysSlopeLimit THEN CAST(ten_days_ma AS NUMERIC) END) = 0 THEN 'flat' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(ten_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :tenDaysSlopeLimit THEN CAST(ten_days_ma AS NUMERIC) END) > 1 THEN 'up' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(ten_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :tenDaysSlopeLimit THEN CAST(ten_days_ma AS NUMERIC) END) < 1 THEN 'down' "
 			+ "            ELSE 'flat' " + "        END AS ten_days_slope, " + "        CASE   "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(twenty_days_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :limit THEN CAST(twenty_days_ma AS NUMERIC) END) = 0 THEN 'flat' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(twenty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :limit THEN CAST(twenty_days_ma AS NUMERIC) END) > 1 THEN 'up' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(twenty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :limit THEN CAST(twenty_days_ma AS NUMERIC) END) < 1 THEN 'down' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(twenty_days_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :twentyDaysSlopeLimit THEN CAST(twenty_days_ma AS NUMERIC) END) = 0 THEN 'flat' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(twenty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :twentyDaysSlopeLimit THEN CAST(twenty_days_ma AS NUMERIC) END) > 1 THEN 'up' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(twenty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :twentyDaysSlopeLimit THEN CAST(twenty_days_ma AS NUMERIC) END) < 1 THEN 'down' "
 			+ "            ELSE 'flat' " + "        END AS twenty_days_slope, " + "        CASE   "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(sixty_days_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :limit THEN CAST(sixty_days_ma AS NUMERIC) END) = 0 THEN 'flat' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(sixty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :limit THEN CAST(sixty_days_ma AS NUMERIC) END) > 1 THEN 'up' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(sixty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :limit THEN CAST(sixty_days_ma AS NUMERIC) END) < 1 THEN 'down' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(sixty_days_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :sixtyDaysSlopeLimit THEN CAST(sixty_days_ma AS NUMERIC) END) = 0 THEN 'flat' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(sixty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :sixtyDaysSlopeLimit THEN CAST(sixty_days_ma AS NUMERIC) END) > 1 THEN 'up' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(sixty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :sixtyDaysSlopeLimit THEN CAST(sixty_days_ma AS NUMERIC) END) < 1 THEN 'down' "
 			+ "            ELSE 'flat' " + "        END AS sixty_days_slope, " + "        CASE   "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(one_twenty_days_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :limit THEN CAST(one_twenty_days_ma AS NUMERIC) END) = 0 THEN 'flat' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(one_twenty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :limit THEN CAST(one_twenty_days_ma AS NUMERIC) END) > 1 THEN 'up' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(one_twenty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :limit THEN CAST(one_twenty_days_ma AS NUMERIC) END) < 1 THEN 'down' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(one_twenty_days_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :oneTwentyDaysSlopeLimit THEN CAST(one_twenty_days_ma AS NUMERIC) END) = 0 THEN 'flat' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(one_twenty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :oneTwentyDaysSlopeLimit THEN CAST(one_twenty_days_ma AS NUMERIC) END) > 1 THEN 'up' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(one_twenty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :oneTwentyDaysSlopeLimit THEN CAST(one_twenty_days_ma AS NUMERIC) END) < 1 THEN 'down' "
 			+ "            ELSE 'down' " + "        END AS one_twenty_days_slope, " + "        CASE   "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(two_fourty_days_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :limit THEN CAST(two_fourty_days_ma AS NUMERIC) END) = 0 THEN 'flat' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(two_fourty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :limit THEN CAST(two_fourty_days_ma AS NUMERIC) END) > 1 THEN 'up' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(two_fourty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :limit THEN CAST(two_fourty_days_ma AS NUMERIC) END) < 1 THEN 'down' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(two_fourty_days_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :twoFourtyDaysSlopeLimit THEN CAST(two_fourty_days_ma AS NUMERIC) END) = 0 THEN 'flat' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(two_fourty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :twoFourtyDaysSlopeLimit THEN CAST(two_fourty_days_ma AS NUMERIC) END) > 1 THEN 'up' "
+			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(two_fourty_days_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :twoFourtyDaysSlopeLimit THEN CAST(two_fourty_days_ma AS NUMERIC) END) < 1 THEN 'down' "
 			+ "            ELSE 'flat' " + "        END AS two_fourty_days_slope " + "    FROM (  "
 			+ "        SELECT   " + "            stock_code,  " + "            trading_day,  "
 			+ "            five_days_ma,  " + "            ten_days_ma,  " + "            twenty_days_ma,  "
@@ -94,7 +94,7 @@ public class StockDayPriceNativeQueryService {
 			+ "            ROW_NUMBER() OVER (PARTITION BY stock_code ORDER BY trading_day DESC) AS rn  "
 			+ "        FROM   " + "            bstock.bstock.stock_day_price sdp  " + "        WHERE   "
 			+ "            sdp.trading_day <= :tradingDay " + "            AND sdp.closing_price NOT LIKE '%-%'  "
-			+ "            AND sdp.closing_price != ''  " + "    ) AS ranked_data  " + "    WHERE rn <= :limit  "
+			+ "            AND sdp.closing_price != ''  " + "    ) AS ranked_data  " + "    WHERE 1 = 1  "
 			+ "    GROUP BY stock_code  " + ") AS ma_results  " + "WHERE 1 = 1 %dynanicCondition "
 			+ "ORDER BY stock_code ";
 
@@ -133,7 +133,8 @@ public class StockDayPriceNativeQueryService {
 
 	@Transactional
 	public List<String> findByDateRangeMaChangeFilter(List<DynamicFilterStockPriceCondition> maConditions,
-			Date startDate, Integer limit) {
+			Date startDate, Integer fiveDaysSlopeLimit, Integer tenDaysSlopeLimit, Integer twentyDaysSlopeLimit,
+			Integer sixtyDaysSlopeLimit, Integer oneTwentyDaysSlopeLimit, Integer twoFourtyDaysSlopeLimit) {
 		StringBuilder sb = new StringBuilder(FIND_DATE_RANGE_MA_TREND_QUERY);
 		StringBuilder dynamicConditionSb = new StringBuilder();
 		Map<String, Object> queryConditionMap = Maps.newHashMap();
@@ -152,7 +153,12 @@ public class StockDayPriceNativeQueryService {
 			query.setParameter(key, value);
 		});
 		query.setParameter("tradingDay", startDate);
-		query.setParameter("limit", limit);
+		query.setParameter("fiveDaysSlopeLimit", fiveDaysSlopeLimit);
+		query.setParameter("tenDaysSlopeLimit", tenDaysSlopeLimit);
+		query.setParameter("twentyDaysSlopeLimit", twentyDaysSlopeLimit);
+		query.setParameter("sixtyDaysSlopeLimit", sixtyDaysSlopeLimit);
+		query.setParameter("oneTwentyDaysSlopeLimit", oneTwentyDaysSlopeLimit);
+		query.setParameter("twoFourtyDaysSlopeLimit", twoFourtyDaysSlopeLimit);
 		List<Tuple> tuples = (List<Tuple>) query.getResultList();
 		return tuples.stream().map(tuple -> tuple.get("stock_code").toString()).toList();
 	}
@@ -168,7 +174,7 @@ public class StockDayPriceNativeQueryService {
 		}
 
 		switch (operator.toLowerCase()) {
-		//這個變數不用考慮operator
+		// 這個變數不用考慮operator
 		case "notconcerned":
 			parameterMap.put(column, values.get(0)); // 将值放入 Map
 			if (StringUtils.isBlank(aliasPrefix)) {
