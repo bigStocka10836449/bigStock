@@ -39,18 +39,15 @@ public class OauthController {
 	private final OauthTokenService oauthTokenService;
 
 	private final UserRegistryService userRegistryService;
-	
 
-	
 	@GetMapping(value = "tempToken")
 	public ResponseEntity<Object> tempToken() {
-	    String token = oauthTokenService.getTmpToken();
-	    Map<String, String> response = new HashMap<>();
-	    response.put("token", token);
-	    return ResponseEntity.ok(response);
+		String token = oauthTokenService.getTmpToken();
+		Map<String, String> response = new HashMap<>();
+		response.put("token", token);
+		return ResponseEntity.ok(response);
 	}
-	
-	
+
 	@Operation(summary = "token 刷新", description = "acctoken 若失效，但refresh token還有效時，gateway自動跟auth要新的access token刷新")
 	@PostMapping(value = "refreshToken", consumes = MediaType.APPLICATION_JSON_VALUE)
 	public String refreshToken(@RequestBody TokenInfo refreshTokenInfo) {
@@ -59,7 +56,8 @@ public class OauthController {
 
 	@Operation(summary = "使用者登入", description = "auth 產生 access token 跟 refresh token ，回傳access token")
 	@PostMapping(value = "login", consumes = MediaType.APPLICATION_JSON_VALUE)
-	public String login(@RequestBody UserInloginInfo userInloginInfo) {		return oauthTokenService.userLoginHandle(userInloginInfo);
+	public String login(@RequestBody UserInloginInfo userInloginInfo) {
+		return oauthTokenService.userLoginHandle(userInloginInfo);
 	}
 
 	@Operation(summary = "使用者註冊", description = "向Auth 註冊 使用者，若註冊成功，會發送驗證信", responses = {
@@ -87,9 +85,8 @@ public class OauthController {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
 		}
 	}
-	
-	@Operation(summary = "取得在線人數", responses = {
-			@ApiResponse(responseCode = "成功 200 回傳人數") })
+
+	@Operation(summary = "取得在線人數", responses = { @ApiResponse(responseCode = "成功 200 回傳人數") })
 	@GetMapping(value = "getRecentlyMembers")
 	public ResponseEntity<String> getRecentlyMembers() {
 		try {

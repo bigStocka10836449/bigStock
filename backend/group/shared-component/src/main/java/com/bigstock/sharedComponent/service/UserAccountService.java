@@ -55,13 +55,10 @@ public class UserAccountService {
         userAccountRepository.delete(userAccount);
     }
     
-    public Optional<UserAccount> findUserByEmailOrPhome(String emailOrPhone) {
-    	Optional<UserAccount>  userAccountOp = userAccountRepository.findByEmail(emailOrPhone);
+    public Optional<UserAccount> findUserByEmail(String email) {
+    	Optional<UserAccount>  userAccountOp = userAccountRepository.findByEmail(email);
 		if (userAccountOp.isEmpty()) {
-			userAccountOp = userAccountRepository.findByPhone(emailOrPhone).stream().findFirst();
-		}
-		if(userAccountOp.isEmpty()) {
-			userAccountOp = userAccountRepository.findByPhone(emailOrPhone).stream().findFirst();
+			userAccountOp = userAccountRepository.findByPhone(email).stream().findFirst();
 		}
 		return userAccountOp;
     }

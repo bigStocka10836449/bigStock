@@ -49,7 +49,7 @@ public class OauthTokenService {
 		String username = userInloginInfo.getUserName();
 		String password = userInloginInfo.getPassword();
 		Optional<UserAccount> userAccountOp = Optional.empty();
-		userAccountOp = userAccountService.findUserByEmailOrPhome(username);
+		userAccountOp = userAccountService.findUserByEmail(username);
 		UserAccount userAccount = userAccountOp.orElseThrow(() -> new JwtException("user can not found"));
 		// 验证密码
 		if (!passwordEncoder.matches(password, userAccount.getUserPassword())) {
