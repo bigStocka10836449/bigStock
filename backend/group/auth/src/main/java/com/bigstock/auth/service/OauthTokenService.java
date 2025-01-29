@@ -74,7 +74,7 @@ public class OauthTokenService {
 		String username = "0938017103";
 		String password = "0938017103";
 		Optional<UserAccount> userAccountOp = Optional.empty();
-		userAccountOp = userAccountService.findUserByEmailOrPhome(username);
+		userAccountOp = userAccountService.findUserByEmail(username);
 		UserAccount userAccount = userAccountOp.orElseThrow(() -> new JwtException("user can not found"));
 		// 验证密码
 		if (!passwordEncoder.matches(password, userAccount.getUserPassword())) {
@@ -145,7 +145,7 @@ public class OauthTokenService {
 		// 使用 Jwts.builder() 建立 JWT
 		JwtBuilder builder = Jwts.builder();
 		Optional<UserAccount> userAccountsOp = Optional.empty();
-		userAccountsOp = userAccountService.findUserByEmailOrPhome(subject);
+		userAccountsOp = userAccountService.findUserByEmail(subject);
 		if (userAccountsOp.isEmpty()) {
 			throw new JwtException("invalid token");
 		}
