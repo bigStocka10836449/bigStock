@@ -77,7 +77,7 @@ public class ChromeDriverUtils {
 		LocalDate today = tradingMonth.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 		DateTimeFormatter tpexDateFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 		 // 設置本月的第一天
-        LocalDate startOfMonth = today.withDayOfYear(122);
+        LocalDate startOfMonth = today.withDayOfYear(1);
 
         // 設置本月的最後一天
         LocalDate endOfMonth = today.withDayOfMonth(today.lengthOfMonth());
@@ -85,6 +85,7 @@ public class ChromeDriverUtils {
         Map<String, String> parameter = Maps.newHashMap();
         parameter.put("startDate", startOfMonth.format(tpexDateFormatter));
         parameter.put("endDate", endOfMonth.format(tpexDateFormatter));
+        parameter.put("id", "");
         parameter.put("response", "json");
         String tpexResult = fetchApiData("https://www.tpex.org.tw/www/zh-tw/bulletin/exDailyQ", parameter);
     	Map<String, Object> tpexResultMap = objectMapper.readValue(tpexResult,
