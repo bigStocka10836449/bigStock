@@ -62,22 +62,22 @@ public class StockMonthPrice {
 	@Column(name = "line_rsv_value")
 	private BigDecimal lineRsvValue;
 
-	@Column(name = "five_week_ma")
+	@Column(name = "five_ma")
 	private BigDecimal fiveMonthMa;
 
-	@Column(name = "twenty_week_ma")
+	@Column(name = "twenty_ma")
 	private BigDecimal twentyMonthMa;
 
-	@Column(name = "ten_week_ma")
+	@Column(name = "ten_ma")
 	private BigDecimal tenMonthMa;
 
-	@Column(name = "sixty_week_ma")
+	@Column(name = "sixty_ma")
 	private BigDecimal sixtyMonthMa;
 
-	@Column(name = "one_twenty_week_ma")
+	@Column(name = "one_twenty_ma")
 	private BigDecimal oneTwentyMonthMa;
 
-	@Column(name = "two_fourty_week_ma")
+	@Column(name = "two_fourty_ma")
 	private BigDecimal twoFourtyMonthMa;
 
 	@Column(name = "opening_price")

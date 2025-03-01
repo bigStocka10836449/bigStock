@@ -63,22 +63,22 @@ public class StockWeekPrice {
 	@Column(name = "line_rsv_value")
 	private BigDecimal lineRsvValue;
 
-	@Column(name = "five_week_ma")
+	@Column(name = "five_ma")
 	private BigDecimal fiveWeekMa;
 
-	@Column(name = "twenty_week_ma")
+	@Column(name = "twenty_ma")
 	private BigDecimal twentyWeekMa;
 
-	@Column(name = "ten_week_ma")
+	@Column(name = "ten_ma")
 	private BigDecimal tenWeekMa;
 
-	@Column(name = "sixty_week_ma")
+	@Column(name = "sixty_ma")
 	private BigDecimal sixtyWeekMa;
 
-	@Column(name = "one_twenty_week_ma")
+	@Column(name = "one_twenty_ma")
 	private BigDecimal oneTwentyWeekMa;
 
-	@Column(name = "two_fourty_week_ma")
+	@Column(name = "two_fourty_ma")
 	private BigDecimal twoFourtyWeekMa;
 
 	@Column(name = "opening_price")
