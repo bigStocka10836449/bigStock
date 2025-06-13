@@ -74,6 +74,12 @@
 			<artifactId>p6spy</artifactId>
 			<version>3.9.1</version>
 		</dependency>
+		<!-- https://mvnrepository.com/artifact/io.socket/socket.io-client -->
+		 <dependency>
+		     <groupId>com.corundumstudio.socketio</groupId>
+		     <artifactId>netty-socketio</artifactId>
+		     <version>2.0.13</version>
+	    </dependency>
 	</dependencies>
 
 </project>

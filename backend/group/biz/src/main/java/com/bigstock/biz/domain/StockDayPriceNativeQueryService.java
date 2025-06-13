@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class StockDayPriceNativeQueryService {
 
-	private final EntityManagerFactory entityManagerFactory;
+	private final EntityManager em;
 
 	private static final String FIND_K_VALUE_CONTINUE_UNDER_TEWNTY_BY_RANGE = "SELECT  "
 			+ "    ranked_data.stock_code, " + "    MAX(ranked_data.trading_day) AS start_day, "
@@ -98,9 +98,9 @@ public class StockDayPriceNativeQueryService {
 			+ "    GROUP BY stock_code  " + ") AS ma_results  " + "WHERE 1 = 1 %dynanicCondition "
 			+ "ORDER BY stock_code ";
 
+	@Transactional
 	public List<String> findKvalueUnderTwentyByDateRange(Date startDate, Integer limit) {
 		StringBuilder sb = new StringBuilder(FIND_K_VALUE_CONTINUE_UNDER_TEWNTY_BY_RANGE);
-		EntityManager em = entityManagerFactory.createEntityManager();
 		Query query = em.createNativeQuery(sb.toString(), Tuple.class);
 		query.setParameter("limit", limit);
 		query.setParameter("tradingDate", startDate);
@@ -108,9 +108,9 @@ public class StockDayPriceNativeQueryService {
 		return tuples.stream().map(tuple -> tuple.get("stock_code").toString()).toList();
 	}
 
+	@Transactional
 	public List<String> findKvalueUpperEightByDateRange(Date startDate, Integer limit) {
 		StringBuilder sb = new StringBuilder(FIND_K_VALUE_CONTINUE_UPPER_EIGHTY_TEWNTY_BY_RANGE);
-		EntityManager em = entityManagerFactory.createEntityManager();
 		Query query = em.createNativeQuery(sb.toString(), Tuple.class);
 		query.setParameter("limit", limit);
 		query.setParameter("tradingDay", startDate);
@@ -122,7 +122,6 @@ public class StockDayPriceNativeQueryService {
 	@Transactional
 	public List<String> findByDateRangeChangeRateOverFilter(Date startDate, Integer limit, String totalChangeRate) {
 		StringBuilder sb = new StringBuilder(FIND_DATE_RANGE_SUM_CHANGE_RATE_QUERY);
-		EntityManager em = entityManagerFactory.createEntityManager();
 		Query query = em.createNativeQuery(sb.toString(), Tuple.class);
 		query.setParameter("tradingDay", startDate);
 		query.setParameter("limit", limit);
@@ -145,7 +144,6 @@ public class StockDayPriceNativeQueryService {
 		if (start != -1) {
 			sb.replace(start, start + "%dynanicCondition".length(), dynamicConditionSb.toString());
 		}
-		EntityManager em = entityManagerFactory.createEntityManager();
 		Query query = em.createNativeQuery(sb.toString(), Tuple.class);
 		queryConditionMap.entrySet().forEach(entry -> {
 			String key = entry.getKey();

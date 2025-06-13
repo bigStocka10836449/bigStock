@@ -2,13 +2,17 @@ package com.bigstock.schedule.utils;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -16,6 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.IsoFields;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -26,8 +31,22 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
+import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeDriverService;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+import org.redisson.api.RBucket;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -49,6 +68,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.PipeInput;
 import com.github.kokorin.jaffree.ffmpeg.PipeOutput;
+import com.google.api.gax.core.FixedCredentialsProvider;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.speech.v1.RecognitionAudio;
+import com.google.cloud.speech.v1.RecognitionConfig;
+import com.google.cloud.speech.v1.RecognizeResponse;
+import com.google.cloud.speech.v1.SpeechClient;
+import com.google.cloud.speech.v1.SpeechRecognitionAlternative;
+import com.google.cloud.speech.v1.SpeechRecognitionResult;
+import com.google.cloud.speech.v1.SpeechSettings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
@@ -168,50 +196,50 @@ public class ChromeDriverUtils {
 	}
 	
 	
-//	public static String testConvertAudio(ByteString audioBytes, String credentialsPath) throws IOException {
-//		// 設置憑證文件的路徑 (將此路徑替換為你的 credentials.json 憑證文件路徑)
-//		String resultString = StringUtils.EMPTY;
-//		try {
-//			// 使用 GoogleCredentials 來加載憑證文件
-//			GoogleCredentials credentials = GoogleCredentials.fromStream(new FileInputStream(credentialsPath));
-//
-//			// 設置 SpeechClient 並將憑證文件應用到 SpeechClient 設置中
-//			SpeechSettings speechSettings = SpeechSettings.newBuilder()
-//					.setCredentialsProvider(FixedCredentialsProvider.create(credentials)).build();
-//
-//			// 使用 SpeechClient 調用 API
-//			try (SpeechClient speechClient = SpeechClient.create(speechSettings)) {
-//
-//				// 讀取音訊文件並轉換為 ByteString 格式
-//
-//				// 設置音訊配置
-//				RecognitionConfig config = RecognitionConfig.newBuilder()
-//						.setEncoding(RecognitionConfig.AudioEncoding.LINEAR16)
-//						// 省略采样率，自动匹配音频文件的采样率
-//						.setLanguageCode("en-US").build();
-//
-//				// 設置音訊數據
-//				RecognitionAudio audio = RecognitionAudio.newBuilder().setContent(audioBytes).build();
-//
-//				// 調用 API 進行語音識別
-//				RecognizeResponse response = speechClient.recognize(config, audio);
-//
-//				// 解析 API 返回的結果
-//				List<SpeechRecognitionResult> results = response.getResultsList();
-//
-//				for (SpeechRecognitionResult result : results) {
-//					SpeechRecognitionAlternative alternative = result.getAlternativesList().get(0);
-//					log.debug("Transcription: %s%n", alternative.getTranscript());
-//					resultString = alternative.getTranscript();
-//				}
-//			}
-//
-//		} catch (IOException e) {
-//			throw e;
-//		}
-//		return resultString;
-//
-//	}
+	public static String testConvertAudio(ByteString audioBytes, String credentialsPath) throws IOException {
+		// 設置憑證文件的路徑 (將此路徑替換為你的 credentials.json 憑證文件路徑)
+		String resultString = StringUtils.EMPTY;
+		try {
+			// 使用 GoogleCredentials 來加載憑證文件
+			GoogleCredentials credentials = GoogleCredentials.fromStream(new FileInputStream(credentialsPath));
+
+			// 設置 SpeechClient 並將憑證文件應用到 SpeechClient 設置中
+			SpeechSettings speechSettings = SpeechSettings.newBuilder()
+					.setCredentialsProvider(FixedCredentialsProvider.create(credentials)).build();
+
+			// 使用 SpeechClient 調用 API
+			try (SpeechClient speechClient = SpeechClient.create(speechSettings)) {
+
+				// 讀取音訊文件並轉換為 ByteString 格式
+
+				// 設置音訊配置
+				RecognitionConfig config = RecognitionConfig.newBuilder()
+						.setEncoding(RecognitionConfig.AudioEncoding.LINEAR16)
+						// 省略采样率，自动匹配音频文件的采样率
+						.setLanguageCode("en-US").build();
+
+				// 設置音訊數據
+				RecognitionAudio audio = RecognitionAudio.newBuilder().setContent(audioBytes).build();
+
+				// 調用 API 進行語音識別
+				RecognizeResponse response = speechClient.recognize(config, audio);
+
+				// 解析 API 返回的結果
+				List<SpeechRecognitionResult> results = response.getResultsList();
+
+				for (SpeechRecognitionResult result : results) {
+					SpeechRecognitionAlternative alternative = result.getAlternativesList().get(0);
+					log.debug("Transcription: %s%n", alternative.getTranscript());
+					resultString = alternative.getTranscript();
+				}
+			}
+
+		} catch (IOException e) {
+			throw e;
+		}
+		return resultString;
+
+	}
 
 	public static String getRandomStockCode(List<String> stockCodes) {
 		if (stockCodes == null || stockCodes.isEmpty()) {
@@ -583,281 +611,310 @@ public class ChromeDriverUtils {
 //
 //	}
 
-//	public static void grepTWSESsecuritiesFirmsDayOperate(String downloadFilepath, String chromeDriverPath,
-//			List<String> twseStockCodes, String bpythonUrl, RBucket<Boolean> graspStockEnableKeyBucket)
-//			throws InterruptedException {
-//		ChromeDriverService service = new ChromeDriverService.Builder()
-//				.usingDriverExecutable(new File(chromeDriverPath)).usingAnyFreePort().build();
-//
-//		// 設定下載文件的偏好
-//		Map<String, Object> prefs = new HashMap<>();
-//		prefs.put("profile.default_content_settings.popups", 0); // 禁止彈出窗口
-//		prefs.put("download.default_directory", downloadFilepath); // 設置下載目錄
-//		prefs.put("download.prompt_for_download", false); // 禁用下載詢問對話框
-//		prefs.put("download.directory_upgrade", true);
-//		prefs.put("safebrowsing.enabled", true); // 啟用安全下載
-//		ChromeOptions options = new ChromeOptions();
-//		options.addArguments("--headless"); // 設定無頭模式
-//		options.addArguments("--no-sandbox"); // 取消沙盒模式
-//		options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
-//		// 使用 setExperimentalOption 來應用這些偏好設置
-//		options.setExperimentalOption("prefs", prefs);
-//		WebDriver driver = new ChromeDriver(service, options);
-//		// 打開目標頁面
-//		driver.get("https://bsr.twse.com.tw/bshtm/bsMenu.aspx");
-//		WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(15));
-//		for (String twseStockCode : twseStockCodes) {
-//			boolean captchaResolved = false;
-//
-//			while (!captchaResolved) {
-//				if (Boolean.FALSE.equals(graspStockEnableKeyBucket.get())) {
-//					return;
-//				}
-//				try {
-//					// 找到 CAPTCHA 圖片元素並截取屏幕
-//					WebElement captchaImage = wait.until(ExpectedConditions
-//							.visibilityOfElementLocated(By.xpath("//img[contains(@src,'CaptchaImage.aspx')]")));
-//					File srcFile = captchaImage.getScreenshotAs(OutputType.FILE);
-//
-//					// 將文件轉換為 byte[]
-//					byte[] fileContent = Files.readAllBytes(srcFile.toPath());
-//
-//					// 將 byte[] 編碼為 Base64 字符串
-//					String base64Image = Base64.getEncoder().encodeToString(fileContent);
-//
-//					// 構建 JSON 請求體
-//					String jsonRequest = "{\"image_byte\":\"" + base64Image + "\"}";
-//
-//					// 發送 POST 請求到 Python 服務，獲取 CAPTCHA 結果
-//					String captchaText = sendPostRequest(jsonRequest, bpythonUrl);
-//
-//					// 檢查 CAPTCHA 長度是否為 5
-//					if (captchaText != null && captchaText.length() == 5) {
-//						// 找到 CAPTCHA 輸入框，並將解析的文本輸入其中
-//						WebElement captchaInput = driver.findElement(By.name("CaptchaControl1"));
-//						captchaInput.clear();
-//						captchaInput.sendKeys(captchaText);
-//
-//						// 找到股票輸入框並輸入股票代號
-//						WebElement stockInput = wait
-//								.until(ExpectedConditions.visibilityOfElementLocated(By.id("TextBox_Stkno")));
-//						stockInput.clear();
-//						stockInput.sendKeys(twseStockCode);
-//
-//						// 找到提交按鈕並點擊
-//						WebElement submitButton = wait.until(ExpectedConditions.elementToBeClickable(By.id("btnOK")));
-//						submitButton.click();
-//
-//						// 嘗試找到錯誤訊息的 <span> 元素
-//						WebElement errorMsg = driver.findElement(By.id("Label_ErrorMsg"));
-//						if (StringUtils.isNotEmpty(errorMsg.getText())) {
-//							if (errorMsg.getText().contains("查無資料")) {
-//								break;
-//							}
-//							// CAPTCHA 長度不正確，點擊重設按鈕
-//							WebElement resetButton = driver.findElement(By.id("Button_Reset"));
-//							resetButton.click();
-//							continue;
-//						}
-//
-//						WebElement downloadLink = wait
-//								.until(ExpectedConditions.elementToBeClickable(By.id("HyperLink_DownloadCSV")));
-//						if (downloadLink != null) {
-//							// 點擊下載鏈接
-//							downloadLink.click();
-//							Thread.sleep(2000);
-//						}
-//						captchaResolved = true; // 退出循環
-//					} else {
-//						// CAPTCHA 長度不正確，點擊重設按鈕
-//						WebElement resetButton = driver.findElement(By.id("Button_Reset"));
-//						resetButton.click();
-//						continue;
-//					}
-//
-//				} catch (Exception e) {
-//					log.warn(e.getMessage(), e);
-//				}
-//			}
-//		}
-//	}
+	public static void grepTWSESsecuritiesFirmsDayOperate(String downloadFilepath, String chromeDriverPath,
+			List<String> twseStockCodes, String bpythonUrl, RBucket<Boolean> graspStockEnableKeyBucket)
+			throws InterruptedException {
+		ChromeDriverService service = new ChromeDriverService.Builder()
+				.usingDriverExecutable(new File(chromeDriverPath)).usingAnyFreePort().build();
 
-//	public static void grepTPEXsecuritiesFirmsDayOperate(String downloadFilepath, String chromeDriverPath,
-//			List<String> tpexStockCodes, String credentialsPath, RBucket<Boolean> graspStockEnableKeyBucket)
-//			throws InterruptedException {
-//		ChromeDriverService service = new ChromeDriverService.Builder()
-//				.usingDriverExecutable(new File(chromeDriverPath)).usingAnyFreePort().build();
-//
-//		// 設定下載文件的偏好
-//		Map<String, Object> prefs = new HashMap<>();
-//		prefs.put("profile.default_content_settings.popups", 0); // 禁止彈出窗口
-//		prefs.put("download.default_directory", downloadFilepath); // 設置下載目錄
-//		prefs.put("download.prompt_for_download", false); // 禁用下載詢問對話框
-//		prefs.put("download.directory_upgrade", true);
-//		prefs.put("safebrowsing.enabled", true); // 啟用安全下載
-//
-//		ChromeOptions options = new ChromeOptions();
-//		options.addArguments("--lang=zh-TW");
-////	    options.addArguments("--headless"); // 設定無頭模式
-//		options.addArguments("--no-sandbox"); // 取消沙盒模式
-//		options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
-//		options.setCapability("goog:loggingPrefs", new HashMap<String, String>() {
-//			{
-//				put("performance", "ALL");
-//			}
-//		});
-//		options.setExperimentalOption("prefs", prefs);
-//
-//		WebDriver driver = new ChromeDriver(service, options);
-//		WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
-//
-//		driver.get("https://www.tpex.org.tw/web/stock/aftertrading/broker_trading/brokerBS.php?l=zh-tw");
-//		Thread.sleep(1000);
-//		// 获取所有 iframe 元素
-//		// 打印每个 iframe 的 title 属性
-//		// CAPTCHA 判斷與處理
-//
-//		if (Boolean.FALSE.equals(graspStockEnableKeyBucket.get())) {
-//			return;
-//		}
-//		// 處理每個股票代碼
-//		List<String> copyTpexStockCodes = Lists.newArrayList();
-//		try {
-//			for (int index = 0; index < tpexStockCodes.size(); index++) {
-//				if (Boolean.FALSE.equals(graspStockEnableKeyBucket.get())) {
-//					return;
-//				}
-//				doReCAPTCHA(driver, wait, credentialsPath);
-//				driver.switchTo().parentFrame();
-//				String tpexStockCode = tpexStockCodes.get(index);
-//				WebElement stockCodeInput = null;
-//
-//				while (true) {
-//					try {
-//						// 獲取所有class='raw'的<div>元素
-//						stockCodeInput = wait
-//								.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("input.code")));
-//					} catch (TimeoutException timeoutException) {
-//						log.info("error stkCode: {}", tpexStockCode);
-//						throw timeoutException;
-//					}
-//
-//					stockCodeInput.clear();
-//					stockCodeInput.sendKeys(tpexStockCode);
-//
-//					// 中英文版本title內容不依樣，recaptcha challenge expires in two minutes、reCAPTCHA
-//					// 驗證問題將在兩分鐘後失效
-//					WebElement queryButton = wait.until(ExpectedConditions
-//							.visibilityOfElementLocated(By.xpath("//*[@id='tables-form']/div[4]/div/button")));
-//					queryButton.click();
-//					doReCAPTCHA(driver, wait, credentialsPath);
-//					try {
-//						WebElement downloadButton = wait.until(ExpectedConditions
-//								.visibilityOfElementLocated(By.xpath("//*[@id='tables-form']/div[3]/div/button[1]")));
-//						downloadButton.click();
-//					} catch (TimeoutException er) {
-//						doReCAPTCHA(driver, wait, credentialsPath);
-//						WebElement stockCodeInputag = null;
-//						try {
-//							stockCodeInputag = wait
-//									.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("input.code")));
-//							stockCodeInputag.clear();
-//							stockCodeInputag.sendKeys(tpexStockCode);
-//
-//							WebElement queryButtonag = wait.until(ExpectedConditions.visibilityOfElementLocated(By
-//									.xpath("//button[@class='btn btn-primary' and @type='button' and @onclick='checkForm()']")));
-//							queryButtonag.click();
-//
-//							WebElement downloadButton = wait.until(ExpectedConditions.visibilityOfElementLocated(
-//									By.xpath("//*[@id='tables-form']/div[3]/div/button[1]")));
-//							downloadButton.click();
-//							File folder = new File(downloadFilepath);
-//							log.info("downloadFilepath :{}", folder.getPath());
-//							log.info("folder Sile :{}", folder.list().length);
-//						} catch (TimeoutException timeoutException) {
-//							throw timeoutException;
-//						}
-//					}
-//
-//					copyTpexStockCodes.add(tpexStockCode);
-//					Thread.sleep(7000);
-//					break;
-//				}
-//			}
-//		} catch (Exception e) {
-//			Thread.sleep(6000);
-//			log.warn(e.getMessage(), e);
-//			log.info("retry grepTPEXsecuritiesFirmsDayOperate-----------------");
-//			driver.quit();
-//			List<String> notDownloadStockCode = tpexStockCodes.stream()
-//					.filter(stockCode -> !copyTpexStockCodes.contains(stockCode)).toList();
-//			grepTPEXsecuritiesFirmsDayOperate(downloadFilepath, chromeDriverPath, notDownloadStockCode, credentialsPath,
-//					graspStockEnableKeyBucket);
-//		}
-//	}
+		// 設定下載文件的偏好
+		Map<String, Object> prefs = new HashMap<>();
+		prefs.put("profile.default_content_settings.popups", 0); // 禁止彈出窗口
+		prefs.put("download.default_directory", downloadFilepath); // 設置下載目錄
+		prefs.put("download.prompt_for_download", false); // 禁用下載詢問對話框
+		prefs.put("download.directory_upgrade", true);
+		prefs.put("safebrowsing.enabled", true); // 啟用安全下載
+		ChromeOptions options = new ChromeOptions();
+		options.addArguments("--headless"); // 設定無頭模式
+		options.addArguments("--no-sandbox"); // 取消沙盒模式
+		options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
+		// 使用 setExperimentalOption 來應用這些偏好設置
+		options.setExperimentalOption("prefs", prefs);
+		WebDriver driver = new ChromeDriver(service, options);
+		// 打開目標頁面
+		driver.get("https://bsr.twse.com.tw/bshtm/bsMenu.aspx");
+		WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(15));
+		for (String twseStockCode : twseStockCodes) {
+			boolean captchaResolved = false;
 
-//	private static void doReCAPTCHA(WebDriver driver, WebDriverWait wait, String credentialsPath) {
-//		WebElement reCAPTCHA = driver.findElement(By.cssSelector("iframe[title='reCAPTCHA']"));
-//		boolean captchaResolved = ObjectUtils.isEmpty(reCAPTCHA);
-//		while (!captchaResolved) {
-//			try {
-//				reCAPTCHA = driver.findElement(By.cssSelector("iframe[title='reCAPTCHA']"));
-//				driver.switchTo().frame(reCAPTCHA);
-//				WebElement recaptchaElement = wait.until(
-//						ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='recaptcha-anchor']/div[2]")));
-//
-//				if (recaptchaElement != null) {
-//					Actions actions = new Actions(driver);
-//					actions.moveToElement(recaptchaElement).click().perform();
-//					driver.switchTo().parentFrame();
-//
-//					try {
-//						// 中英文版本title內容不依樣，recaptcha challenge expires in two minutes、reCAPTCHA
-//						// 驗證問題將在兩分鐘後失效
-//						driver.switchTo().frame(wait.until(ExpectedConditions
-//								.visibilityOfElementLocated(By.xpath("//iframe[@title='reCAPTCHA 驗證問題將在兩分鐘後失效']"))));
-//					} catch (TimeoutException ex) {
-//						log.warn(ex.getMessage(), ex);
-//						break;
-//					}
-//
-//					WebElement recaptchaAudioButton = wait
-//							.until(ExpectedConditions.visibilityOfElementLocated((By.id("recaptcha-audio-button"))));
-//
-//					Actions audioActions = new Actions(driver);
-//					audioActions.moveToElement(recaptchaAudioButton).click().perform();
-//
-//					WebElement audioDownloadLink = wait.until(ExpectedConditions
-//							.visibilityOfElementLocated(By.className("rc-audiochallenge-tdownload-link")));
-//
-//					String dynamicHref = audioDownloadLink.getAttribute("href");
-//					RestTemplate restTemplate = new RestTemplate();
-//					ResponseEntity<byte[]> response = restTemplate.exchange(dynamicHref, HttpMethod.GET, null,
-//							byte[].class);
-//
-//					byte[] mp3Bytes = response.getBody();
-//					ByteString audioBytes = convertMp3ToWav(mp3Bytes);
-//					String audioResult = testConvertAudio(audioBytes, credentialsPath);
-//
-//					WebElement inputField = wait
-//							.until(ExpectedConditions.visibilityOfElementLocated(By.id("audio-response")));
-//					inputField.sendKeys(audioResult);
-//					System.out.println("解析内容已输入到 reCAPTCHA 音频输入框中。");
-//
-//					WebElement verifyButton = wait
-//							.until(ExpectedConditions.visibilityOfElementLocated(By.id("recaptcha-verify-button")));
-//					verifyButton.click();
-//					driver.switchTo().parentFrame();
-//					captchaResolved = true;
-//				}
-//
-//			} catch (Exception e) {
-//				log.warn(e.getMessage(), e);
-//				break;
-//			}
-//		}
-//		driver.switchTo().parentFrame();
-//	}
+			while (!captchaResolved) {
+				if (Boolean.FALSE.equals(graspStockEnableKeyBucket.get())) {
+					return;
+				}
+				try {
+					// 找到 CAPTCHA 圖片元素並截取屏幕
+					WebElement captchaImage = wait.until(ExpectedConditions
+							.visibilityOfElementLocated(By.xpath("//img[contains(@src,'CaptchaImage.aspx')]")));
+					File srcFile = captchaImage.getScreenshotAs(OutputType.FILE);
+
+					// 將文件轉換為 byte[]
+					byte[] fileContent = Files.readAllBytes(srcFile.toPath());
+
+					// 將 byte[] 編碼為 Base64 字符串
+					String base64Image = Base64.getEncoder().encodeToString(fileContent);
+
+					// 構建 JSON 請求體
+					String jsonRequest = "{\"image_byte\":\"" + base64Image + "\"}";
+
+					// 發送 POST 請求到 Python 服務，獲取 CAPTCHA 結果
+					String captchaText = sendPostRequest(jsonRequest, bpythonUrl);
+
+					// 檢查 CAPTCHA 長度是否為 5
+					if (captchaText != null && captchaText.length() == 5) {
+						// 找到 CAPTCHA 輸入框，並將解析的文本輸入其中
+						WebElement captchaInput = driver.findElement(By.name("CaptchaControl1"));
+						captchaInput.clear();
+						captchaInput.sendKeys(captchaText);
+
+						// 找到股票輸入框並輸入股票代號
+						WebElement stockInput = wait
+								.until(ExpectedConditions.visibilityOfElementLocated(By.id("TextBox_Stkno")));
+						stockInput.clear();
+						stockInput.sendKeys(twseStockCode);
+
+						// 找到提交按鈕並點擊
+						WebElement submitButton = wait.until(ExpectedConditions.elementToBeClickable(By.id("btnOK")));
+						submitButton.click();
+
+						// 嘗試找到錯誤訊息的 <span> 元素
+						WebElement errorMsg = driver.findElement(By.id("Label_ErrorMsg"));
+						if (StringUtils.isNotEmpty(errorMsg.getText())) {
+							if (errorMsg.getText().contains("查無資料")) {
+								break;
+							}
+							// CAPTCHA 長度不正確，點擊重設按鈕
+							WebElement resetButton = driver.findElement(By.id("Button_Reset"));
+							resetButton.click();
+							continue;
+						}
+
+						WebElement downloadLink = wait
+								.until(ExpectedConditions.elementToBeClickable(By.id("HyperLink_DownloadCSV")));
+						if (downloadLink != null) {
+							// 點擊下載鏈接
+							downloadLink.click();
+							Thread.sleep(2000);
+						}
+						captchaResolved = true; // 退出循環
+					} else {
+						// CAPTCHA 長度不正確，點擊重設按鈕
+						WebElement resetButton = driver.findElement(By.id("Button_Reset"));
+						resetButton.click();
+						continue;
+					}
+
+				} catch (Exception e) {
+					log.warn(e.getMessage(), e);
+				}
+			}
+		}
+	}
+
+	public static void grepTPEXsecuritiesFirmsDayOperate(String downloadFilepath, String chromeDriverPath,
+			List<String> tpexStockCodes, String credentialsPath, RBucket<Boolean> graspStockEnableKeyBucket)
+			throws InterruptedException {
+		ChromeDriverService service = new ChromeDriverService.Builder()
+				.usingDriverExecutable(new File(chromeDriverPath)).usingAnyFreePort().build();
+
+		// 設定下載文件的偏好
+		Map<String, Object> prefs = new HashMap<>();
+		prefs.put("profile.default_content_settings.popups", 0); // 禁止彈出窗口
+		prefs.put("download.default_directory", downloadFilepath); // 設置下載目錄
+		prefs.put("download.prompt_for_download", false); // 禁用下載詢問對話框
+		prefs.put("download.directory_upgrade", true);
+		prefs.put("safebrowsing.enabled", true); // 啟用安全下載
+
+		ChromeOptions options = new ChromeOptions();
+		options.addArguments("--lang=zh-TW");
+//	    options.addArguments("--headless"); // 設定無頭模式
+		options.addArguments("--no-sandbox"); // 取消沙盒模式
+		options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
+		options.addArguments("--disable-blink-features=AutomationControlled");
+		options.addArguments("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36");
+		options.addArguments("--enable-features=WebRTC-H264WithOpenH264FFmpeg");
+		options.setCapability("goog:loggingPrefs", new HashMap<String, String>() {
+			{
+				put("performance", "ALL");
+			}
+		});
+		options.setExperimentalOption("prefs", prefs);
+
+		WebDriver driver = new ChromeDriver(service, options);
+	    // 執行 JavaScript 來隱藏 webdriver 屬性
+        ((JavascriptExecutor) driver).executeScript(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+        );
+        ((JavascriptExecutor) driver).executeScript(
+        	    "const getParameter = WebGLRenderingContext.prototype.getParameter;" +
+        	    "WebGLRenderingContext.prototype.getParameter = function(parameter) {" +
+        	    "    if (parameter === 37445) return 'Intel Inc.';" +
+        	    "    if (parameter === 37446) return 'Intel Iris OpenGL Engine';" +
+        	    "    return getParameter.call(this, parameter);" +
+        	    "};"
+        	);
+        ((JavascriptExecutor) driver).executeScript(
+        	    "HTMLCanvasElement.prototype.toDataURL = function() { return 'data:image/png;base64,fakeimage=='; };"
+        	);
+        ((JavascriptExecutor) driver).executeScript(
+        	    "const getChannelData = AudioBuffer.prototype.getChannelData;" +
+        	    "AudioBuffer.prototype.getChannelData = function() {" +
+        	    "    const results = getChannelData.call(this);" +
+        	    "    for (let i = 0; i < results.length; i += 100) {" +
+        	    "        results[i] = results[i] + 0.0000001;" +
+        	    "    }" +
+        	    "    return results;" +
+        	    "};"
+        	);
+
+		WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+
+		driver.get("https://www.tpex.org.tw/web/stock/aftertrading/broker_trading/brokerBS.php?l=zh-tw");
+		Thread.sleep(1000);
+		// 获取所有 iframe 元素
+		// 打印每个 iframe 的 title 属性
+		// CAPTCHA 判斷與處理
+
+		if (Boolean.FALSE.equals(graspStockEnableKeyBucket.get())) {
+			return;
+		}
+		// 處理每個股票代碼
+		List<String> copyTpexStockCodes = Lists.newArrayList();
+		try {
+			for (int index = 0; index < tpexStockCodes.size(); index++) {
+				if (Boolean.FALSE.equals(graspStockEnableKeyBucket.get())) {
+					return;
+				}
+				doReCAPTCHA(driver, wait, credentialsPath);
+				driver.switchTo().parentFrame();
+				String tpexStockCode = tpexStockCodes.get(index);
+				WebElement stockCodeInput = null;
+
+				while (true) {
+					try {
+						// 獲取所有class='raw'的<div>元素
+						stockCodeInput = wait
+								.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("input.code")));
+					} catch (TimeoutException timeoutException) {
+						log.info("error stkCode: {}", tpexStockCode);
+						throw timeoutException;
+					}
+
+					stockCodeInput.clear();
+					stockCodeInput.sendKeys(tpexStockCode);
+
+					// 中英文版本title內容不依樣，recaptcha challenge expires in two minutes、reCAPTCHA
+					// 驗證問題將在兩分鐘後失效
+					WebElement queryButton = wait.until(ExpectedConditions
+							.visibilityOfElementLocated(By.xpath("//*[@id='tables-form']/div[4]/div/button")));
+					queryButton.click();
+					doReCAPTCHA(driver, wait, credentialsPath);
+					try {
+						WebElement downloadButton = wait.until(ExpectedConditions
+								.visibilityOfElementLocated(By.xpath("//*[@id='tables-form']/div[3]/div/button[1]")));
+						downloadButton.click();
+					} catch (TimeoutException er) {
+						doReCAPTCHA(driver, wait, credentialsPath);
+						WebElement stockCodeInputag = null;
+						try {
+							stockCodeInputag = wait
+									.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("input.code")));
+							stockCodeInputag.clear();
+							stockCodeInputag.sendKeys(tpexStockCode);
+
+							WebElement queryButtonag = wait.until(ExpectedConditions.visibilityOfElementLocated(By
+									.xpath("//button[@class='btn btn-primary' and @type='button' and @onclick='checkForm()']")));
+							queryButtonag.click();
+
+							WebElement downloadButton = wait.until(ExpectedConditions.visibilityOfElementLocated(
+									By.xpath("//*[@id='tables-form']/div[3]/div/button[1]")));
+							downloadButton.click();
+							File folder = new File(downloadFilepath);
+							log.info("downloadFilepath :{}", folder.getPath());
+							log.info("folder Sile :{}", folder.list().length);
+						} catch (TimeoutException timeoutException) {
+							throw timeoutException;
+						}
+					}
+
+					copyTpexStockCodes.add(tpexStockCode);
+					Thread.sleep(7000);
+					break;
+				}
+			}
+		} catch (Exception e) {
+			Thread.sleep(6000);
+			log.warn(e.getMessage(), e);
+			log.info("retry grepTPEXsecuritiesFirmsDayOperate-----------------");
+			driver.quit();
+			List<String> notDownloadStockCode = tpexStockCodes.stream()
+					.filter(stockCode -> !copyTpexStockCodes.contains(stockCode)).toList();
+			grepTPEXsecuritiesFirmsDayOperate(downloadFilepath, chromeDriverPath, notDownloadStockCode, credentialsPath,
+					graspStockEnableKeyBucket);
+		}
+	}
+
+	private static void doReCAPTCHA(WebDriver driver, WebDriverWait wait, String credentialsPath) {
+		WebElement reCAPTCHA = driver.findElement(By.cssSelector("iframe[title='reCAPTCHA']"));
+		boolean captchaResolved = ObjectUtils.isEmpty(reCAPTCHA);
+		while (!captchaResolved) {
+			try {
+				reCAPTCHA = driver.findElement(By.cssSelector("iframe[title='reCAPTCHA']"));
+				driver.switchTo().frame(reCAPTCHA);
+				WebElement recaptchaElement = wait.until(
+						ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='recaptcha-anchor']/div[2]")));
+
+				if (recaptchaElement != null) {
+					Actions actions = new Actions(driver);
+					actions.moveToElement(recaptchaElement).click().perform();
+					driver.switchTo().parentFrame();
+
+					try {
+						// 中英文版本title內容不依樣，recaptcha challenge expires in two minutes、reCAPTCHA
+						// 驗證問題將在兩分鐘後失效
+						driver.switchTo().frame(wait.until(ExpectedConditions
+								.visibilityOfElementLocated(By.xpath("//iframe[@title='reCAPTCHA 驗證問題將在兩分鐘後失效']"))));
+					} catch (TimeoutException ex) {
+						log.warn(ex.getMessage(), ex);
+						break;
+					}
+
+					WebElement recaptchaAudioButton = wait
+							.until(ExpectedConditions.visibilityOfElementLocated((By.id("recaptcha-audio-button"))));
+
+					Actions audioActions = new Actions(driver);
+					audioActions.moveToElement(recaptchaAudioButton).click().perform();
+
+					WebElement audioDownloadLink = wait.until(ExpectedConditions
+							.visibilityOfElementLocated(By.className("rc-audiochallenge-tdownload-link")));
+
+					String dynamicHref = audioDownloadLink.getAttribute("href");
+					RestTemplate restTemplate = new RestTemplate();
+					ResponseEntity<byte[]> response = restTemplate.exchange(dynamicHref, HttpMethod.GET, null,
+							byte[].class);
+
+					byte[] mp3Bytes = response.getBody();
+					ByteString audioBytes = convertMp3ToWav(mp3Bytes);
+					String audioResult = testConvertAudio(audioBytes, credentialsPath);
+
+					WebElement inputField = wait
+							.until(ExpectedConditions.visibilityOfElementLocated(By.id("audio-response")));
+					inputField.sendKeys(audioResult);
+					System.out.println("解析内容已输入到 reCAPTCHA 音频输入框中。");
+
+					WebElement verifyButton = wait
+							.until(ExpectedConditions.visibilityOfElementLocated(By.id("recaptcha-verify-button")));
+					verifyButton.click();
+					driver.switchTo().parentFrame();
+					captchaResolved = true;
+				}
+
+			} catch (Exception e) {
+				log.warn(e.getMessage(), e);
+				break;
+			}
+		}
+		driver.switchTo().parentFrame();
+	}
 
 	public static List<StockDayPrice> graspTwseDayPrice(String url, Date tradeDate) throws InterruptedException,
 			JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {

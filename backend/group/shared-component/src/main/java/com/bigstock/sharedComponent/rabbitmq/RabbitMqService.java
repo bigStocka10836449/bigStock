@@ -42,6 +42,14 @@ public class RabbitMqService {
 
 	private static final Map<String, Object> tmpStoredReceivedData = Maps.newConcurrentMap();
 
+	public void sendMessage(Object message, String exchange, String routeKey, String sessionId) {
+		MessagePostProcessor messagePostProcessor = messageProperties -> {
+			messageProperties.getMessageProperties().setHeader("sessionId", sessionId);
+			return messageProperties;
+		};
+		rabbitTemplate.convertAndSend(exchange, routeKey, message, messagePostProcessor, new CorrelationData());
+	}
+	
 	public void sendMessage(Object message, String exchange, String routeKey, String UUidString, String exchangePrefix,
 			String queueNamePrefix) {
 		MessagePostProcessor messagePostProcessor = messageProperties -> {

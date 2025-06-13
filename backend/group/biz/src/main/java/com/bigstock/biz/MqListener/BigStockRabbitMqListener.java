@@ -19,10 +19,13 @@ import org.springframework.stereotype.Component;
 
 import com.bigstock.biz.service.BizService;
 import com.bigstock.sharedComponent.dto.DynamicFilterStockCodeVo;
+import com.bigstock.sharedComponent.dto.MQPayload;
 import com.bigstock.sharedComponent.dto.SingleStockPriceBizVo;
 import com.bigstock.sharedComponent.dto.SingleStockPriceVo;
 import com.bigstock.sharedComponent.dto.StockInfoVo;
 import com.bigstock.sharedComponent.dto.StructureContinueIncreaseVo;
+import com.bigstock.sharedComponent.service.SocketPushService;
+import com.corundumstudio.socketio.SocketIOClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -46,7 +49,6 @@ public class BigStockRabbitMqListener {
 //	private static final String URL_TRANSFER_DON_PREFIX = "dummy/bd/settlement";
 //
 //	private static final String URL_DUMMY_ICB = "dummy/icb";
-
 //	private final RestTemplate restTemplate;
 
 	private final RabbitTemplate rabbitTemplate;
@@ -66,6 +68,8 @@ public class BigStockRabbitMqListener {
 	@Value("${server.port}")
 	private String serverPort;
 
+	public final SocketPushService socketPushService;
+
 //	@RabbitListener(queues = "SingleStockPriceQueue")
 	@RabbitListener(bindings = @QueueBinding(value = @Queue(value = "SingleStockPriceQueue"), exchange = @Exchange(value = "SingleStockPriceExchange", type = ExchangeTypes.DIRECT), // 这里指定交换机类型为
 																																														// TOPIC
@@ -74,8 +78,7 @@ public class BigStockRabbitMqListener {
 	public void receiveTransferDoneMessage(@Payload String jsonMessage,
 			@Header(name = "UUID", required = false) String uuid,
 			@Header(name = "sendQueueName", required = false) String sendQueueName,
-			@Header(name = "sendExchangeName", required = false) String sendExchangeName)
-	{
+			@Header(name = "sendExchangeName", required = false) String sendExchangeName) {
 		try {
 			ObjectMapper objectMapper = new ObjectMapper();
 			objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd"));
@@ -88,14 +91,13 @@ public class BigStockRabbitMqListener {
 			};
 			SingleStockPriceVo vo = bizService.getSingleStockPrices(singleStockPriceBizVo.getStockCode(),
 					singleStockPriceBizVo.getSearchStartDate(), singleStockPriceBizVo.getSearchEndDate());
-			
-			String voString =
-					objectMapper.writeValueAsString(vo);
+
+			String voString = objectMapper.writeValueAsString(vo);
 			rabbitTemplate.convertAndSend(sendExchangeName, uuid, voString, messagePostProcessor,
 					new CorrelationData());
 //		rabbitTemplate.convertAndSend("sendExchange", message, message,new CorrelationData());
 		} catch (Exception e) {
-			log.error(e.getMessage(),e);
+			log.error(e.getMessage(), e);
 			rabbitTemplate.convertAndSend("SingleStockPriceExchangeError", "SingleStockPriceQueueError", jsonMessage);
 		}
 	}
@@ -116,18 +118,18 @@ public class BigStockRabbitMqListener {
 				messageProperties.getMessageProperties().setHeader("UUID", uuid);
 				return messageProperties;
 			};
-			 List<StructureContinueIncreaseVo> vos = bizService.getShareholderStructureContinueIncreaseLastTowWeeks();
+			List<StructureContinueIncreaseVo> vos = bizService.getShareholderStructureContinueIncreaseLastTowWeeks();
 			String voString = objectMapper.writeValueAsString(vos);
 			rabbitTemplate.convertAndSend(sendExchangeName, uuid, voString, messagePostProcessor,
 					new CorrelationData());
 		} catch (Exception e) {
-			//這裡應該也要給mq處理
-			log.error(e.getMessage(),e);
-			rabbitTemplate.convertAndSend("ShareholderStructureIncreaseExchangeError", "ShareholderStructureIncreaseExchangeError", jsonMessage);
+			// 這裡應該也要給mq處理
+			log.error(e.getMessage(), e);
+			rabbitTemplate.convertAndSend("ShareholderStructureIncreaseExchangeError",
+					"ShareholderStructureIncreaseExchangeError", jsonMessage);
 		}
 	}
-	
-	
+
 	@RabbitListener(bindings = @QueueBinding(value = @Queue(value = "StockCodeFilterTypeQueue"), exchange = @Exchange(value = "StockCodeFilterTypeExchange", type = ExchangeTypes.DIRECT), // 这里指定交换机类型为
 			// TOPIC
 			key = "StockCodeFilterTypeQueue" // 这里指定 routing key
@@ -140,7 +142,8 @@ public class BigStockRabbitMqListener {
 		try {
 			ObjectMapper objectMapper = new ObjectMapper();
 			List<DynamicFilterStockCodeVo> singleStockPriceBizVos = objectMapper.readValue(jsonMessage,
-					 new TypeReference<List<DynamicFilterStockCodeVo>>() {});
+					new TypeReference<List<DynamicFilterStockCodeVo>>() {
+					});
 			MessagePostProcessor messagePostProcessor = messageProperties -> {
 				messageProperties.getMessageProperties().setHeader("UUID", uuid);
 				return messageProperties;
@@ -150,9 +153,85 @@ public class BigStockRabbitMqListener {
 			rabbitTemplate.convertAndSend(sendExchangeName, uuid, voString, messagePostProcessor,
 					new CorrelationData());
 		} catch (Exception e) {
-			//這裡應該也要給mq處理
-			log.error(e.getMessage(),e);
-			rabbitTemplate.convertAndSend("StockExchangeDetailExchangeError", "StockExchangeDetailExchangeError", jsonMessage);
+			// 這裡應該也要給mq處理
+			log.error(e.getMessage(), e);
+			rabbitTemplate.convertAndSend("StockCodeFilterTypeExchangeError", "StockCodeFilterTypeExchangeError",
+					jsonMessage);
+		}
+	}
+
+	@RabbitListener(bindings = @QueueBinding(value = @Queue(value = "SSESingleStockPriceQueue"), exchange = @Exchange(value = "SSESingleStockPriceExchange", type = ExchangeTypes.TOPIC), // 这里指定交换机类型为
+			// TOPIC
+			key = "stock.price.*" // 这里指定 routing key
+	), ackMode = "AUTO")
+	public void receiveTransferDoneMessage(@Payload String jsonMessage,
+			@Header(name = "sessionId", required = true) String sessionId) {
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
+			objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd"));
+			SingleStockPriceBizVo singleStockPriceBizVo = objectMapper.readValue(jsonMessage,
+					SingleStockPriceBizVo.class);
+			SingleStockPriceVo vo = bizService.getSingleStockPrices(singleStockPriceBizVo.getStockCode(),
+					singleStockPriceBizVo.getSearchStartDate(), singleStockPriceBizVo.getSearchEndDate());
+
+			String voString = objectMapper.writeValueAsString(vo);
+		} catch (Exception e) {
+			log.error(e.getMessage(), e);
+			rabbitTemplate.convertAndSend("SSESingleStockPriceExchangeError", "SSESingleStockPriceQueueError",
+					jsonMessage);
+		}
+	}
+
+	@RabbitListener(bindings = @QueueBinding(value = @Queue(value = "SSEShareholderStructureIncreaseQueue"), exchange = @Exchange(value = "SSEShareholderStructureIncreaseExchange", type = ExchangeTypes.TOPIC), // 这里指定交换机类型为
+			// TOPIC
+			key = "stock.shareholder.*" // 这里指定 routing key
+	), ackMode = "AUTO")
+	public void shareholderStructureIncreaseListener(@Payload String jsonMessage,
+			@Header(name = "sessionId", required = true) String sessionId)
+			throws URISyntaxException, JsonMappingException, JsonProcessingException {
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
+			objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd"));
+			List<StructureContinueIncreaseVo> vos = bizService.getShareholderStructureContinueIncreaseLastTowWeeks();
+			String voString = objectMapper.writeValueAsString(vos);
+		} catch (Exception e) {
+			// 這裡應該也要給mq處理
+			log.error(e.getMessage(), e);
+			rabbitTemplate.convertAndSend("SSEShareholderStructureIncreaseExchangeError",
+					"SSEShareholderStructureIncreaseExchangeError", jsonMessage);
+		}
+	}
+
+	@RabbitListener(bindings = @QueueBinding(value = @Queue(value = "SSEStockCodeFilterTypeQueue"), exchange = @Exchange(value = "SSEStockCodeFilterTypeExchange", type = ExchangeTypes.TOPIC), // 这里指定交换机类型为
+			// TOPIC
+			key = "stock.filter.*" // 这里指定 routing key
+	), ackMode = "AUTO")
+	public void stockExchangeDetailListener(@Payload String jsonMessage,
+			@Header(name = "sessionId", required = true) String sessionId)
+			throws URISyntaxException, JsonMappingException, JsonProcessingException {
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
+			List<DynamicFilterStockCodeVo> singleStockPriceBizVos = objectMapper.readValue(jsonMessage,
+					new TypeReference<List<DynamicFilterStockCodeVo>>() {
+					});
+			List<StockInfoVo> vos = bizService.getMatchStockCodeByCondition(singleStockPriceBizVos);
+			socketPushService.sendToUser(socketPushService.getUserId(sessionId), vos);
+		} catch (Exception e) {
+			// 這裡應該也要給mq處理
+			log.error(e.getMessage(), e);
+			rabbitTemplate.convertAndSend("SSEStockCodeFilterTypeExchangeError", "SSEStockCodeFilterTypeExchangeError",
+					jsonMessage);
+		}
+	}
+
+	@RabbitListener(queues = "queue.socketio.push")
+	public void handleSocketPush(MQPayload payload) {
+		String userId = payload.getUserId();
+		Object data = payload.getData();
+
+		SocketIOClient client = socketPushService.getLocalClientMap().get(userId);
+		if (client != null) {
+			client.sendEvent("update", data);
 		}
 	}
 }

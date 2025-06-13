@@ -47,6 +47,7 @@ import com.bigstock.sharedComponent.service.StockMonthPriceService;
 import com.bigstock.sharedComponent.service.StockWeekPriceService;
 import com.google.common.collect.Lists;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -289,6 +290,7 @@ public class BizService {
 				}).toList();
 	}
 
+	@Transactional
 	public List<StockInfoVo> getMatchStockCodeByCondition(List<DynamicFilterStockCodeVo> dynamicFilterStockCodeVos) {
 		return dynamicFilterStockCodeVos.stream().map(dynamicFilterStockCodeVo -> {
 			String aspect = dynamicFilterStockCodeVo.getAspect();
