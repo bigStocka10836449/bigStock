@@ -1,6 +1,7 @@
 package com.bigstock.gateway.infra;
 
 import java.time.Duration;
+import java.util.Date;
 
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
@@ -42,58 +43,47 @@ public class BigStockGatewayCustomWebFilter implements WebFilter {
 	private static final Logger log = LoggerFactory.getLogger(BigStockGatewayCustomWebFilter.class);
 
 	@Override
-	public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-		ServerHttpRequest request = exchange.getRequest();
-		ServerHttpResponse response = exchange.getResponse();
-		if(!request.getPath().value().startsWith("/actuator/")) {
-			log.info("Request URL: {}", exchange.getRequest().getURI().toString());
-		}
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        ServerHttpRequest request = exchange.getRequest();
+        ServerHttpResponse response = exchange.getResponse();
 
-		try {
-			if (request.getPath().value().startsWith("/actuator/") || request.getPath().value().startsWith("/auth/")
-					|| request.getPath().value().startsWith("/api/biz/swagger")
-					|| request.getPath().value().startsWith("/gateway/swagger/")
-					|| request.getPath().value().contains("/webjars/")) {
-				return chain.filter(exchange);
-			}
-			String token = request.getHeaders().getFirst("Authorization");
-			if (token == null || !token.startsWith("Bearer ")) {
-				return unauthorized(response);
-			}
+        if (!request.getPath().value().startsWith("/actuator/")) {
+            log.info("Request URL: {}", request.getURI());
+        }
 
-			token = token.substring(7);
+        try {
+            String path = request.getPath().value();
+            if (path.startsWith("/actuator/") || path.startsWith("/auth/")
+                    || path.startsWith("/api/guest-token") || path.startsWith("/api/refresh-token")
+                    || path.startsWith("/api/biz/swagger") || path.startsWith("/gateway/swagger/")
+                    || path.contains("/webjars/")) {
+                return chain.filter(exchange);
+            }
 
-			Claims claims = parseJwtToken(token);
-			RBucket<Object> refreshToken = redissonClient.getBucket("refresh_token:" + claims.getSubject());
-			RBucket<Object> accessTokenRB = redissonClient.getBucket("access_token:" + claims.getSubject());
-			// 假設accessTokenRB不存在或client带的token与Redis的token不一样的时候，依样导回登入页
-			if (!request.getPath().value().startsWith("/actuator/")
+            String token = request.getHeaders().getFirst("Authorization");
+            if (token == null || !token.startsWith("Bearer ")) {
+                return unauthorized(response);
+            }
 
-					&& !request.getPath().value().startsWith("/auth/")) {
-				if ((!accessTokenRB.isExists() || !token.equals(accessTokenRB.get().toString()))
-						&& !refreshToken.isExists()) {
-					return unauthorized(response);
-				}
-			}
-			if (accessTokenRB.isExists()) {
-				refreshToken.expire(Duration.ofHours(4));
-				accessTokenRB.expire(Duration.ofHours(1));
-				return chain.filter(exchange);
-			}
+            token = token.substring(7);
+            Claims claims = parseJwtToken(token);
+            String role = claims.get("role", String.class);
 
-			// 如果 access token 无效，再进行 refresh token 的流程
-			if (refreshToken.isExists()) {
-				String accessToken = tryRefreshToken(refreshToken.get().toString());
-				refreshToken.expire(Duration.ofHours(4));
-				request.getHeaders().set("Authorization", accessToken);
-				return chain.filter(exchange);
-			}
-			// 如果 access token 和 refresh token 都无效，則导回登入页
-			return unauthorized(response);
-		} catch (JwtException e) {
-			return handleJwtException(response, e);
-		}
-	}
+            if ("GUEST".equals(role)) {
+                return chain.filter(exchange);
+            }
+
+            Date expiration = claims.getExpiration();
+            if (expiration != null && new Date().after(expiration)) {
+                return unauthorized(response); // token 已過期，返回 401，由前端觸發 refresh
+            }
+
+            return chain.filter(exchange);
+
+        } catch (JwtException e) {
+            return handleJwtException(response, e);
+        }
+    }
 
 	private Claims parseJwtToken(String token) throws JwtException {
 		Jws<Claims> jws = Jwts.parser().verifyWith(Keys.hmacShaKeyFor(secretKey.getBytes())).build()
