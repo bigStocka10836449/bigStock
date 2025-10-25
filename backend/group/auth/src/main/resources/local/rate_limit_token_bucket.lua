@@ -1,4 +1,3 @@
-// rate_limit_token_bucket.lua
 -- Token Bucket 限流
 -- KEYS[1]: 限流 Key
 -- ARGV[1]: 每秒補充速率（tokensPerSecond）

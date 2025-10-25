@@ -42,10 +42,11 @@ spring:
     consul:
       host: ${SPRING_CONSUL_HOST}
       port: ${SPRING_CONSUL_PORT}    
-    discovery:
-      health-check-path: /actuator/health # 设置健康检查路径为 Actuator 的健康端点路径
-      health-check-interval: 15s # 设置健康检查间隔为 15 秒
-      instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}} # 设置实例ID
+      discovery:
+        health-check-path: /actuator/health # 设置健康检查路径为 Actuator 的健康端点路径
+        health-check-interval: 15s # 设置健康检查间隔为 15 秒
+        instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}} # 设置实例ID
+        prefer-ip-address: true #使用 IP
     gateway:
       routes:
       - id: big-stcok-biz-http-api

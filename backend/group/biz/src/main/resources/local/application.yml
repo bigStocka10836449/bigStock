@@ -18,6 +18,8 @@ spring:
     consul:
       host: 127.0.0.1
       port: 8500      
+      discovery:
+        prefer-ip-address: true #使用 IP
   datasource:
     url: jdbc:postgresql://127.0.0.1:15432/bstock
     username: bstockuser

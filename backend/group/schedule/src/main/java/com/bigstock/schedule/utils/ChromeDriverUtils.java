@@ -5,7 +5,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.URI;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -26,6 +27,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -33,6 +35,13 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.json.JSONObject;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
@@ -51,7 +60,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -1094,10 +1102,92 @@ public class ChromeDriverUtils {
 		}).toList();
 	}
 	
+	
+	public static List<StockDayPrice> graspTpexEmergingStockDayPrice() throws InterruptedException, JsonMappingException,
+			JsonProcessingException, RestClientException, URISyntaxException {
+		String jsonResponse = fetchApiData("https://www.tpex.org.tw/openapi/v1/tpex_esb_latest_statistics");
+		System.out.println("Length of response: " + jsonResponse.length());
+		System.out.println("Ends with ']': " + jsonResponse.trim().endsWith("]")); // 應該為 true
+		log.info(jsonResponse);
+		ObjectMapper objectMapper = new ObjectMapper();
+		List<Map<String, String>> responseList = objectMapper
+				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
+				}).stream()
+//		.filter(data -> {
+//			String code = data.get("SecuritiesCompanyCode").toString();
+//			return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
+//		})
+				.collect(Collectors.toList());
+		return responseList.stream().map(map -> {
+			// 指定日期字符串格式
+			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+
+			String monthAndDate = map.get("Date").substring(map.get("Date").length() - 4);
+			int year = Integer.parseInt(map.get("Date").replace(monthAndDate, "")) + 1911; // 民国转换为西元
+			String standardDateString = year + "/" + monthAndDate.substring(0, 2) + "/" + monthAndDate.substring(2, 4);
+
+			// 解析标准日期字符串为 LocalDate 对象
+			LocalDate localDate = LocalDate.parse(standardDateString, dateStringformatter);
+			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
+			LocalDate today = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+
+			// 設置本周第一天的日期
+			LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
+
+			// 設置本周最後一天的日期
+			LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
+			// 獲取系統默認時區
+			ZoneId zoneId = ZoneId.systemDefault();
+
+			// 獲取偏移量
+			ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
+
+			// 將 LocalDate 轉換為 Date
+			Date startOfWeeDate = Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
+			Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
+			StockDayPrice stockDayPrice = new StockDayPrice();
+			stockDayPrice.setStockCode(map.get("SecuritiesCompanyCode"));
+			//Average
+			if (ObjectUtils.isNotEmpty(map.get("PreviousAveragePrice"))) {
+				stockDayPrice.setOpeningPrice(map.get("PreviousAveragePrice").replaceAll(",", ""));
+			} else {
+				stockDayPrice.setOpeningPrice(map.get("Average").replaceAll(",", ""));
+			}
+			stockDayPrice.setClosingPrice(map.get("LatestPrice").replaceAll(",", ""));
+
+			BigDecimal open = new BigDecimal(
+			        Optional.ofNullable(stockDayPrice.getOpeningPrice()).filter(s -> !s.isBlank()).orElse("0")
+			);
+			BigDecimal close = new BigDecimal(
+			        Optional.ofNullable(stockDayPrice.getClosingPrice()).filter(s -> !s.isBlank()).orElse("0")
+			);
+
+
+			BigDecimal diff = close.subtract(open).setScale(2, RoundingMode.HALF_UP);
+			// 0.00 或 -0.00 都顯示成 "0"
+			String changeStr = (diff.compareTo(BigDecimal.ZERO) == 0) ? "0.00" : diff.toPlainString();
+		
+			stockDayPrice.setChange(diff.toPlainString());
+			
+			stockDayPrice.setHighPrice(map.get("Highest").replaceAll(",", ""));
+			stockDayPrice.setLowPrice(map.get("Lowest").replaceAll(",", ""));
+			stockDayPrice.setChange(changeStr);
+			stockDayPrice.setTradingDay(date);
+			stockDayPrice.setStartOfWeekDate(startOfWeeDate);
+			stockDayPrice.setEndOfWeekDate(endOfWeekDate);
+			stockDayPrice
+					.setWeekOfYear(endOfWeekLocalDate.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
+			stockDayPrice.setTradingVolume(map.get("TransactionVolume").toString());
+			return stockDayPrice;
+		}).toList();
+	}
+	
 	public static List<StockDayPrice> graspTpexDayPrice(String url) throws InterruptedException, JsonMappingException,
 			JsonProcessingException, RestClientException, URISyntaxException {
 		String jsonResponse = fetchApiData("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
-
+		System.out.println("Length of response: " + jsonResponse.length());
+		System.out.println("Ends with ']': " + jsonResponse.trim().endsWith("]")); // 應該為 true
+		log.info(jsonResponse);
 		ObjectMapper objectMapper = new ObjectMapper();
 		List<Map<String, String>> responseList = objectMapper
 				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
@@ -1107,7 +1197,6 @@ public class ChromeDriverUtils {
 //					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
 //				})
 				.collect(Collectors.toList());
-
 		return responseList.stream().map(map -> {
 			// 指定日期字符串格式
 			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
@@ -1421,48 +1510,80 @@ public class ChromeDriverUtils {
 		return allStockDayPrices;
 	}
 
-	private static String fetchApiData(String url) throws URISyntaxException, RestClientException {
-		RestTemplate restTemplate = new RestTemplate();
-		restTemplate.getMessageConverters().stream()
-				.filter(converter -> converter instanceof org.springframework.http.converter.StringHttpMessageConverter)
-				.forEach(converter -> ((org.springframework.http.converter.StringHttpMessageConverter) converter)
-						.setDefaultCharset(StandardCharsets.UTF_8));
-		ResponseEntity<String> responseEntity = restTemplate.exchange(new URI(url), HttpMethod.GET, null, String.class);
-		return responseEntity.getBody();
-	}
+	private static String fetchApiData(String url) {
+		int maxRetries = 3;
+		int retryDelayMs = 1000;
 
-	private static String fetchApiData(String url, Map<String, String> formParameters)
-			throws URISyntaxException, RestClientException {
-		RestTemplate restTemplate = new RestTemplate();
+		for (int attempt = 1; attempt <= maxRetries; attempt++) {
+			try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+				HttpGet request = new HttpGet(url);
+				HttpResponse response = httpClient.execute(request);
+				org.apache.http.HttpEntity entity = response.getEntity();
 
-		// Set the default character encoding to UTF-8
-		restTemplate.getMessageConverters().stream()
-				.filter(converter -> converter instanceof org.springframework.http.converter.StringHttpMessageConverter)
-				.forEach(converter -> ((org.springframework.http.converter.StringHttpMessageConverter) converter)
-						.setDefaultCharset(StandardCharsets.UTF_8));
-		// Prepare form parameters
+				if (entity != null) {
+					String body = EntityUtils.toString(entity, StandardCharsets.UTF_8);
 
-		// Set headers and form data
-		HttpHeaders headers = new HttpHeaders();
-		headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+					if (body != null) {
+						return body;
+					} else {
+						log.warn("Attempt {}/{}: JSON malformed or incomplete", attempt, maxRetries);
+					}
+				}
 
-		// Build the form body
-		StringBuilder formBody = new StringBuilder();
-		formParameters.forEach((key, value) -> {
-			if (formBody.length() > 0) {
-				formBody.append("&");
+			} catch (Exception e) {
+				log.warn("Attempt {}/{}: Exception while fetching data: {}", attempt, maxRetries, e.getMessage());
 			}
-			formBody.append(key).append("=").append(value);
-		});
 
-		// Create the request entity
-		HttpEntity<String> requestEntity = new HttpEntity<>(formBody.toString(), headers);
+			try {
+				Thread.sleep(retryDelayMs);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new RuntimeException("Thread was interrupted during retry wait", e);
+			}
+		}
+		throw new RuntimeException("Failed to fetch valid JSON after " + maxRetries + " attempts.");
+	}
+	
+	public static String fetchApiData(String url, Map<String, String> formParameters) {
+	    int maxRetries = 3;
+	    int retryDelayMs = 1000;
 
-		// Perform the POST request
-		ResponseEntity<String> responseEntity = restTemplate.exchange(new URI(url), HttpMethod.POST, requestEntity,
-				String.class);
+	    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+	        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+	            HttpPost httpPost = new HttpPost(url);
 
-		return responseEntity.getBody();
+	            // Prepare form parameters
+	            List<org.apache.http.message.BasicNameValuePair> params = new ArrayList<>();
+	            for (Map.Entry<String, String> entry : formParameters.entrySet()) {
+	                params.add(new org.apache.http.message.BasicNameValuePair(entry.getKey(), entry.getValue()));
+	            }
+
+	            httpPost.setEntity(new org.apache.http.client.entity.UrlEncodedFormEntity(params, StandardCharsets.UTF_8));
+
+	            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+	                int statusCode = response.getStatusLine().getStatusCode();
+	                String responseBody = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+
+	                if ((statusCode == 200) && responseBody != null) {
+	                    return responseBody;
+	                } else {
+	                    log.warn("Attempt {}/{}: Bad response (status: {})", attempt, maxRetries, statusCode);
+	                }
+	            }
+
+	        } catch (Exception e) {
+	            log.warn("Attempt {}/{}: Exception during POST request: {}", attempt, maxRetries, e.getMessage());
+	        }
+
+	        try {
+	            Thread.sleep(retryDelayMs);
+	        } catch (InterruptedException ie) {
+	            Thread.currentThread().interrupt();
+	            throw new RuntimeException("Thread was interrupted during retry wait", ie);
+	        }
+	    }
+
+	    throw new RuntimeException("POST request failed or response is invalid after " + maxRetries + " attempts.");
 	}
 
 	private static String decodeHtmlEntities(String input) {

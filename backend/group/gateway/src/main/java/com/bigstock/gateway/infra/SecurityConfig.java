@@ -1,6 +1,7 @@
 package com.bigstock.gateway.infra;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -30,12 +31,14 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
 import com.bigstock.sharedComponent.entity.RolePath;
 import com.bigstock.sharedComponent.service.RolePathService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Lists;
 
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
@@ -76,12 +79,13 @@ public class SecurityConfig {
 		// 獲取所有的角色及其對應的路徑
 		List<RolePath> rolePaths = rolePathService.getAllRolePaths();
 
-		http.addFilterBefore(bigStockGatewayCustomWebFilter, SecurityWebFiltersOrder.HTTP_BASIC).cors()
-				.configurationSource(corsConfiguration()).and().authorizeExchange(exchanges -> {
-
+		http.addFilterBefore(bigStockGatewayCustomWebFilter, SecurityWebFiltersOrder.HTTP_BASIC).authorizeExchange(exchanges -> {
+					List<String> roleIds = 	Lists.newArrayList(rolePaths.stream().map(rolePath -> rolePath.getRoleId().toString()).toList());
+					roleIds.add("Guest");
 					// 動態生成每個角色的 pathMatchers
+					JwtReactiveAuthorizationManager authorizationManager = new JwtReactiveAuthorizationManager(
+							roleIds);
 				    for (RolePath rolePath : rolePaths) {
-		                String roleId = rolePath.getRoleId().toString();
 		                Map<String, List<String>> pathsMap = parseRoleAllowedUrlPath(rolePath.getRoleAllowedUrlPath());
 
 		                // 根據每個 HTTP 方法設置 pathMatchers 和動態的 JwtReactiveAuthorizationManager
@@ -89,7 +93,6 @@ public class SecurityConfig {
 		                    String httpMethod = entry.getKey();
 		                    List<String> paths = entry.getValue();
 
-		                    JwtReactiveAuthorizationManager authorizationManager = new JwtReactiveAuthorizationManager(List.of(roleId));
 
 		                    // 動態配置每個 HTTP 方法對應的路徑和授權管理器
 		                    switch (httpMethod) {
@@ -117,24 +120,21 @@ public class SecurityConfig {
 		return http.build();
 	}
 
-	CorsConfigurationSource corsConfiguration() {
-		CorsConfiguration corsConfig = new CorsConfiguration();
-		corsConfig.applyPermitDefaultValues();
-		corsConfig.addAllowedMethod(HttpMethod.GET);
-		corsConfig.addAllowedMethod(HttpMethod.POST);
-		corsConfig.addAllowedMethod(HttpMethod.PATCH);
-		corsConfig.addAllowedMethod(HttpMethod.PUT);
-		corsConfig.addAllowedMethod(HttpMethod.DELETE);
-		corsConfig.addAllowedMethod(HttpMethod.OPTIONS);
-		corsConfig.setAllowedOrigins(Arrays.asList("*"));
-		corsConfig.setAllowedHeaders(Arrays.asList("*"));
-		corsConfig.setMaxAge(36000L);
-		corsConfig.setAllowCredentials(false); // When allowCredentials is true, allowedOrigins cannot contain the
-												// special value "*"
 
-		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-		source.registerCorsConfiguration("/**", corsConfig);
-		return source;
+	//WebFlux 作法
+	@Bean
+	public CorsWebFilter corsWebFilter() {
+	    CorsConfiguration config = new CorsConfiguration();
+	    config.setAllowedOrigins(List.of("http://localhost:13001", "http://127.0.0.1:13001"));
+	    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+	    config.setAllowedHeaders(List.of("*"));
+	    config.setExposedHeaders(List.of("X-Refreshed-Token")); //這是你要讓 JS 拿到 header 的關鍵
+	    config.setAllowCredentials(true);
+
+	    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+	    source.registerCorsConfiguration("/**", config);
+
+	    return new CorsWebFilter(source);
 	}
 
 	@SuppressWarnings("unchecked")

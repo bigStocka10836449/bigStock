@@ -25,7 +25,7 @@ import com.bigstock.auth.domain.vo.UserInloginInfo;
 import com.bigstock.auth.domain.vo.UserRegistryInfo;
 import com.bigstock.auth.service.OauthTokenService;
 import com.bigstock.auth.service.UserRegistryService;
-
+import org.springframework.http.server.reactive.ServerHttpRequest;
 //import io.micrometer.tracing.Span;
 //import io.micrometer.tracing.Tracer;
 //import io.micrometer.tracing.annotation.NewSpan;
@@ -33,7 +33,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.mail.MessagingException;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -49,7 +48,7 @@ public class OauthController {
 	private final UserRegistryService userRegistryService;
 
 	@GetMapping(value = "tempToken")
-	public ResponseEntity<?> tempToken(HttpServletRequest request,
+	public ResponseEntity<?> tempToken(ServerHttpRequest request,
             @CookieValue(value = "guest_id", required = false) String guestId)  {
 		try {
 				return oauthTokenService.getTmpToken(request, guestId);

@@ -135,10 +135,13 @@ public class GraspStockPrice {
 	// 每周日早上8点触发更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 	@Transactional
-	@PostConstruct
+//	@PostConstruct
 	public void updateStockDayPrice() throws RestClientException, URISyntaxException, JsonMappingException,
 			JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
+		
+		List<StockDayPrice> stockTpexEmergingStockPrices = ChromeDriverUtils.graspTpexEmergingStockDayPrice();		
+		
 		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
 				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
 
@@ -180,6 +183,8 @@ public class GraspStockPrice {
 //			return stockDayPrice;
 //		}).toList();
 //		stockDayPriceService.saveAll(ss);
+		
+		stockDayPriceService.saveAll(stockTpexEmergingStockPrices);
 		stockDayPriceService.saveAll(stockTpexDayPrices);
 		stockTpexDayPrices.stream().forEach(stockTpexDayPrice -> {
 			calculateRSVValueAndLimitDownUp(stockTpexDayPrice);
@@ -190,6 +195,16 @@ public class GraspStockPrice {
 				stockTpexDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
 			}
 		});
+		stockTpexEmergingStockPrices.stream().forEach(stockTpexDayPrice -> {
+			calculateRSVValueAndLimitDownUp(stockTpexDayPrice);
+			stockTpexDayPrice.setMonthOfYear((stockTpexDayPrice.getTradingDay().getYear() + 1900) + "W"
+					+ (stockTpexDayPrice.getTradingDay().getMonth() + 1));
+			if (stockTpexTradeVolumeInfosMap.containsKey(stockTpexDayPrice.getStockCode())) {
+				TradeVolumeInfo tradeVolumeInfo = stockTpexTradeVolumeInfosMap.get(stockTpexDayPrice.getStockCode());
+				stockTpexDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
+			}
+		});
+		stockDayPriceService.saveAll(stockTpexEmergingStockPrices);
 		stockDayPriceService.saveAll(stockTpexDayPrices);
 		stockDayPriceService.saveAll(stockTwseDayPrices);
 		stockTwseDayPrices.stream().forEach(stockTwseDayPrice -> {
@@ -448,7 +463,7 @@ public class GraspStockPrice {
 
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}")
 	@Transactional
-//	@PostConstruct
+	@PostConstruct
 	public void updateMarginTradingAndShortSellingInfo() throws RestClientException, URISyntaxException,
 			JsonMappingException, JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料

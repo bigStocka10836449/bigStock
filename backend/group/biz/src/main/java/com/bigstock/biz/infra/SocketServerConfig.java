@@ -19,6 +19,7 @@ public class SocketServerConfig {
 	
     @Bean(destroyMethod = "stop")
     public SocketIOServer socketIOServer() {
+    	//netstat -ano | findstr :<PORT> Port被占用的話 netstat -plnt | grep :<PORT>
     	com.corundumstudio.socketio.Configuration config = new com.corundumstudio.socketio.Configuration();
         config.setPort(9092);
         config.setOrigin("*");

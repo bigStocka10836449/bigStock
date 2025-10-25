@@ -20,8 +20,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.DigestUtils;
 
 import com.bigstock.auth.domain.vo.UserInloginInfo;
 import com.bigstock.sharedComponent.entity.RoleInfo;
@@ -82,49 +84,52 @@ public class OauthTokenService {
 				.body(Map.of("accessToken", accessToken, "exp", expiration.getTime()));
 	}
 	
-	public ResponseEntity<?> getTmpToken(HttpServletRequest request,
-            String guestId) throws IOException, HttpException {
-		
-			String ip = request.getRemoteAddr();
-	        String key = "rl:guest-token:tb:" + ip;
-	        long now = System.currentTimeMillis() / 1000;
-	        RScript script = redissonClient.getScript(StringCodec.INSTANCE);
-	        String scriptText = new String(Objects.requireNonNull(getClass().getClassLoader()
-	                .getResourceAsStream("rate_limit_token_bucket.lua")).readAllBytes(), StandardCharsets.UTF_8);
+	public ResponseEntity<?> getTmpToken(ServerHttpRequest request, String guestId) throws IOException, HttpException {
 
-	        Long allowed = script.eval(
-	                RScript.Mode.READ_WRITE,
-	                scriptText,
-	                RScript.ReturnType.INTEGER,
-	                Collections.singletonList(key),
-	                "1",  // 每秒補 1 token
-	                "10", // 最大桶容量
-	                String.valueOf(now)
-	        );
-	        if (allowed == null || allowed == 0) {
-	            throw new HttpException("Rate limit exceeded");
-	        }
+		// 1. 取得 IP，優先從 X-Forwarded-For 中讀取（多個時取第一個），否則 fallback 到 remote IP
+		String ip = Optional.ofNullable(request.getHeaders().getFirst("X-Forwarded-For"))
+				.map(xff -> xff.split(",")[0].trim())
+				.orElseGet(() -> request.getRemoteAddress().getAddress().getHostAddress());
 
-	        if (guestId == null || !(redissonClient.getBucket("guest:" + guestId)).isExists()) {
-	            guestId = UUID.randomUUID().toString();
-	            redissonClient.getBucket("guest:" + guestId).set("1", Duration.ofHours(1));
-	        }
+		// 2. 取得 User-Agent，預設為 unknown
+		String userAgent = Optional.ofNullable(request.getHeaders().getFirst("User-Agent")).orElse("unknown");
 
-	        RBucket<String> jwtBucket = redissonClient.getBucket("jwt:" + guestId);
-	        String token = jwtBucket.get();
+		// 3. 將 IP + User-Agent 做 MD5 hash，作為限流 key
+		String identifier = ip + ":" + userAgent;
+		String key = "rl:guest-token:tb:" + DigestUtils.md5DigestAsHex(identifier.getBytes(StandardCharsets.UTF_8));
+		long now = System.currentTimeMillis() / 1000;
+		RScript script = redissonClient.getScript(StringCodec.INSTANCE);
+		String scriptText = new String(
+				Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("rate_limit_token_bucket.lua"))
+						.readAllBytes(),
+				StandardCharsets.UTF_8);
 
-	        if (token == null) {
-	            token = createTempAccessToken(guestId, "Guest");
-	            jwtBucket.set(token, Duration.ofHours(1));
-	        } 
-	        Claims claims = parseJwtToken(token);
-	    	ResponseCookie cookie = ResponseCookie.from("guest_id", guestId)
-	                .httpOnly(true).secure(true).sameSite("Strict").path("/")
-	                .maxAge(Duration.ofHours(1)).build();
-	    	return ResponseEntity.ok()
-	                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-	                .header("X-Refreshed-Token", "Bearer " + token)
-	                .body(Map.of("token", token, "exp", claims.getExpiration()));
+		Long allowed = script.eval(RScript.Mode.READ_WRITE, scriptText, RScript.ReturnType.INTEGER,
+				Collections.singletonList(key), "1", // 每秒補 1 token
+				"10", // 最大桶容量
+				String.valueOf(now));
+		if (allowed == null || allowed == 0) {
+			throw new HttpException("Rate limit exceeded");
+		}
+
+		if (guestId == null || !(redissonClient.getBucket("guest:" + guestId)).isExists()) {
+			guestId = UUID.randomUUID().toString();
+			redissonClient.getBucket("guest:" + guestId).set("1", Duration.ofHours(1));
+		}
+
+		RBucket<String> jwtBucket = redissonClient.getBucket("jwt:" + guestId);
+		String token = jwtBucket.get();
+
+		if (token == null) {
+			token = createTempAccessToken(guestId, "Guest");
+			jwtBucket.set(token, Duration.ofHours(1));
+		}
+		Claims claims = parseJwtToken(token);
+		ResponseCookie cookie = ResponseCookie.from("guest_id", guestId).httpOnly(true).secure(true).sameSite("Strict")
+				.path("/").maxAge(Duration.ofHours(1)).build();
+		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
+				.header("X-Refreshed-Token", "Bearer " + token)
+				.body(Map.of("token", token, "exp", claims.getExpiration()));
 	}
 	
 	public ResponseEntity<?> refreshToken(String refreshToken) {
@@ -262,7 +267,7 @@ public class OauthTokenService {
 
 		// 設定 JWT 主體
 		builder.subject(subject);
-		builder.claim("roles", Lists.newArrayList("guest"));
+		builder.claim("roles", Lists.newArrayList("Guest"));
 		// 設定 JWT 發行時間
 		builder.issuedAt(new Date());
 

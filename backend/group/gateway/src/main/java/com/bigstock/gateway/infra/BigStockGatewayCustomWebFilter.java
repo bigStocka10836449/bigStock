@@ -46,7 +46,7 @@ public class BigStockGatewayCustomWebFilter implements WebFilter {
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         ServerHttpResponse response = exchange.getResponse();
-
+        String host = request.getURI().getHost();
         if (!request.getPath().value().startsWith("/actuator/")) {
             log.info("Request URL: {}", request.getURI());
         }

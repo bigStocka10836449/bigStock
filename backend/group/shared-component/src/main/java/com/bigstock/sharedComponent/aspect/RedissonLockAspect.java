@@ -59,6 +59,7 @@ public class RedissonLockAspect {
 				}
 				// Proceed with the method invocation to get the value
 				Object result = joinPoint.proceed();
+		        cache.put(cacheKey, result);
 				return result;
 			} else {
 				throw new RuntimeException("Could not acquire lock for " + lockKey);
