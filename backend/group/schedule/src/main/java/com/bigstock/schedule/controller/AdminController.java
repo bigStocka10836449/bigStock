@@ -35,15 +35,15 @@ public class AdminController {
 		return ResponseEntity.ok().build();
 	}
 
-	@PatchMapping("doGrepSecuritiesFirmsDayOperate")
-	public ResponseEntity<String> doGrepSecuritiesFirmsDayOperate() {
-		try {
-			graspStockPrice.tryRedoGrepSecuritiesFirmsDayOperate();
-		} catch (Exception e) {
-			log.error(e.getMessage(), e);
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
-		}
-		return ResponseEntity.ok().build();
-	}
+//	@PatchMapping("doGrepSecuritiesFirmsDayOperate")
+//	public ResponseEntity<String> doGrepSecuritiesFirmsDayOperate() {
+//		try {
+//			graspStockPrice.tryRedoGrepSecuritiesFirmsDayOperate();
+//		} catch (Exception e) {
+//			log.error(e.getMessage(), e);
+//			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+//		}
+//		return ResponseEntity.ok().build();
+//	}
 
 }

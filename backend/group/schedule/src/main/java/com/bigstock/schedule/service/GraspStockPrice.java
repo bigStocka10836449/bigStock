@@ -103,7 +103,7 @@ public class GraspStockPrice {
 
 	private final StockMonthPriceService stockMonthPriceService;
 
-	private final RedissonClient redissonClient;
+//	private final RedissonClient redissonClient;
 	
 	private static final String GRASPSTOCK_REDIS_ENABLE_KEY = "bstock:schedule:GraspStock:enable";
 	private static final String GRASPSTOCK_REDIS_ENABLE_IS_SHUTDOWN_KEY = "bstock:schedule:GraspStock:isSutDown";
@@ -135,7 +135,7 @@ public class GraspStockPrice {
 	// 每周日早上8点触发更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 	@Transactional
-//	@PostConstruct
+	@PostConstruct
 	public void updateStockDayPrice() throws RestClientException, URISyntaxException, JsonMappingException,
 			JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
@@ -463,7 +463,7 @@ public class GraspStockPrice {
 
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}")
 	@Transactional
-	@PostConstruct
+//	@PostConstruct
 	public void updateMarginTradingAndShortSellingInfo() throws RestClientException, URISyntaxException,
 			JsonMappingException, JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
@@ -485,71 +485,71 @@ public class GraspStockPrice {
 	}
 //    @PostConstruct
 //	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-securitiesfirms-dayoperate}")
-	public void grepSecuritiesFirmsDayOperate() throws InterruptedException, RestClientException, URISyntaxException,
-			UnsupportedAudioFileException, IOException, LineUnavailableException, JavaLayerException {
-        RBucket<Boolean> graspStockEnableKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_KEY);
-        RBucket<Boolean> graspStockIsSutDownKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_IS_SHUTDOWN_KEY);
-        Boolean graspStockEnable = graspStockEnableKeyBucket.get();
-        File downloadPathFolder = new File(downloadPath);
-        if(ObjectUtils.isEmpty(graspStockEnable) || Boolean.FALSE.equals(graspStockEnable)) {
-        	graspStockEnableKeyBucket.set(Boolean.TRUE);
-        	graspStockIsSutDownKeyBucket.set(Boolean.FALSE);
-			if(!downloadPathFolder.exists()) {
-				downloadPathFolder.mkdirs();
-			}
-			try {
-				doGrepSecuritiesFirmsDayOperate(downloadPathFolder, graspStockEnableKeyBucket,
-						graspStockIsSutDownKeyBucket, Lists.newArrayList());
-			} catch (Exception e) {
-				log.warn(e.getMessage(), e);
-			} finally {
-				graspStockEnableKeyBucket.set(Boolean.FALSE);
-				graspStockIsSutDownKeyBucket.set(Boolean.TRUE);
-			}
-        } else {
-        	return;
-        }
-	}
+//	public void grepSecuritiesFirmsDayOperate() throws InterruptedException, RestClientException, URISyntaxException,
+//			UnsupportedAudioFileException, IOException, LineUnavailableException, JavaLayerException {
+//        RBucket<Boolean> graspStockEnableKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_KEY);
+//        RBucket<Boolean> graspStockIsSutDownKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_IS_SHUTDOWN_KEY);
+//        Boolean graspStockEnable = graspStockEnableKeyBucket.get();
+//        File downloadPathFolder = new File(downloadPath);
+//        if(ObjectUtils.isEmpty(graspStockEnable) || Boolean.FALSE.equals(graspStockEnable)) {
+//        	graspStockEnableKeyBucket.set(Boolean.TRUE);
+//        	graspStockIsSutDownKeyBucket.set(Boolean.FALSE);
+//			if(!downloadPathFolder.exists()) {
+//				downloadPathFolder.mkdirs();
+//			}
+//			try {
+//				doGrepSecuritiesFirmsDayOperate(downloadPathFolder, graspStockEnableKeyBucket,
+//						graspStockIsSutDownKeyBucket, Lists.newArrayList());
+//			} catch (Exception e) {
+//				log.warn(e.getMessage(), e);
+//			} finally {
+//				graspStockEnableKeyBucket.set(Boolean.FALSE);
+//				graspStockIsSutDownKeyBucket.set(Boolean.TRUE);
+//			}
+//        } else {
+//        	return;
+//        }
+//	}
 
 	// 手動重跑抓取買賣日報表資訊，執行外框
-	public void tryRedoGrepSecuritiesFirmsDayOperate() throws JsonMappingException, JsonProcessingException,
-			RestClientException, InterruptedException, URISyntaxException {
-		RBucket<Boolean> graspStockEnableKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_KEY);
-		RBucket<Boolean> graspStockIsSutDownKeyBucket = redissonClient
-				.getBucket(GRASPSTOCK_REDIS_ENABLE_IS_SHUTDOWN_KEY);
-		File downloadPathFolder = new File(downloadPath);
-		if (!(Boolean.FALSE.equals(graspStockEnableKeyBucket.get())
-				&& Boolean.TRUE.equals(graspStockIsSutDownKeyBucket.get()))) {
-			graspStockEnableKeyBucket.set(Boolean.FALSE);
-			while (Boolean.FALSE.equals(graspStockIsSutDownKeyBucket.get())) {
-				Thread.sleep(5000);
-			}
-		}
-		// 使用 CompletableFuture 啟動異步任務
-		CompletableFuture.runAsync(() -> {
-			try {
-				graspStockEnableKeyBucket.set(Boolean.TRUE);
-				graspStockIsSutDownKeyBucket.set(Boolean.FALSE);
-
-				if (!downloadPathFolder.exists()) {
-					downloadPathFolder.mkdirs();
-				}
-
-				List<String> finshedStockCodes = List.of(downloadPathFolder.listFiles()).stream().map(downloadFile -> {
-					String stockCode = removeFileExtension(downloadFile.getName());
-					return (stockCode.contains("_") ? stockCode.split("_")[0] : stockCode);
-				}).toList();
-
-				doGrepSecuritiesFirmsDayOperate(downloadPathFolder, graspStockEnableKeyBucket,
-						graspStockIsSutDownKeyBucket, finshedStockCodes);
-			} catch (Exception e) {
-				log.warn(e.getMessage(), e);
-			} finally {
-				graspStockEnableKeyBucket.set(Boolean.FALSE);
-				graspStockIsSutDownKeyBucket.set(Boolean.TRUE);
-			}
-		});
-	}
+//	public void tryRedoGrepSecuritiesFirmsDayOperate() throws JsonMappingException, JsonProcessingException,
+//			RestClientException, InterruptedException, URISyntaxException {
+//		RBucket<Boolean> graspStockEnableKeyBucket = redissonClient.getBucket(GRASPSTOCK_REDIS_ENABLE_KEY);
+//		RBucket<Boolean> graspStockIsSutDownKeyBucket = redissonClient
+//				.getBucket(GRASPSTOCK_REDIS_ENABLE_IS_SHUTDOWN_KEY);
+//		File downloadPathFolder = new File(downloadPath);
+//		if (!(Boolean.FALSE.equals(graspStockEnableKeyBucket.get())
+//				&& Boolean.TRUE.equals(graspStockIsSutDownKeyBucket.get()))) {
+//			graspStockEnableKeyBucket.set(Boolean.FALSE);
+//			while (Boolean.FALSE.equals(graspStockIsSutDownKeyBucket.get())) {
+//				Thread.sleep(5000);
+//			}
+//		}
+//		// 使用 CompletableFuture 啟動異步任務
+//		CompletableFuture.runAsync(() -> {
+//			try {
+//				graspStockEnableKeyBucket.set(Boolean.TRUE);
+//				graspStockIsSutDownKeyBucket.set(Boolean.FALSE);
+//
+//				if (!downloadPathFolder.exists()) {
+//					downloadPathFolder.mkdirs();
+//				}
+//
+//				List<String> finshedStockCodes = List.of(downloadPathFolder.listFiles()).stream().map(downloadFile -> {
+//					String stockCode = removeFileExtension(downloadFile.getName());
+//					return (stockCode.contains("_") ? stockCode.split("_")[0] : stockCode);
+//				}).toList();
+//
+//				doGrepSecuritiesFirmsDayOperate(downloadPathFolder, graspStockEnableKeyBucket,
+//						graspStockIsSutDownKeyBucket, finshedStockCodes);
+//			} catch (Exception e) {
+//				log.warn(e.getMessage(), e);
+//			} finally {
+//				graspStockEnableKeyBucket.set(Boolean.FALSE);
+//				graspStockIsSutDownKeyBucket.set(Boolean.TRUE);
+//			}
+//		});
+//	}
 
 	//執行買賣日報表抓取流程
     private void doGrepSecuritiesFirmsDayOperate(File downloadPathFolder, RBucket<Boolean> graspStockEnableKeyBucket, RBucket<Boolean> graspStockIsSutDownKeyBucket, List<String> filterStockCodes) throws InterruptedException, JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
