@@ -1,4 +1,4 @@
-package com.bigstock.auth.infra;
+package com.bigstock.biz.infra;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

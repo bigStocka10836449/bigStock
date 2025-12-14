@@ -1,4 +1,4 @@
-package com.bigstock.auth.service;
+package com.bigstock.biz.service;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -25,7 +25,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
-import com.bigstock.auth.domain.vo.UserInloginInfo;
+import com.bigstock.biz.vo.UserInloginInfo;
 import com.bigstock.sharedComponent.entity.RoleInfo;
 import com.bigstock.sharedComponent.entity.UserAccount;
 import com.bigstock.sharedComponent.service.RoleInfoService;
@@ -38,7 +38,6 @@ import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 
 @Service

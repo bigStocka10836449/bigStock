@@ -1,4 +1,4 @@
-package com.bigstock.auth.domain.vo;
+package com.bigstock.biz.vo;
 
 import lombok.Data;
 

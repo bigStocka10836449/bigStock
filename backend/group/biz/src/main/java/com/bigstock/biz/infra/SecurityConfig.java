@@ -1,4 +1,4 @@
-package com.bigstock.gateway.infra;
+package com.bigstock.biz.infra;
 
 import java.io.IOException;
 import java.util.ArrayList;

@@ -1,9 +1,9 @@
-package com.bigstock.auth.domain.builder;
+package com.bigstock.biz.builder;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-import com.bigstock.auth.domain.vo.UserRegistryInfo;
+import com.bigstock.biz.domain.vo.UserRegistryInfo;
 import com.bigstock.sharedComponent.entity.UserAccount;
 
 @Mapper(componentModel = "spring")

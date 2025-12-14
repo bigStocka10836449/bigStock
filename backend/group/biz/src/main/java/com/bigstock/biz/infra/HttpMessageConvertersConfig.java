@@ -1,4 +1,4 @@
-package com.bigstock.gateway.infra;
+package com.bigstock.biz.infra;
 
 import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.context.annotation.Bean;

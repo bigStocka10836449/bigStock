@@ -1,13 +1,9 @@
-package com.bigstock.gateway.infra;
+package com.bigstock.biz.infra;
 
-import java.time.Duration;
 import java.util.Date;
 
-import org.redisson.api.RBucket;
-import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -16,9 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
-
-import com.bigstock.gateway.domain.vo.TokenInfo;
-import com.bigstock.gateway.protocol.OAuth2Client;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -30,15 +23,10 @@ import reactor.core.publisher.Mono;
 @Component
 public class BigStockGatewayCustomWebFilter implements WebFilter {
 
-	@Autowired
-	private RedissonClient redissonClient;
 	@Value("${server.oauth2.secret-key}")
 	private String secretKey;
-//	@Value("${server.oauth2.url}")
-//	private String oauth2Url;
 
-	@Autowired
-	OAuth2Client oauth2Client;
+
 
 	private static final Logger log = LoggerFactory.getLogger(BigStockGatewayCustomWebFilter.class);
 
@@ -143,27 +131,6 @@ public class BigStockGatewayCustomWebFilter implements WebFilter {
 //		}
 //	}
 
-	/**
-	 * 利用refreshToken 重新產生access token
-	 * 
-	 * @param refreshToken
-	 * @return
-	 */
-	private String tryRefreshToken(String refreshToken) {
-
-		// Create an OAuth2Client instance
-//		OAuth2Client oAuth2Client = Feign.builder().contract(new SpringMvcContract()).client(new OkHttpClient())
-//				.encoder(new JacksonEncoder()).target(OAuth2Client.class, oauth2Url);
-		TokenInfo refreshTokenInfo = new TokenInfo();
-		refreshTokenInfo.setRefreshToken(refreshToken);
-		// Call the refresh token API
-		String newAccessToken = oauth2Client.refreshToken(refreshTokenInfo);
-//		String newAccessToken = oAuth2Client.refreshToken(refreshTokenInfo);
-
-		// Store the new refresh token in Redis using redissonClient
-		return newAccessToken;
-//		return createAuthentication(parseJwtToken(newAccessToken));
-	}
 
 	private Mono<Void> unauthorized(ServerHttpResponse response) {
 		response.setStatusCode(HttpStatus.UNAUTHORIZED);

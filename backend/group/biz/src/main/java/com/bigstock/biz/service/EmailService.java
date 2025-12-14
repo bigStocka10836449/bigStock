@@ -1,4 +1,4 @@
-package com.bigstock.auth.service;
+package com.bigstock.biz.service;
 
 import java.util.HashMap;
 import java.util.Map;

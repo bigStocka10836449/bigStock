@@ -12,14 +12,12 @@ spring:
 #      probability: 1.0 # 设置采样率为100%
   application:
     name: bigstock-biz
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    enabled: true    
   main:
     allow-bean-definition-overriding: true
-  cloud:
-    consul:
-      host: 127.0.0.1
-      port: 8500      
-      discovery:
-        prefer-ip-address: true #使用 IP
   datasource:
     url: jdbc:postgresql://127.0.0.1:15432/bstock
     username: bstockuser
@@ -43,14 +41,21 @@ spring:
         min-idle: 10
         max-wait: 100000
     port: 6379
-  rabbitmq:
-    host: 127.0.0.1
-    port: 5672
-    username: admin
-    password: rabbitmq
-    virtual-host: /
-    pool:
-      channelCacheSize: 5        
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: a26404691@gmail.com
+    password: uynt zdgf suhj cjmi
+    from: a26404691@gmail.com
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          ssl:
+            trust: smtp.gmail.com          
 logging:
   config: classpath:logback.xml
   
@@ -60,21 +65,7 @@ springdoc:
   swagger-ui:
     path: /biz/swagger/swagger-ui.html  
     
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-  tracing:
-    enabled: true
-    sampling:
-      probability: 1.0  # 设置采样率为 100%
-    export:
-      otlp:
-        enabled: true
-        endpoint: http://localhost:14250  # Jaeger 的 OTLP 接收端点  
-tracing:
-  url: http://localhost:4317          
+    
 #opentracing:
 #  jaeger:
 #    enabled: true

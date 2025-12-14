@@ -1,4 +1,4 @@
-package com.bigstock.auth.domain.vo;
+package com.bigstock.biz.domain.vo;
 
 import java.time.LocalDateTime;
 import java.util.Date;

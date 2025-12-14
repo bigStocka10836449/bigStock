@@ -1,4 +1,4 @@
-package com.bigstock.auth.service;
+package com.bigstock.biz.service;
 
 import java.util.Date;
 
@@ -7,8 +7,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.bigstock.auth.domain.builder.UserAccountBuilder;
-import com.bigstock.auth.domain.vo.UserRegistryInfo;
+import com.bigstock.biz.builder.UserAccountBuilder;
+import com.bigstock.biz.domain.vo.UserRegistryInfo;
 import com.bigstock.sharedComponent.entity.UserAccount;
 import com.bigstock.sharedComponent.service.RoleInfoService;
 import com.bigstock.sharedComponent.service.UserAccountService;

@@ -1,16 +1,12 @@
-package com.bigstock.auth.web;
+package com.bigstock.biz.controller;
 
 import java.io.IOException;
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.apache.http.HttpException;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,12 +16,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.bigstock.auth.domain.vo.TokenInfo;
-import com.bigstock.auth.domain.vo.UserInloginInfo;
-import com.bigstock.auth.domain.vo.UserRegistryInfo;
-import com.bigstock.auth.service.OauthTokenService;
-import com.bigstock.auth.service.UserRegistryService;
-import org.springframework.http.server.reactive.ServerHttpRequest;
+import com.bigstock.biz.vo.UserInloginInfo;
+import com.bigstock.biz.domain.vo.UserRegistryInfo;
+import com.bigstock.biz.service.OauthTokenService;
+import com.bigstock.biz.service.UserRegistryService;
+
 //import io.micrometer.tracing.Span;
 //import io.micrometer.tracing.Tracer;
 //import io.micrometer.tracing.annotation.NewSpan;

@@ -1,4 +1,4 @@
-package com.bigstock.gateway.infra;
+package com.bigstock.biz.infra;
 
 import java.util.Collection;
 import java.util.List;

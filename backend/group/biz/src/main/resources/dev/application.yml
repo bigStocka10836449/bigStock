@@ -9,12 +9,12 @@ server:
 spring: 
   application:
     name: bigstock-biz
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    enabled: true  
   main:
     allow-bean-definition-overriding: true
-  cloud:
-    consul:
-      host: ${SPRING_CONSUL_HOST}
-      port: ${SPRING_CONSUL_PORT}    
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
@@ -36,15 +36,22 @@ spring:
         max-idle: 500
         min-idle: 10
         max-wait: 100000
-    port: ${SPRING_REDIS_PORT}
-  rabbitmq:
-    host: ${SPRING_RABBITMQ_HOST}
-    port: ${SPRING_RABBITMQ_PORT}
-    username: ${SPRING_RABBITMQ_USERNAME}
-    password: ${SPRING_RABBITMQ_PASSWORD}
-    virtual-host: /
-    pool:
-      channelCacheSize: 5        
+    port: ${SPRING_REDIS_PORT}   
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: a26404691@gmail.com
+    password: uynt zdgf suhj cjmi
+    from: a26404691@gmail.com
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          ssl:
+            trust: smtp.gmail.com             
 logging:
   config: classpath:logback.xml
   
@@ -53,15 +60,3 @@ springdoc:
     path: /biz/swagger/v3/api-docs  
   swagger-ui:
     path: /biz/swagger/swagger-ui.html  
-    
-management:
-  tracing:
-    enabled: true
-    sampling:
-      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY}  # 设置采样率为 100%
-    export:
-      otlp:
-        enabled: true
-        endpoint: ${MANAGEMENT_TRACING_EXPORT_ENDPOINT}  # Jaeger 的 OTLP 接收端点          
-tracing:
-  url: ${TRACING_URL}  
