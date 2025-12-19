@@ -56,9 +56,9 @@ public class GraspShareholderStructureService {
 
 	private final StockInfoService stockInfoService;
 
-	@PostConstruct
+//	@PostConstruct
 	// 每天晚上8點更新
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}")
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}")
 	public void updateShareholderStructure()
 			throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException {
 		// 先抓DB裡面全部的代號資料
@@ -68,15 +68,18 @@ public class GraspShareholderStructureService {
 		stockCodeWeekInfos.stream().forEach(stockCodeWeekInfo -> {
 			String stockCode = stockCodeWeekInfo.get(37);
 			try {
-				Optional<StockInfo> stockInfoOp = stockInfoService.findById(stockCode);
-				if (stockInfoOp.isPresent()) {
-					log.info("ssList is empty : {}, so create data", stockCode);
-					ShareholderStructure shareholderStructure = refreshStockLatestInfo(stockCode,
-							stockInfoOp.get().getStockName(), stockCodeWeekInfo);
-					shareholderStructures.add(shareholderStructure);
-				} else {
-					log.info(String.format("ssList is empty : %1s , and StockInfo is not exsits either", stockCode));
+				if(stockCode.trim().equals("2330")) {
+					log.info(stockCode);
 				}
+				Optional<StockInfo> stockInfoOp = stockInfoService.findById(stockCode.trim());
+//				if (!stockInfoOp.isPresent()) {
+					log.info("ssList is empty : {}, so create data", stockCode);
+					ShareholderStructure shareholderStructure = refreshStockLatestInfo(stockCode.trim(),
+							stockInfoOp.isPresent() ? stockInfoOp.get().getStockName().trim() : stockCode.trim(), stockCodeWeekInfo);
+					shareholderStructures.add(shareholderStructure);
+//				} else {
+//					log.info(String.format("ssList is empty : %1s , and StockInfo is not exsits either", stockCode));
+//				}
 			} catch (InterruptedException e) {
 				log.error(e.getMessage(), e);
 			}
