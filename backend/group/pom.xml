@@ -24,23 +24,6 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
-		<!--
-		https://mvnrepository.com/artifact/org.springframework.cloud/spring-cloud-starter -->
-		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter</artifactId>
-			<version>4.1.1</version>
-		</dependency>
-
-		<!--
-		https://mvnrepository.com/artifact/org.springframework.cloud/spring-cloud-starter-consul-discovery -->
-		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-consul-discovery</artifactId>
-			<version>4.1.0</version>
-		</dependency>
-
-	
 
 
 		<!-- https://mvnrepository.com/artifact/org.apache.poi/poi-ooxml -->
@@ -61,11 +44,6 @@
 		</dependency>
 		<!--
 		https://mvnrepository.com/artifact/org.springframework/spring-webflux -->
-		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-webflux</artifactId>
-
-		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-lang3</artifactId>
@@ -111,42 +89,12 @@
 		</dependency>
 
 		<!--
-		https://mvnrepository.com/artifact/org.springframework.cloud/spring-cloud-starter-openfeign -->
-		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-openfeign</artifactId>
-			<version>4.1.0</version>
-		</dependency>
-		<!-- https://mvnrepository.com/artifact/com.squareup.okhttp3/okhttp -->
-		<!-- https://mvnrepository.com/artifact/io.github.openfeign/feign-okhttp -->
-		<dependency>
-			<groupId>io.github.openfeign</groupId>
-			<artifactId>feign-okhttp</artifactId>
-			<version>13.2.1</version>
-		</dependency>
-		<!--
-		https://mvnrepository.com/artifact/io.github.openfeign/feign-jackson -->
-		<dependency>
-			<groupId>io.github.openfeign</groupId>
-			<artifactId>feign-jackson</artifactId>
-			<version>13.2.1</version>
-		</dependency>
-		<!--
 		https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-actuator -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
-		<dependency>
-			<groupId>org.springframework.amqp</groupId>
-			<artifactId>spring-rabbit</artifactId>
-			<version>3.1.3</version>
-		</dependency>
 
-		<dependency>
-			<groupId>com.rabbitmq</groupId>
-			<artifactId>amqp-client</artifactId>
-		</dependency>
 		<!--
 		https://mvnrepository.com/artifact/jakarta.persistence/jakarta.persistence-api -->
 		<dependency>

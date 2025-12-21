@@ -1,6 +1,10 @@
 server:
   port: 18080
   shutdown: graceful
+  oauth2:
+    secret-key: 4903837210390382930293802938293802932038203920382039203820392038
+    key: classpath:jwt.pem
+  registry-verify-url: http://127.0.0.1:18080/auth/verify?token= 
 #  ssl:
 #    enabled: false
 #    key-store: classpath:container-sit.testesunbank.com.tw.jks

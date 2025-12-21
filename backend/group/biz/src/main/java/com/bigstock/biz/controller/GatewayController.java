@@ -6,10 +6,7 @@ import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,8 +26,7 @@ import com.bigstock.sharedComponent.dto.SingleStockPriceBizVo;
 import com.bigstock.sharedComponent.dto.SingleStockPriceVo;
 import com.bigstock.sharedComponent.dto.StockInfoVo;
 import com.bigstock.sharedComponent.dto.StructureContinueIncreaseVo;
-import com.bigstock.sharedComponent.rabbitmq.RabbitMqService;
-import com.bigstock.sharedComponent.service.SocketPushService;
+//import com.bigstock.sharedComponent.service.SocketPushService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -44,8 +40,8 @@ import lombok.extern.slf4j.Slf4j;
 public class GatewayController {
 
 	
-	@Autowired
-	SocketPushService socketPushService;
+//	@Autowired
+//	SocketPushService socketPushService;
 	@Autowired
 	BizService bizService;
 
@@ -125,11 +121,11 @@ public class GatewayController {
 	}
 
 
-	@PostMapping("sse/session")
-	public ResponseEntity<Map<String,String>> createSSESession(Authentication authentication){
-	    String userId = authentication.getName();
-	    String sessionId = userId + "-" + System.currentTimeMillis(); 
-	    socketPushService.storeSessionIfAbsent(sessionId, userId, Duration.ofSeconds(3600));
-	    return ResponseEntity.ok(Map.of("sessionId", sessionId));
-	}
+//	@PostMapping("sse/session")
+//	public ResponseEntity<Map<String,String>> createSSESession(Authentication authentication){
+//	    String userId = authentication.getName();
+//	    String sessionId = userId + "-" + System.currentTimeMillis(); 
+//	    socketPushService.storeSessionIfAbsent(sessionId, userId, Duration.ofSeconds(3600));
+//	    return ResponseEntity.ok(Map.of("sessionId", sessionId));
+//	}
 }

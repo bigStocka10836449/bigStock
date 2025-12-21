@@ -20,7 +20,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
@@ -38,6 +37,7 @@ import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -83,15 +83,16 @@ public class OauthTokenService {
 				.body(Map.of("accessToken", accessToken, "exp", expiration.getTime()));
 	}
 	
-	public ResponseEntity<?> getTmpToken(ServerHttpRequest request, String guestId) throws IOException, HttpException {
+	public ResponseEntity<?> getTmpToken(HttpServletRequest request, String guestId) throws IOException, HttpException {
 
 		// 1. 取得 IP，優先從 X-Forwarded-For 中讀取（多個時取第一個），否則 fallback 到 remote IP
-		String ip = Optional.ofNullable(request.getHeaders().getFirst("X-Forwarded-For"))
-				.map(xff -> xff.split(",")[0].trim())
-				.orElseGet(() -> request.getRemoteAddress().getAddress().getHostAddress());
+		String ip = Optional.ofNullable(request.getHeader("X-Forwarded-For"))
+		        .map(xff -> xff.split(",")[0].trim())
+		        .orElseGet(request::getRemoteAddr);
 
 		// 2. 取得 User-Agent，預設為 unknown
-		String userAgent = Optional.ofNullable(request.getHeaders().getFirst("User-Agent")).orElse("unknown");
+		String userAgent = Optional.ofNullable(request.getHeader("User-Agent"))
+		        .orElse("unknown");
 
 		// 3. 將 IP + User-Agent 做 MD5 hash，作為限流 key
 		String identifier = ip + ":" + userAgent;
@@ -137,7 +138,7 @@ public class OauthTokenService {
 	    String subject = claims.getSubject();
 	    String role = claims.get("roles", List.class).get(0).toString();
 	    
-	    if ("Guest".equals(role)) {
+	    if ("4".equals(role)) {
 	        // Guest 不應進入 refresh 流程，直接拋錯或略過
 	        throw new JwtException("Guest token cannot be refreshed");
 	    }
@@ -266,7 +267,7 @@ public class OauthTokenService {
 
 		// 設定 JWT 主體
 		builder.subject(subject);
-		builder.claim("roles", Lists.newArrayList("Guest"));
+		builder.claim("roles", Lists.newArrayList("4"));
 		// 設定 JWT 發行時間
 		builder.issuedAt(new Date());
 
