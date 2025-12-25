@@ -1,84 +1,5 @@
 version: '3.7'
 services:
-  bigstock-gateway:
-    build: ../../../gateway/docker/
-    restart: always 
-    container_name: bigstock-gateway
-    ports:
-      - "11081:11081" 
-    depends_on:
-    #  - redis    
-    #  - bstock-postgresql 
-      - bigstock-auth  
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.bigstock-gateway.rule=PathPrefix(`/bigstock-gateway`)"
-      - "traefik.http.services.bigstock-gateway.loadbalancer.server.port=11081"
-      - "traefik.http.routers.bigstock-gateway.entrypoints=web"
-      - "traefik.http.middlewares.strip-prefix.stripPrefix.prefixes=/bigstock-gateway"
-      - "traefik.http.routers.bigstock-gateway.middlewares=strip-prefix"
-      - "traefik.docker.network=big_stock_network"     
-    environment:
-      SPRING_CONSUL_HOST: big_stock_consul
-      SPRING_CONSUL_PORT: 8500  
-      SPRING_DATASOURCE_URL: jdbc:postgresql://bstock-postgresql:5432/bstock
-      SPRING_DATASOURCE_USERNAME: bstockuser
-      SPRING_DATASOURCE_PASSWORD: postgresql   
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: admin
-      SPRING_RABBITMQ_PASSWORD: rabbitmq
-      JAVA_COMMAND_STR: -Xlog:gc+heap=trace:file=/opt/bigstock/logs/Xlog.log:time,uptimemillis,tid  -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -Dcatalina.home=/opt/bigstock -Xms1868M -Xmx1868M -Xss1M  -XX:MetaspaceSize=512m -XX:MaxMetaspaceSize=512m  -XX:MaxGCPauseMillis=10 -XX:InitiatingHeapOccupancyPercent=60 -XX:+UnlockExperimentalVMOptions -XX:MaxTenuringThreshold=10 -XX:G1NewSizePercent=3
-      JAR_NAME: bigstock-gateway.jar
-      MANAGEMENT_TRACING_EXPORT_ENDPOINT: http://localhost:14250
-      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 0.1
-      TRACING_URL: http://jaeger:4317
-    deploy:
-      resources:
-        limits:
-          memory: 2g
-        reservations:
-          memory: 1g       
-    networks:
-      - big_stock_network      
-  bigstock-auth:
-    build: ../../../auth/docker/
-    restart: always 
-    container_name: bigstock-auth
-    ports:
-      - "10093:10093" 
-    networks:
-      - big_stock_network      
-    environment:
-      SPRING_CONSUL_HOST: big_stock_consul
-      SPRING_CONSUL_PORT: 8500  
-      SPRING_DATASOURCE_URL: jdbc:postgresql://bstock-postgresql:5432/bstock
-      SPRING_DATASOURCE_USERNAME: bstockuser
-      SPRING_DATASOURCE_PASSWORD: postgresql
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: admin
-      SPRING_RABBITMQ_PASSWORD: rabbitmq      
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-      JAVA_COMMAND_STR: -Xlog:gc+heap=trace:file=/opt/bigstock/logs/Xlog.log:time,uptimemillis,tid  -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -Dcatalina.home=/opt/bigstock/ -Xms1024M -Xmx1024M -Xss256K  -XX:MetaspaceSize=512m -XX:MaxMetaspaceSize=512m  -XX:MaxGCPauseMillis=10 -XX:InitiatingHeapOccupancyPercent=60 -XX:+UnlockExperimentalVMOptions -XX:MaxTenuringThreshold=10 -XX:G1NewSizePercent=3
-      JAR_NAME: bigstock-auth.jar 
-      SPRING_MAIL_HOST: smtp.gmail.com
-      SPRING_MAIL_PORT: 587
-      SPRING_MAIL_USERNAME: a26404691@gmail.com
-      SPRING_MAIL_PASSWORD: uynt zdgf suhj cjmi
-      SPRING_MAIL_FROM: a26404691@gmail.com
-      SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_TRUST: smtp.gmail.com
-      SERVER_REGISTRY_VERIFY_RUL: http://127.0.0.1:10093/auth/verify?token= 
-      MANAGEMENT_TRACING_EXPORT_ENDPOINT: http://jaeger:14250
-      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 0.1
-      TRACING_URL: http://jaeger:4317
-    deploy:
-      resources:
-        limits:
-          memory: 1g
   bigstock-biz:
     build: ../../../biz/docker/
     restart: always 
@@ -86,10 +7,7 @@ services:
     ports:
       - "18080:18080" 
     depends_on:
-     # - redis  
-     # - rabbitmq  
-     # - bstock-postgresql  
-      - bigstock-gateway
+      - redis  
     environment:
       SPRING_CONSUL_HOST: big_stock_consul
       SPRING_CONSUL_PORT: 8500  
@@ -102,7 +20,7 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: admin
       SPRING_RABBITMQ_PASSWORD: rabbitmq 
-      JAVA_COMMAND_STR: -Xlog:gc+heap=trace:file=/opt/bigstock/logs/Xlog.log:time,uptimemillis,tid  -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -Dcatalina.home=/opt/bigstock -Xms1868M -Xmx1868M -Xss1M  -XX:MetaspaceSize=512m -XX:MaxMetaspaceSize=512m  -XX:MaxGCPauseMillis=10 -XX:InitiatingHeapOccupancyPercent=60 -XX:+UnlockExperimentalVMOptions -XX:MaxTenuringThreshold=10 -XX:G1NewSizePercent=3
+      JAVA_COMMAND_STR: -Xlog:gc+heap=trace:file=/opt/bigstock/logs/Xlog.log:time,uptimemillis,tid  -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -Dcatalina.home=/opt/bigstock -Xms800M -Xmx800M -Xss1M  -XX:MetaspaceSize=256m -XX:MaxMetaspaceSize=256m  -XX:MaxGCPauseMillis=10 -XX:InitiatingHeapOccupancyPercent=60 -XX:+UnlockExperimentalVMOptions -XX:MaxTenuringThreshold=10 -XX:G1NewSizePercent=3
       JAR_NAME: bigstock-biz.jar  
       MANAGEMENT_TRACING_EXPORT_ENDPOINT: http://jaeger:14250
       MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 0.1
@@ -112,17 +30,14 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2g
+          memory: 1g
   bigstock-schedule:
     build: ../../../schedule/docker/
     restart: always 
     container_name: bigstock-schedule
     ports:
       - "18081:18081" 
-    shm_size: 2g
-   # depends_on:
-   #   - redis    
-   #   - bstock-postgresql
+    shm_size: 512m
     environment:
       SPRING_CONSUL_HOST: big_stock_consul
       SPRING_CONSUL_PORT: 8500  
@@ -136,7 +51,7 @@ services:
       SPRING_RABBITMQ_USERNAME: admin
       SPRING_RABBITMQ_PASSWORD: rabbitmq  
       CHROME_DRIVER_LINUX_PATH: /usr/local/bin/chromedriver
-      JAVA_COMMAND_STR: -Xlog:gc+heap=trace:file=/opt/bigstock/logs/Xlog.log:time,uptimemillis,tid  -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -Dcatalina.home=/opt/bigstock -Xms1g -Xmx1g -Xss1M  -XX:MetaspaceSize=512m -XX:MaxMetaspaceSize=512m  -XX:MaxGCPauseMillis=10 -XX:InitiatingHeapOccupancyPercent=60 -XX:+UnlockExperimentalVMOptions -XX:MaxTenuringThreshold=10 -XX:G1NewSizePercent=3
+      JAVA_COMMAND_STR: -Xlog:gc+heap=trace:file=/opt/bigstock/logs/Xlog.log:time,uptimemillis,tid  -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -Dcatalina.home=/opt/bigstock -Xms512m -Xmx512m -Xss1M  -XX:MetaspaceSize=256m -XX:MaxMetaspaceSize=256m  -XX:MaxGCPauseMillis=10 -XX:InitiatingHeapOccupancyPercent=60 -XX:+UnlockExperimentalVMOptions -XX:MaxTenuringThreshold=10 -XX:G1NewSizePercent=3
       JAR_NAME: bigstock-schedule.jar  
       SCHEDULE_BPYTHON_URL: http://bigstock-python:8000/captcha/
       SCHEDULE_CREDENTIALS-PATHL: /opt/bigstock/google-api-cloud-speech-to-text.json
@@ -147,7 +62,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1g     
+          memory: 512m     
     networks:
       - big_stock_network       
     volumes:

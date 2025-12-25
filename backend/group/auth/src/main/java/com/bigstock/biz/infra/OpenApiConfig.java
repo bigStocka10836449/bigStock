@@ -1,4 +1,4 @@
-package com.bigstock.auth.infra;
+package com.bigstock.biz.infra;
 
 import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.beans.factory.annotation.Value;

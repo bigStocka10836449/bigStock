@@ -67,7 +67,9 @@ springdoc:
   api-docs:
     path: /biz/swagger/v3/api-docs  
   swagger-ui:
-    path: /biz/swagger/swagger-ui.html  
+    path: /biz/swagger/swagger-ui.html
+    enable: true
+    supportHeaderParams: true
     
     
 #opentracing:
