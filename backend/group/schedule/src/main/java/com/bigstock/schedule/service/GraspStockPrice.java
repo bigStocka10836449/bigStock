@@ -135,7 +135,7 @@ public class GraspStockPrice {
 	// 每周日早上8点触发更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 	@Transactional
-	@PostConstruct
+//	@PostConstruct
 	public void updateStockDayPrice() throws RestClientException, URISyntaxException, JsonMappingException,
 			JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
@@ -463,7 +463,7 @@ public class GraspStockPrice {
 
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}")
 	@Transactional
-//	@PostConstruct
+	@PostConstruct
 	public void updateMarginTradingAndShortSellingInfo() throws RestClientException, URISyntaxException,
 			JsonMappingException, JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
@@ -693,6 +693,9 @@ public class GraspStockPrice {
 
 		double latestClosingPrice = closingPrices.get(0);
 		Double rsv = (latestClosingPrice - lowestLow) / (highestHigh - lowestLow) * 100.0;
+		if(rsv.isNaN()) {
+			rsv = (latestClosingPrice - (lowestLow-0.001d)) / (highestHigh - (lowestLow-0.001d)) * 100.0;
+		}
 		rsv = roundToThreeDecimalPlaces(rsv);
 		Double previousK = StringUtils.isNotBlank(twoFourtyStockDayPrices.get(1).getLineKvalue())
 				? Double.valueOf(twoFourtyStockDayPrices.get(1).getLineKvalue())
