@@ -71,6 +71,36 @@ springdoc:
     enable: true
     supportHeaderParams: true
     
+schedule:
+  bpython-url: http://127.0.0.1:8000/captcha/
+  credentials-pathl: D:\GOOGLE_APPLICATION_CREDENTIALS\api-project-488164973892-240337ff54fe.json
+  task:
+    scheduling:
+      cron:
+        expression: 
+          grasp-stock-price: "0 */40 * * * *"
+          grasp-securitiesfirms-dayoperate: "0 */30 * * * *"
+          update-shareholder-structure: "0 */30 * * * *"
+          update-stock-info: "0 */30 * * * *"
+          update-margin-trading:  "0 */30 * * * *"
+  chromeDriverPath:
+    windows: 
+      active: true	
+      path: D:/bigStock/backend/group/schedule/src/main/resources/chrome-driver/chromedriver-win64/chromedriver-win64/chromedriver.exe
+    linux:
+       active: false
+       driver-path: 1111
+     #  chrome-path: ${CHROME_LINUX_PATH}	
+    download-path: D:\bigStock\Downloads
+  tdccQryStockUrl: https://www.tdcc.com.tw/portal/zh/smWeb/qryStock
+  overTheCounterUrl: https://mops.twse.com.tw/mops/web/t51sb01
+  manual-date-range:
+    tpex-baseurl: https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock
+    search-start-date: 2025-10-05
+    search-end-date: 2025-12-07
+     # date格式 yyyyMMdd 
+    twse-baseurl: https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=%1s&stockNo=%2s&response=json&_=1730439477455    
+    
     
 #opentracing:
 #  jaeger:

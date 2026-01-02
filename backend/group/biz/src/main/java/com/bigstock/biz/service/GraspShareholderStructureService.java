@@ -1,4 +1,4 @@
-package com.bigstock.schedule.service;
+package com.bigstock.biz.service;
 
 import java.net.URISyntaxException;
 import java.util.List;
@@ -11,7 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 
-import com.bigstock.schedule.utils.ChromeDriverUtils;
+import com.bigstock.biz.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockInfo;
 import com.bigstock.sharedComponent.service.ShareholderStructureService;
@@ -20,7 +20,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.common.collect.Lists;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,7 +57,7 @@ public class GraspShareholderStructureService {
 
 	@PostConstruct
 	// 每天晚上8點更新
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}")
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}")
 	public void updateShareholderStructure()
 			throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException {
 		// 先抓DB裡面全部的代號資料
@@ -68,15 +67,18 @@ public class GraspShareholderStructureService {
 		stockCodeWeekInfos.stream().forEach(stockCodeWeekInfo -> {
 			String stockCode = stockCodeWeekInfo.get(37);
 			try {
-				Optional<StockInfo> stockInfoOp = stockInfoService.findById(stockCode);
-				if (stockInfoOp.isPresent()) {
-					log.info("ssList is empty : {}, so create data", stockCode);
-					ShareholderStructure shareholderStructure = refreshStockLatestInfo(stockCode,
-							stockInfoOp.get().getStockName(), stockCodeWeekInfo);
-					shareholderStructures.add(shareholderStructure);
-				} else {
-					log.info(String.format("ssList is empty : %1s , and StockInfo is not exsits either", stockCode));
+				if(stockCode.trim().equals("2330")) {
+					log.info(stockCode);
 				}
+				Optional<StockInfo> stockInfoOp = stockInfoService.findById(stockCode.trim());
+//				if (!stockInfoOp.isPresent()) {
+					log.info("ssList is empty : {}, so create data", stockCode);
+					ShareholderStructure shareholderStructure = refreshStockLatestInfo(stockCode.trim(),
+							stockInfoOp.isPresent() ? stockInfoOp.get().getStockName().trim() : stockCode.trim(), stockCodeWeekInfo);
+					shareholderStructures.add(shareholderStructure);
+//				} else {
+//					log.info(String.format("ssList is empty : %1s , and StockInfo is not exsits either", stockCode));
+//				}
 			} catch (InterruptedException e) {
 				log.error(e.getMessage(), e);
 			}

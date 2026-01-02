@@ -1,4 +1,4 @@
-package com.bigstock.schedule.dto.GrapAndInserDateRangeStockPrice;
+package com.bigstock.biz.dto;
 
 import com.bigstock.sharedComponent.dto.DateRangeDto;
 

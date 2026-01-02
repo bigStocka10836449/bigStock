@@ -7,7 +7,6 @@ import org.springframework.stereotype.Repository;
 
 import com.bigstock.sharedComponent.entity.RolePath;
 
-@Repository
 public interface RolePathRepository extends JpaRepository<RolePath, Long> {
 
     // 根據角色ID查詢其可訪問的路徑

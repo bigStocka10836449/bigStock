@@ -1,4 +1,4 @@
-package com.bigstock.schedule.service;
+package com.bigstock.biz.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -17,7 +17,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.bigstock.schedule.utils.ChromeDriverUtils;
+import com.bigstock.biz.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockInfoService;

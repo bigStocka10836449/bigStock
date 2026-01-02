@@ -10,14 +10,14 @@ services:
       - ./bstock_dump.sql:/tmp/bstock_dump.sql
       - ./bstock_dump.sql:/docker-entrypoint-initdb.d/02_bstock_dump.sql
       - ./init.sql:/docker-entrypoint-initdb.d/01_init.sql
-    shm_size: 2gb  
+    shm_size: 1536m  
     networks:
       - big_stock_network   
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgresql 
       POSTGRES_SHARED_BUFFERS: "256MB"
-    mem_limit: 2g
+    mem_limit: 1536m
   redis:
     image: redis:7.2.4
     container_name: redis
@@ -29,153 +29,7 @@ services:
     command: ["redis-server", "/etc/redis/redis.conf"]
     networks:
       - big_stock_network  
-    mem_limit: 1g  # 增加到 1G
-  redisinsight:
-    image: redislabs/redisinsight:v2
-    restart: always 
-    container_name: redisinsight
-    ports:
-      - "5540:5540"
-    depends_on:
-      - redis
-    environment:
-      LOG_LEVEL: "debug"  
-    networks:
-      - big_stock_network 
-    mem_limit: 512m  # 減少到 512MB
-  rabbitmq:
-    hostname: rabbitmq
-    image: rabbitmq:3.12.13-management
-    restart: always 
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: rabbitmq   
-    networks:
-      - big_stock_network 
-    mem_limit: 1540m
-  consul:
-    image: consul:1.7.3   
-    restart: always 
-    container_name: big_stock_consul
-    ports:  
-      - "8500:8500"
-    networks:
-      - big_stock_network    
-    mem_limit: 512m
-  jaeger:
-    image: jaegertracing/all-in-one:1.58.0
-    restart: always 
-    container_name: jaeger
-    ports:
-      - "5775:5775/udp"
-      - "6831:6831/udp"
-      - "6832:6832/udp"
-      - "5778:5778"
-      - "16686:16686"
-      - "14268:14268"
-      - "14250:14250"
-      - "9411:9411"
-      - "4317:4317"
-      - "4318:4318"
-      - "14269:14269"
-    networks:
-      - big_stock_network    
-    environment:
-      COLLECTOR_OTLP_ENABLED: true
-      COLLECTOR_ZIPKIN_HTTP_PORT: 9411
-      JAEGER_SAMPLER_TYPE: const
-      JAEGER_SAMPLER_PARAM: 1
-      JAEGER_REPORTER_LOG_SPANS: "true"
-      JAEGER_REPORTER_FLUSH_INTERVAL: "500"
-      JAEGER_REPORTER_MAX_QUEUE_SIZE: "10000" 
-      METRICS_BACKEND: prometheus
-      METRICS_HTTP_ROUTE: /metrics
-    mem_limit: 256m  # 減少到 512MB
-  traefik:
-    image: traefik:v2.11.2
-    restart: always 
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--entryPoints.web.address=:80"
-      - "--metrics.prometheus=true"
-      - "--metrics.prometheus.entryPoint=metrics"
-      - "--entryPoints.metrics.address=:9090"
-      - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
-      - "--providers.docker.constraints=Label(`traefik.enable`, `true`)"
-    ports:
-      - "30080:80"
-      - "38080:8080"
-      - "39090:9090"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
-    networks:
-      - big_stock_network  
-    labels:
-      - "traefik.enable=true" 
-      - "traefik.docker.network=big_stock_network"
-    mem_limit: 512m
-  prometheus:
-    image: prom/prometheus:v2.52.0
-    restart: always 
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./prometheus/data:/prometheus
-    command:
-      - '--storage.tsdb.path=/prometheus'
-      - '--config.file=/etc/prometheus/prometheus.yml'
-    ports:
-      - "29090:9090"
-    networks:
-      - big_stock_network       
-    mem_limit: 512m  # 減少到 512MB
-  postgres_exporter:
-    restart: always 
-    image: prometheuscommunity/postgres-exporter:v0.15.0
-    environment:
-      DATA_SOURCE_NAME: "postgresql://postgres:postgresql@bstock-postgresql:5432/bstock?sslmode=disable"
-    ports:
-      - "39187:9187"
-    networks:
-      - big_stock_network
-    mem_limit: 256m
-  grafana:
-    image: grafana/grafana:10.0.0-ubuntu
-    restart: always 
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./grafana_data:/var/lib/grafana
-    networks:
-      - big_stock_network
-    mem_limit: 512m
-  rabbitmq_exporter:
-    hostname: rabbitmqexporter
-    image: kbudde/rabbitmq-exporter:1.0.0  
-    restart: always 
-    ports:
-      - "9419:9419"
-    environment:
-      RABBIT_URL: http://rabbitmq:15672
-      RABBIT_USER: admin
-      RABBIT_PASSWORD: rabbitmq
-    networks:
-      - big_stock_network    
-    mem_limit: 256m
-  redis_exporter:
-    hostname: redisexporter
-    image: oliver006/redis_exporter:v1.63.0
-    restart: always 
-    ports:
-      - "9121:9121"
-    environment:  
-      REDIS_ADDR: redis://redis:6379
-    networks:
-      - big_stock_network
-    mem_limit: 256m
+    mem_limit: 512m  # 增加到 1G
     ##暫時移除
   #bigstock-python:
   #  build: ../../../BstockPython/src/

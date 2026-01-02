@@ -24,6 +24,7 @@ services:
       JAR_NAME: bigstock-biz.jar  
       MANAGEMENT_TRACING_EXPORT_ENDPOINT: http://jaeger:14250
       MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 0.1
+      SCHEDULE_BPYTHON_URL: http://bigstock-python:8000/captcha/
       TRACING_URL: http://jaeger:4317
     networks:
       - big_stock_network  
@@ -31,42 +32,7 @@ services:
       resources:
         limits:
           memory: 1g
-  bigstock-schedule:
-    build: ../../../schedule/docker/
-    restart: always 
-    container_name: bigstock-schedule
-    ports:
-      - "18081:18081" 
-    shm_size: 512m
-    environment:
-      SPRING_CONSUL_HOST: big_stock_consul
-      SPRING_CONSUL_PORT: 8500  
-      SPRING_DATASOURCE_URL: jdbc:postgresql://bstock-postgresql:5432/bstock
-      SPRING_DATASOURCE_USERNAME: bstockuser
-      SPRING_DATASOURCE_PASSWORD: postgresql     
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: admin
-      SPRING_RABBITMQ_PASSWORD: rabbitmq  
-      CHROME_DRIVER_LINUX_PATH: /usr/local/bin/chromedriver
-      JAVA_COMMAND_STR: -Xlog:gc+heap=trace:file=/opt/bigstock/logs/Xlog.log:time,uptimemillis,tid  -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -Dcatalina.home=/opt/bigstock -Xms512m -Xmx512m -Xss1M  -XX:MetaspaceSize=256m -XX:MaxMetaspaceSize=256m  -XX:MaxGCPauseMillis=10 -XX:InitiatingHeapOccupancyPercent=60 -XX:+UnlockExperimentalVMOptions -XX:MaxTenuringThreshold=10 -XX:G1NewSizePercent=3
-      JAR_NAME: bigstock-schedule.jar  
-      SCHEDULE_BPYTHON_URL: http://bigstock-python:8000/captcha/
-      SCHEDULE_CREDENTIALS-PATHL: /opt/bigstock/google-api-cloud-speech-to-text.json
-      CHROME_DOWNLOAD_PATH: /opt/bigstock/download
-      MANAGEMENT_TRACING_EXPORT_ENDPOINT: http://jaeger:14250
-      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 0.1
-      TRACING_URL: http://jaeger:4317
-    deploy:
-      resources:
-        limits:
-          memory: 512m     
-    networks:
-      - big_stock_network       
-    volumes:
-      - ../../../schedule/chrome-driver/chromedriver-linux64/chromedriver:/home/bigstock/chrome-driver/chromedriver-linux64/chromedriver
+
 networks:
   big_stock_network:
     external: true                
