@@ -1,8 +1,8 @@
 version: '3.7'
 services:
   bigstock-biz:
-    build: ../../../biz/docker/
-    restart: always 
+    image: isaac0410/bstock-all-in-one:${BIGSTOCK_TAG}
+    restart: always
     container_name: bigstock-biz
     ports:
       - "18080:18080" 
