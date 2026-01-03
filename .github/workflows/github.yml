@@ -45,4 +45,17 @@ jobs:
         run: |
           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login \
             -u "${{ secrets.DOCKER_USERNAME }}" \
-            --password-stdin ${{ secrets.DOCKER_REGISTRY }}  
+            --password-stdin ${{ secrets.DOCKER_REGISTRY }} 
+      - name: Prepare Docker build artifacts
+        run: |
+          cp backend/group/biz/target/bigstock-biz.jar backend/group/biz/docker/      
+      - name: Build Docker image
+        run: |
+          IMAGE_TAG=${{ github.ref_name }}
+          docker build \
+            -t isaac0410/bstock-all-in-one:${IMAGE_TAG} \
+            backend/group/biz/docker
+      - name: Push Docker image
+        run: |
+          IMAGE_TAG=${{ github.ref_name }}
+          docker push isaac0410/bstock-all-in-one:${IMAGE_TAG}             
