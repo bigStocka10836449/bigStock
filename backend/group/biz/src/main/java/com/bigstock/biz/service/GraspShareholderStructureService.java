@@ -55,9 +55,9 @@ public class GraspShareholderStructureService {
 
 	private final StockInfoService stockInfoService;
 
-	@PostConstruct
+//	@PostConstruct
 	// 每天晚上8點更新
-//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}")
+	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}")
 	public void updateShareholderStructure()
 			throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException {
 		// 先抓DB裡面全部的代號資料

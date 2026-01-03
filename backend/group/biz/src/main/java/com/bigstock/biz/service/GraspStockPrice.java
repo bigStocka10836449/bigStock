@@ -13,6 +13,7 @@ import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
@@ -110,7 +111,7 @@ public class GraspStockPrice {
 	// 每天下午5點更新
 //	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 	// 每周日早上8点触发更新
-//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
+	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 	@Transactional
 //	@PostConstruct
 	public void updateStockDayPrice() throws RestClientException, URISyntaxException, JsonMappingException,
@@ -438,7 +439,7 @@ public class GraspStockPrice {
 //		stockDayPriceService.saveAll(needFixedStockDayPrices);
 	}
 
-//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}")
+	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}")
 	@Transactional
 //	@PostConstruct
 	public void updateMarginTradingAndShortSellingInfo() throws RestClientException, URISyntaxException,

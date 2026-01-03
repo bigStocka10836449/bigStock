@@ -71,11 +71,11 @@ schedule:
     scheduling:
       cron:
         expression: 
-          grasp-stock-price: "0 */40 * * * *"
-          grasp-securitiesfirms-dayoperate: "0 */30 * * * *"
-          update-shareholder-structure: "0 */30 * * * *"
-          update-stock-info: "0 */30 * * * *"
-          update-margin-trading:  "0 */30 * * * *"
+          grasp-stock-price: "0 30 8 * * *"
+          grasp-securitiesfirms-dayoperate: "0 30 8 * * *"
+          update-shareholder-structure: "0 30 8 * * *"
+          update-stock-info: "0 30 8 * * *"
+          update-margin-trading: "0 30 8 * * *"
   chromeDriverPath:
     windows: 
       active: false	
