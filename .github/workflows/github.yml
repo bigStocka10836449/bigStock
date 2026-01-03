@@ -34,3 +34,15 @@ jobs:
         run: |
           echo Add other actions to build,
           echo test, and deploy your project.
+      - name: Build with Maven
+        working-directory: backend/group
+        run: mvn clean install -DskipTests=true
+      # ---------------------------------------------------
+      # Log in to Docker registry
+      # (Docker Hub / GHCR / Harbor 都可)
+      # ---------------------------------------------------
+      - name: Login to Docker Registry
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login \
+            -u "${{ secrets.DOCKER_USERNAME }}" \
+            --password-stdin ${{ secrets.DOCKER_REGISTRY }}  
