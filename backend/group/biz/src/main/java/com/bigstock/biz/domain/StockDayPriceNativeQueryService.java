@@ -23,41 +23,50 @@ public class StockDayPriceNativeQueryService {
 
 	private final EntityManager em;
 
+	private static final String SAFE_NUMERIC =
+			"CASE WHEN btrim(%s) ~ '^-?\\d+(\\.\\d+)?$' THEN CAST(btrim(%s) AS NUMERIC) ELSE NULL END";
+
 	private static final String FIND_K_VALUE_CONTINUE_UNDER_TEWNTY_BY_RANGE = "SELECT  "
 			+ "    ranked_data.stock_code, " + "    MAX(ranked_data.trading_day) AS start_day, "
 			+ "    MIN(ranked_data.trading_day) AS end_day, " + "    COUNT(*) AS total_days, "
-			+ "    SUM(CASE WHEN CAST(ranked_data.line_k_value AS NUMERIC) <= 20 THEN 1 ELSE 0 END) AS required_count "
+			+ "    SUM(CASE WHEN ranked_data.line_k_value <= 20 THEN 1 ELSE 0 END) AS required_count "
 			+ "FROM ( " + "    SELECT  " + "        sdp.stock_code, " + "        sdp.trading_day, "
-			+ "        CAST(sdp.line_k_value AS NUMERIC) AS line_k_value, "
+			+ "        " + String.format(SAFE_NUMERIC, "sdp.line_k_value", "sdp.line_k_value") + " AS line_k_value, "
 			+ "        ROW_NUMBER() OVER (PARTITION BY sdp.stock_code ORDER BY sdp.trading_day DESC) AS rn "
 			+ "    FROM  " + "        bstock.bstock.stock_day_price sdp " + "    WHERE  "
 			+ "        sdp.trading_day <= :tradingDate " + "        AND sdp.closing_price NOT LIKE '%-%' "
-			+ "        AND sdp.closing_price != '' " + ") AS ranked_data " + "WHERE rn <= :limit "
+			+ "        AND sdp.closing_price != '' " + ") AS ranked_data "
+			+ "WHERE rn <= :limit AND ranked_data.line_k_value IS NOT NULL "
 			+ "GROUP BY ranked_data.stock_code " + "HAVING COUNT(*) = :limit "
-			+ "AND SUM(CASE WHEN CAST(line_k_value AS NUMERIC) <= 20 THEN 1 ELSE 0 END) = COUNT(*) "
+			+ "AND SUM(CASE WHEN line_k_value <= 20 THEN 1 ELSE 0 END) = COUNT(*) "
 			+ "ORDER BY ranked_data.stock_code, start_day ";
 
 	private static final String FIND_K_VALUE_CONTINUE_UPPER_EIGHTY_TEWNTY_BY_RANGE = "SELECT  " + "    stock_code, "
 			+ "    MAX(trading_day) AS start_day, " + "    MIN(trading_day) AS end_day, "
 			+ "    COUNT(*) AS total_days, "
-			+ "    SUM(CASE WHEN CAST(line_k_value AS NUMERIC) >= 80 THEN 1 ELSE 0 END) AS required_count " + "FROM ( "
+			+ "    SUM(CASE WHEN line_k_value >= 80 THEN 1 ELSE 0 END) AS required_count " + "FROM ( "
 			+ "    SELECT  " + "        stock_code, " + "        trading_day, "
-			+ "        CAST(line_k_value AS NUMERIC) AS line_k_value, "
+			+ "        " + String.format(SAFE_NUMERIC, "sdp.line_k_value", "sdp.line_k_value") + " AS line_k_value, "
 			+ "        ROW_NUMBER() OVER (PARTITION BY stock_code ORDER BY trading_day DESC) AS rn " + "    FROM  "
 			+ "        bstock.bstock.stock_day_price sdp " + "    WHERE  " + "        sdp.trading_day <= :tradingDay "
 			+ "        AND sdp.closing_price NOT LIKE '%-%' " + "        AND sdp.closing_price != '' "
-			+ ") AS ranked_data " + "WHERE rn <= :limit " + "GROUP BY stock_code " + "HAVING COUNT(*) = :limit "
-			+ "AND SUM(CASE WHEN CAST(line_k_value AS NUMERIC) >= 80 THEN 1 ELSE 0 END) = COUNT(*) "
+			+ ") AS ranked_data "
+			+ "WHERE rn <= :limit AND ranked_data.line_k_value IS NOT NULL "
+			+ "GROUP BY stock_code " + "HAVING COUNT(*) = :limit "
+			+ "AND SUM(CASE WHEN line_k_value >= 80 THEN 1 ELSE 0 END) = COUNT(*) "
 			+ "ORDER BY stock_code, start_day ";
 
 	private static final String FIND_DATE_RANGE_SUM_CHANGE_RATE_QUERY = " select stock_code, total_change_rate from ( "
-			+ "	SELECT  " + "    stock_code, " + "    SUM(CAST(change_rate AS NUMERIC)) AS total_change_rate  "
+			+ "	SELECT  " + "    stock_code, " + "    SUM(change_rate) AS total_change_rate  "
 			+ "FROM ( " + "    SELECT  " + "        stock_code, " + "        trading_day, "
 			+ "        ROW_NUMBER() OVER (PARTITION BY stock_code ORDER BY trading_day DESC) AS rn, "
-			+ "        CAST(change_rate AS NUMERIC) AS change_rate  " + "    FROM  "
+			+ "        " + String.format(SAFE_NUMERIC, "sdp.change_rate", "sdp.change_rate") + " AS change_rate  "
+			+ "    FROM  "
 			+ "        bstock.bstock.stock_day_price sdp " + "    WHERE  " + "        sdp.trading_day <= :tradingDay "
 			+ "        AND sdp.closing_price NOT LIKE '%-%' " + "        AND sdp.closing_price != '' "
-			+ ") AS ranked_data " + "WHERE rn <= :limit " + "GROUP BY stock_code "
+			+ ") AS ranked_data "
+			+ "WHERE rn <= :limit AND ranked_data.change_rate IS NOT NULL "
+			+ "GROUP BY stock_code HAVING COUNT(*) = :limit "
 			+ "ORDER BY stock_code) result_stock_day_price "
 			+ "where result_stock_day_price.total_change_rate >= :totalRate  ";
 
@@ -138,7 +147,10 @@ public class StockDayPriceNativeQueryService {
 		StringBuilder dynamicConditionSb = new StringBuilder();
 		Map<String, Object> queryConditionMap = Maps.newHashMap();
 		maConditions.stream().forEach(maCondition -> {
-			dynamicConditionSb.append(buildConditionClause(StringUtils.EMPTY, maCondition, queryConditionMap));
+			String clause = buildConditionClause(StringUtils.EMPTY, maCondition, queryConditionMap);
+			if (StringUtils.isNotBlank(clause)) {
+				dynamicConditionSb.append(clause);
+			}
 		});
 		int start = sb.indexOf("%dynanicCondition");
 		if (start != -1) {
