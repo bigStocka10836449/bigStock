@@ -242,7 +242,10 @@ public class StockDayPriceNativeQueryService {
 		StringBuilder dynamicConditionSb = new StringBuilder();
 		Map<String, Object> queryConditionMap = Maps.newHashMap();
 		maConditions.stream().forEach(maCondition -> {
-			dynamicConditionSb.append(buildConditionClause(StringUtils.EMPTY, maCondition, queryConditionMap));
+			String clause = buildConditionClause(StringUtils.EMPTY, maCondition, queryConditionMap);
+			if (StringUtils.isNotBlank(clause)) {
+				dynamicConditionSb.append(clause);
+			}
 		});
 		int start = sb.indexOf("%dynanicCondition");
 		if (start != -1) {
