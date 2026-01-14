@@ -11,7 +11,6 @@ import com.bigstock.sharedComponent.dto.DynamicFilterStockPriceCondition;
 import com.google.common.collect.Maps;
 
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
 import jakarta.transaction.Transactional;
@@ -21,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class StockDayPriceNativeQueryService {
 
-	private final EntityManager em;
+    private final EntityManager em;
 
 	private static final String FIND_K_VALUE_CONTINUE_UNDER_TEWNTY_BY_RANGE ="""
 			SELECT
@@ -202,140 +201,146 @@ public class StockDayPriceNativeQueryService {
 		    ORDER BY stock_code
 		    """;
 
-	@Transactional
-	public List<String> findKvalueUnderTwentyByDateRange(Date startDate, Integer limit) {
-		StringBuilder sb = new StringBuilder(FIND_K_VALUE_CONTINUE_UNDER_TEWNTY_BY_RANGE);
-		Query query = em.createNativeQuery(sb.toString(), Tuple.class);
-		query.setParameter("limit", limit);
-		query.setParameter("tradingDate", startDate);
-		List<Tuple> tuples = (List<Tuple>) query.getResultList();
-		return tuples.stream().map(tuple -> tuple.get("stock_code").toString()).toList();
-	}
+    private void ensureUtf8ClientEncoding() {
+        em.createNativeQuery("SET client_encoding TO 'UTF8'").executeUpdate();
+    }
 
-	@Transactional
-	public List<String> findKvalueUpperEightByDateRange(Date startDate, Integer limit) {
-		StringBuilder sb = new StringBuilder(FIND_K_VALUE_CONTINUE_UPPER_EIGHTY_TEWNTY_BY_RANGE);
-		Query query = em.createNativeQuery(sb.toString(), Tuple.class);
-		query.setParameter("limit", limit);
-		query.setParameter("tradingDay", startDate);
-		List<Tuple> tuples = (List<Tuple>) query.getResultList();
-		return tuples.stream().map(tuple -> tuple.get("stock_code").toString()).toList();
-	}
+    @Transactional
+    public List<String> findKvalueUnderTwentyByDateRange(Date startDate, Integer limit) {
+        ensureUtf8ClientEncoding();
 
-	@SuppressWarnings("unchecked")
-	@Transactional
-	public List<String> findByDateRangeChangeRateOverFilter(Date startDate, Integer limit, String totalChangeRate) {
-		StringBuilder sb = new StringBuilder(FIND_DATE_RANGE_SUM_CHANGE_RATE_QUERY);
-		Query query = em.createNativeQuery(sb.toString(), Tuple.class);
-		query.setParameter("tradingDay", startDate);
-		query.setParameter("limit", limit);
-		query.setParameter("totalRate", Integer.valueOf(totalChangeRate));
-		List<Tuple> tuples = (List<Tuple>) query.getResultList();
-		return tuples.stream().map(tuple -> tuple.get("stock_code").toString()).toList();
-	}
+        Query query = em.createNativeQuery(FIND_K_VALUE_CONTINUE_UNDER_TEWNTY_BY_RANGE, Tuple.class);
+        query.setParameter("limit", limit);
+        query.setParameter("tradingDate", startDate);
+        @SuppressWarnings("unchecked")
+        List<Tuple> tuples = (List<Tuple>) query.getResultList();
+        return tuples.stream().map(tuple -> tuple.get("stock_code").toString()).toList();
+    }
 
-	@Transactional
-	public List<String> findByDateRangeMaChangeFilter(List<DynamicFilterStockPriceCondition> maConditions,
-			Date startDate, Integer fiveDaysSlopeLimit, Integer tenDaysSlopeLimit, Integer twentyDaysSlopeLimit,
-			Integer sixtyDaysSlopeLimit, Integer oneTwentyDaysSlopeLimit, Integer twoFourtyDaysSlopeLimit) {
-		StringBuilder sb = new StringBuilder(FIND_DATE_RANGE_MA_TREND_QUERY);
-		StringBuilder dynamicConditionSb = new StringBuilder();
-		Map<String, Object> queryConditionMap = Maps.newHashMap();
-		maConditions.stream().forEach(maCondition -> {
-			String clause = buildConditionClause(StringUtils.EMPTY, maCondition, queryConditionMap);
-			if (StringUtils.isNotBlank(clause)) {
-				dynamicConditionSb.append(clause);
-			}
-		});
-		int start = sb.indexOf("%dynanicCondition");
-		if (start != -1) {
-			sb.replace(start, start + "%dynanicCondition".length(), dynamicConditionSb.toString());
-		}
-		Query query = em.createNativeQuery(sb.toString(), Tuple.class);
-		queryConditionMap.entrySet().forEach(entry -> {
-			String key = entry.getKey();
-			String value = entry.getValue().toString();
-			query.setParameter(key, value);
-		});
-		query.setParameter("tradingDay", startDate);
-		query.setParameter("fiveDaysSlopeLimit", fiveDaysSlopeLimit);
-		query.setParameter("tenDaysSlopeLimit", tenDaysSlopeLimit);
-		query.setParameter("twentyDaysSlopeLimit", twentyDaysSlopeLimit);
-		query.setParameter("sixtyDaysSlopeLimit", sixtyDaysSlopeLimit);
-		query.setParameter("oneTwentyDaysSlopeLimit", oneTwentyDaysSlopeLimit);
-		query.setParameter("twoFourtyDaysSlopeLimit", twoFourtyDaysSlopeLimit);
-		List<Tuple> tuples = (List<Tuple>) query.getResultList();
-		return tuples.stream().map(tuple -> tuple.get("stock_code").toString()).toList();
-	}
+    @Transactional
+    public List<String> findKvalueUpperEightByDateRange(Date startDate, Integer limit) {
+        ensureUtf8ClientEncoding();
 
-	private static String buildConditionClause(String aliasPrefix, DynamicFilterStockPriceCondition condition,
-			Map<String, Object> parameterMap) {
-		String column = condition.getName();
-		List<String> values = condition.getValue();
-		String operator = condition.getOperator();
+        Query query = em.createNativeQuery(FIND_K_VALUE_CONTINUE_UPPER_EIGHTY_TEWNTY_BY_RANGE, Tuple.class);
+        query.setParameter("limit", limit);
+        query.setParameter("tradingDay", startDate);
+        @SuppressWarnings("unchecked")
+        List<Tuple> tuples = (List<Tuple>) query.getResultList();
+        return tuples.stream().map(tuple -> tuple.get("stock_code").toString()).toList();
+    }
 
-		if (column == null || column.isEmpty() || operator == null || operator.isEmpty()) {
-			return null; // 无效条件，忽略
-		}
+    @SuppressWarnings("unchecked")
+    @Transactional
+    public List<String> findByDateRangeChangeRateOverFilter(Date startDate, Integer limit, String totalChangeRate) {
+        ensureUtf8ClientEncoding();
 
-		switch (operator.toLowerCase()) {
-		// 這個變數不用考慮operator
-		case "notconcerned":
-			parameterMap.put(column, values.get(0)); // 将值放入 Map
-			if (StringUtils.isBlank(aliasPrefix)) {
-				return " and " + column + " = :" + column;
-			}
-			return " and " + aliasPrefix + "." + column + " = :" + column;
-		case "eq":
-			parameterMap.put(column, values.get(0)); // 将值放入 Map
-			if (StringUtils.isBlank(aliasPrefix)) {
-				return " and " + column + " = :" + column;
-			}
-			return " and " + aliasPrefix + "." + column + " = :" + column;
-		case "lte":
-			parameterMap.put(column, values.get(0));
-			if (StringUtils.isBlank(aliasPrefix)) {
-				return " and " + column + " <= :" + column;
-			}
-			return " and " + aliasPrefix + "." + column + " <= :" + column;
-		case "gte":
-			parameterMap.put(column, values.get(0));
-			if (StringUtils.isBlank(aliasPrefix)) {
-				return " and " + column + " >= :" + column;
-			}
-			return " and " + aliasPrefix + "." + column + " >= :" + column;
-		case "lt":
-			parameterMap.put(column, values.get(0));
-			if (StringUtils.isBlank(aliasPrefix)) {
-				return " and " + column + " < :" + column;
-			}
-			return " and " + aliasPrefix + "." + column + " < :" + column;
-		case "gt":
-			parameterMap.put(column, values.get(0));
-			if (StringUtils.isBlank(aliasPrefix)) {
-				return " and " + column + " > :" + column;
-			}
-			return " and " + aliasPrefix + "." + column + " > :" + column;
-		case "in":
-			parameterMap.put(column, values); // IN 操作直接放入 List
-			if (StringUtils.isBlank(aliasPrefix)) {
-				return " and " + column + " IN (:" + column + ")";
-			}
-			return " and " + aliasPrefix + "." + column + " IN (:" + column + ")";
-		case "between":
-			if (values.size() == 2) {
-				parameterMap.put(column + "_start", values.get(0));
-				parameterMap.put(column + "_end", values.get(1));
-				if (StringUtils.isBlank(aliasPrefix)) {
-					return " and " + column + " BETWEEN :" + column + "_start AND :" + column + "_end";
-				}
-				return " and " + aliasPrefix + "." + column + " BETWEEN :" + column + "_start AND :" + column + "_end";
-			}
-			break;
-		default:
-			throw new IllegalArgumentException("Unsupported operator: " + operator);
-		}
+        Query query = em.createNativeQuery(FIND_DATE_RANGE_SUM_CHANGE_RATE_QUERY, Tuple.class);
+        query.setParameter("tradingDay", startDate);
+        query.setParameter("limit", limit);
+        query.setParameter("totalRate", Integer.valueOf(totalChangeRate));
 
-		return null;
-	}
+        List<Tuple> tuples = (List<Tuple>) query.getResultList();
+        return tuples.stream().map(tuple -> tuple.get("stock_code").toString()).toList();
+    }
+
+    @Transactional
+    public List<String> findByDateRangeMaChangeFilter(List<DynamicFilterStockPriceCondition> maConditions,
+            Date startDate, Integer fiveDaysSlopeLimit, Integer tenDaysSlopeLimit, Integer twentyDaysSlopeLimit,
+            Integer sixtyDaysSlopeLimit, Integer oneTwentyDaysSlopeLimit, Integer twoFourtyDaysSlopeLimit) {
+
+        ensureUtf8ClientEncoding();
+
+        StringBuilder sb = new StringBuilder(FIND_DATE_RANGE_MA_TREND_QUERY);
+        StringBuilder dynamicConditionSb = new StringBuilder();
+        Map<String, Object> queryConditionMap = Maps.newHashMap();
+
+        maConditions.forEach(maCondition -> {
+            String clause = buildConditionClause(StringUtils.EMPTY, maCondition, queryConditionMap);
+            if (StringUtils.isNotBlank(clause)) {
+                dynamicConditionSb.append(clause);
+            }
+        });
+
+        int start = sb.indexOf("%dynanicCondition");
+        if (start != -1) {
+            sb.replace(start, start + "%dynanicCondition".length(), dynamicConditionSb.toString());
+        }
+
+        Query query = em.createNativeQuery(sb.toString(), Tuple.class);
+
+        queryConditionMap.forEach((k, v) -> query.setParameter(k, v));
+
+        query.setParameter("tradingDay", startDate);
+        query.setParameter("fiveDaysSlopeLimit", fiveDaysSlopeLimit);
+        query.setParameter("tenDaysSlopeLimit", tenDaysSlopeLimit);
+        query.setParameter("twentyDaysSlopeLimit", twentyDaysSlopeLimit);
+        query.setParameter("sixtyDaysSlopeLimit", sixtyDaysSlopeLimit);
+        query.setParameter("oneTwentyDaysSlopeLimit", oneTwentyDaysSlopeLimit);
+        query.setParameter("twoFourtyDaysSlopeLimit", twoFourtyDaysSlopeLimit);
+
+        @SuppressWarnings("unchecked")
+        List<Tuple> tuples = (List<Tuple>) query.getResultList();
+        return tuples.stream().map(tuple -> tuple.get("stock_code").toString()).toList();
+    }
+
+    private static String buildConditionClause(String aliasPrefix, DynamicFilterStockPriceCondition condition,
+            Map<String, Object> parameterMap) {
+
+        String column = condition.getName();
+        List<String> values = condition.getValue();
+        String operator = condition.getOperator();
+
+        if (column == null || column.isEmpty() || operator == null || operator.isEmpty()) {
+            return null;
+        }
+
+        switch (operator.toLowerCase()) {
+            case "notconcerned":
+            case "eq":
+                parameterMap.put(column, values.get(0));
+                if (StringUtils.isBlank(aliasPrefix)) return " and " + column + " = :" + column;
+                return " and " + aliasPrefix + "." + column + " = :" + column;
+
+            case "lte":
+                parameterMap.put(column, values.get(0));
+                if (StringUtils.isBlank(aliasPrefix)) return " and " + column + " <= :" + column;
+                return " and " + aliasPrefix + "." + column + " <= :" + column;
+
+            case "gte":
+                parameterMap.put(column, values.get(0));
+                if (StringUtils.isBlank(aliasPrefix)) return " and " + column + " >= :" + column;
+                return " and " + aliasPrefix + "." + column + " >= :" + column;
+
+            case "lt":
+                parameterMap.put(column, values.get(0));
+                if (StringUtils.isBlank(aliasPrefix)) return " and " + column + " < :" + column;
+                return " and " + aliasPrefix + "." + column + " < :" + column;
+
+            case "gt":
+                parameterMap.put(column, values.get(0));
+                if (StringUtils.isBlank(aliasPrefix)) return " and " + column + " > :" + column;
+                return " and " + aliasPrefix + "." + column + " > :" + column;
+
+            case "in":
+                parameterMap.put(column, values);
+                if (StringUtils.isBlank(aliasPrefix)) return " and " + column + " IN (:" + column + ")";
+                return " and " + aliasPrefix + "." + column + " IN (:" + column + ")";
+
+            case "between":
+                if (values.size() == 2) {
+                    parameterMap.put(column + "_start", values.get(0));
+                    parameterMap.put(column + "_end", values.get(1));
+                    if (StringUtils.isBlank(aliasPrefix))
+                        return " and " + column + " BETWEEN :" + column + "_start AND :" + column + "_end";
+                    return " "
+                    		+ "and " + aliasPrefix + "." + column + " BETWEEN :" + column + "_start AND :" + column + "_end";
+                }
+                break;
+
+            default:
+                throw new IllegalArgumentException("Unsupported operator: " + operator);
+        }
+
+        return null;
+    }
 }
