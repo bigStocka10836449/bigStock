@@ -9,8 +9,10 @@ import java.time.temporal.IsoFields;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -123,148 +125,230 @@ public class BizService {
 	}
 
 	public SingleStockPriceVo getSingleStockPrices(String stockCode, Date startDate, Date endDate)
-			throws ParseException {
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-		List<StockDayPrice> stockDayPrices = Lists.newArrayList();
+	        throws ParseException {
 
-		if (ObjectUtils.isEmpty(startDate) || ObjectUtils.isEmpty(endDate)) {
-			stockDayPrices = stockDayPriceService.findStockCodeAndLimit(stockCode, 360);
-		} else {
+	    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+	    List<StockDayPrice> stockDayPrices = Lists.newArrayList();
 
-			stockDayPrices = stockDayPriceService.findByStockCodeAndStartDateAndEndDateCache(stockCode,
-					sdf.format(startDate), sdf.format(endDate));
-		}
-		List<SingleStockDayPriceVo> singleStockDayPriceVos = stockDayPrices.stream()
-				.sorted(Comparator.comparing(StockDayPrice::getTradingDay).reversed()).map(stockDayPrice -> {
-					String highPrice = stockDayPrice.getHighPrice();
-					String lowPrice = stockDayPrice.getLowPrice();
-					String openingPrice = stockDayPrice.getOpeningPrice();
-					String closingPrice = stockDayPrice.getClosingPrice();
-					SimpleDateFormat sfd = new SimpleDateFormat("yyyy-MM-dd");
-					SingleStockDayPriceVo vo = new SingleStockDayPriceVo();
-					vo.setClosingPrice(closingPrice.replaceAll(",", ""));
-					vo.setOpeningPrice(openingPrice.replaceAll(",", ""));
-					vo.setHighPrice(highPrice.replaceAll(",", ""));
-					vo.setLowPrice(lowPrice.replaceAll(",", ""));
-					vo.setTradingDate(sfd.format(stockDayPrice.getTradingDay()));
-					vo.setStockCode(stockCode);
-					String tradingVolume = stockDayPrice.getTradingVolume();
-					if (StringUtils.isNotBlank(tradingVolume)) {
-						vo.setTradingVolume(new BigDecimal(tradingVolume)
-								.divide(new BigDecimal("1000"), 0, RoundingMode.HALF_UP).toString());
-					}
-					vo.setFiveMa(ObjectUtils.isNotEmpty(stockDayPrice.getFiveDaysMa())
-							? new BigDecimal(stockDayPrice.getFiveDaysMa())
-							: new BigDecimal(0));
-					vo.setTenMa(ObjectUtils.isNotEmpty(stockDayPrice.getTenDaysMa())
-							? new BigDecimal(stockDayPrice.getTenDaysMa())
-							: new BigDecimal(0));
-					vo.setTwentyMa(ObjectUtils.isNotEmpty(stockDayPrice.getTwentyDaysMa())
-							? new BigDecimal(stockDayPrice.getTwentyDaysMa())
-							: new BigDecimal(0));
-					vo.setSixtyMa(ObjectUtils.isNotEmpty(stockDayPrice.getTwentyDaysMa())
-							? new BigDecimal(stockDayPrice.getSixtyDaysMa())
-							: new BigDecimal(0));
-					vo.setOneTwentyMa(ObjectUtils.isNotEmpty(stockDayPrice.getOneTwentyDaysMa())
-							? new BigDecimal(stockDayPrice.getOneTwentyDaysMa())
-							: new BigDecimal(0));
-					vo.setTwoFourtyMa(ObjectUtils.isNotEmpty(stockDayPrice.getTwoFourtyDaysMa())
-							? new BigDecimal(stockDayPrice.getTwoFourtyDaysMa())
-							: new BigDecimal(0));
-					vo.setLineKvalue(ObjectUtils.isNotEmpty(stockDayPrice.getLineKvalue())
-							? new BigDecimal(stockDayPrice.getLineKvalue())
-							: new BigDecimal(0));
-					vo.setLineDvalue(ObjectUtils.isNotEmpty(stockDayPrice.getLineDvalue())
-							? new BigDecimal(stockDayPrice.getLineDvalue())
-							: new BigDecimal(0));
-					return vo;
-				}).toList();
-		List<SingleStockWeekPriceVo> singleStockWeekPriceVo = stockWeekPriceService
-				.findStockCodeAndLimit(stockCode, 360).stream()
-				.sorted(Comparator.comparing(StockWeekPrice::getWeekOfYear)).map(stockWeekPrice -> {
-					SingleStockWeekPriceVo vo = new SingleStockWeekPriceVo();
-					vo.setClosingPrice(stockWeekPrice.getClosingPrice().toString());
-					vo.setOpeningPrice(stockWeekPrice.getOpeningPrice().toString());
-					vo.setHighPrice(stockWeekPrice.getHighPrice().toString());
-					vo.setLowPrice(stockWeekPrice.getLowPrice().toString());
-					vo.setFirstTradingDate(sdf.format(stockWeekPrice.getFirstTradingDay()));
-					vo.setStockCode(stockCode);
-					String tradingVolume = stockWeekPrice.getTradingVolume().toString();
-					if (StringUtils.isNotBlank(tradingVolume)) {
-						vo.setTradingVolume(new BigDecimal(tradingVolume)
-								.divide(new BigDecimal("1000"), 0, RoundingMode.HALF_UP).toString());
-					}
-					vo.setFiveMa(ObjectUtils.isNotEmpty(stockWeekPrice.getFiveWeekMa()) ? stockWeekPrice.getFiveWeekMa()
-							: new BigDecimal(0));
-					vo.setTenMa(ObjectUtils.isNotEmpty(stockWeekPrice.getTenWeekMa()) ? stockWeekPrice.getTenWeekMa()
-							: new BigDecimal(0));
-					vo.setTwentyMa(
-							ObjectUtils.isNotEmpty(stockWeekPrice.getTwentyWeekMa()) ? stockWeekPrice.getTenWeekMa()
-									: new BigDecimal(0));
-					vo.setSixtyMa(
-							ObjectUtils.isNotEmpty(stockWeekPrice.getTwentyWeekMa()) ? stockWeekPrice.getTwentyWeekMa()
-									: new BigDecimal(0));
-					vo.setOneTwentyMa(ObjectUtils.isNotEmpty(stockWeekPrice.getOneTwentyWeekMa())
-							? stockWeekPrice.getOneTwentyWeekMa()
-							: new BigDecimal(0));
-					vo.setTwoFourtyMa(ObjectUtils.isNotEmpty(stockWeekPrice.getTwoFourtyWeekMa())
-							? stockWeekPrice.getTwoFourtyWeekMa()
-							: new BigDecimal(0));
-					vo.setLineKvalue(
-							ObjectUtils.isNotEmpty(stockWeekPrice.getLineKValue()) ? stockWeekPrice.getLineKValue()
-									: new BigDecimal(0));
-					vo.setLineDvalue(
-							ObjectUtils.isNotEmpty(stockWeekPrice.getLineDValue()) ? stockWeekPrice.getLineDValue()
-									: new BigDecimal(0));
-					return vo;
-				}).toList();
-		List<SingleStockMonthPriceVo> singleStockMonthPriceVo = stockMonthPriceService
-				.findStockCodeAndLimit(stockCode, 240).stream()
-				.sorted(Comparator.comparing(StockMonthPrice::getYear).thenComparing(StockMonthPrice::getMonth))
-				.map(stockMonthPrice -> {
-					SingleStockMonthPriceVo vo = new SingleStockMonthPriceVo();
-					vo.setClosingPrice(stockMonthPrice.getClosingPrice().toString());
-					vo.setOpeningPrice(stockMonthPrice.getOpeningPrice().toString());
-					vo.setHighPrice(stockMonthPrice.getHighPrice().toString());
-					vo.setLowPrice(stockMonthPrice.getLowPrice().toString());
-					vo.setFirstTradingDate(sdf.format(stockMonthPrice.getFirstTradingDay()));
-					vo.setStockCode(stockCode);
-					String tradingVolume = stockMonthPrice.getTradingVolume().toString();
-					if (StringUtils.isNotBlank(tradingVolume)) {
-						vo.setTradingVolume(new BigDecimal(tradingVolume)
-								.divide(new BigDecimal("1000"), 0, RoundingMode.HALF_UP).toString());
-					}
-					vo.setFiveMa(
-							ObjectUtils.isNotEmpty(stockMonthPrice.getFiveMonthMa()) ? stockMonthPrice.getFiveMonthMa()
-									: new BigDecimal(0));
-					vo.setTenMa(
-							ObjectUtils.isNotEmpty(stockMonthPrice.getTenMonthMa()) ? stockMonthPrice.getTenMonthMa()
-									: new BigDecimal(0));
-					vo.setTwentyMa(ObjectUtils.isNotEmpty(stockMonthPrice.getTwentyMonthMa())
-							? stockMonthPrice.getTwentyMonthMa()
-							: new BigDecimal(0));
-					vo.setSixtyMa(ObjectUtils.isNotEmpty(stockMonthPrice.getTwentyMonthMa())
-							? stockMonthPrice.getTwentyMonthMa()
-							: new BigDecimal(0));
-					vo.setOneTwentyMa(ObjectUtils.isNotEmpty(stockMonthPrice.getOneTwentyMonthMa())
-							? stockMonthPrice.getOneTwentyMonthMa()
-							: new BigDecimal(0));
-					vo.setTwoFourtyMa(ObjectUtils.isNotEmpty(stockMonthPrice.getTwoFourtyMonthMa())
-							? stockMonthPrice.getTwoFourtyMonthMa()
-							: new BigDecimal(0));
-					vo.setLineKvalue(
-							ObjectUtils.isNotEmpty(stockMonthPrice.getLineKValue()) ? stockMonthPrice.getLineKValue()
-									: new BigDecimal(0));
-					vo.setLineDvalue(
-							ObjectUtils.isNotEmpty(stockMonthPrice.getLineDValue()) ? stockMonthPrice.getLineDValue()
-									: new BigDecimal(0));
-					return vo;
-				}).toList();
-		SingleStockPriceVo sspv = new SingleStockPriceVo();
-		sspv.setSingleStockDayPriceVos(singleStockDayPriceVos);
-		sspv.setSingleStockWeekPriceVos(singleStockWeekPriceVo);
-		sspv.setSingleStockMonthPriceVos(singleStockMonthPriceVo);
-		return sspv;
+	    if (ObjectUtils.isEmpty(startDate) || ObjectUtils.isEmpty(endDate)) {
+	        stockDayPrices = stockDayPriceService.findStockCodeAndLimit(stockCode, 360);
+	    } else {
+	        stockDayPrices = stockDayPriceService.findByStockCodeAndStartDateAndEndDateCache(
+	                stockCode,
+	                sdf.format(startDate),
+	                sdf.format(endDate)
+	        );
+	    }
+
+	    // 新增：先用「日K本身」算出日期區間，再查融資融券，同日 merge
+	    Date lastTradingDay = null;   // 最新交易日
+	    Date firstTradingDay = null;  // 最舊交易日
+
+	    if (stockDayPrices != null && !stockDayPrices.isEmpty()) {
+	        lastTradingDay = stockDayPrices.stream()
+	                .max(Comparator.comparing(StockDayPrice::getTradingDay))
+	                .map(StockDayPrice::getTradingDay)
+	                .orElse(null);
+
+	        firstTradingDay = stockDayPrices.stream()
+	                .min(Comparator.comparing(StockDayPrice::getTradingDay))
+	                .map(StockDayPrice::getTradingDay)
+	                .orElse(null);
+	    }
+
+	    // key = yyyy-MM-dd
+	    Map<String, MarginTradingAndShortSellingInfo> marginMapByDay = new HashMap<>();
+
+	    if (firstTradingDay != null && lastTradingDay != null) {
+	        List<MarginTradingAndShortSellingInfo> marginInfos =
+	                marginTradingAndShortSellingInfoService
+	                        .findMarginTradingAndShortSellingInfoByDateRange(
+	                                stockCode,
+	                                firstTradingDay,
+	                                lastTradingDay
+	                        );
+
+	        if (marginInfos != null && !marginInfos.isEmpty()) {
+	            for (MarginTradingAndShortSellingInfo m : marginInfos) {
+	                if (m != null && m.getTradingDay() != null) {
+	                    marginMapByDay.put(
+	                            sdf.format(m.getTradingDay()),
+	                            m
+	                    );
+	                }
+	            }
+	        }
+	    }
+
+	    //日K維持原本：日期倒序
+	    List<SingleStockDayPriceVo> singleStockDayPriceVos = stockDayPrices.stream()
+	            .sorted(Comparator.comparing(StockDayPrice::getTradingDay).reversed())
+	            .map(stockDayPrice -> {
+
+	                String highPrice = stockDayPrice.getHighPrice();
+	                String lowPrice = stockDayPrice.getLowPrice();
+	                String openingPrice = stockDayPrice.getOpeningPrice();
+	                String closingPrice = stockDayPrice.getClosingPrice();
+
+	                SingleStockDayPriceVo vo = new SingleStockDayPriceVo();
+
+	                vo.setClosingPrice(closingPrice == null ? null : closingPrice.replaceAll(",", ""));
+	                vo.setOpeningPrice(openingPrice == null ? null : openingPrice.replaceAll(",", ""));
+	                vo.setHighPrice(highPrice == null ? null : highPrice.replaceAll(",", ""));
+	                vo.setLowPrice(lowPrice == null ? null : lowPrice.replaceAll(",", ""));
+
+	                String tradingDateStr = sdf.format(stockDayPrice.getTradingDay());
+	                vo.setTradingDate(tradingDateStr);
+	                vo.setStockCode(stockCode);
+
+	                String tradingVolume = stockDayPrice.getTradingVolume();
+	                if (StringUtils.isNotBlank(tradingVolume)) {
+	                    vo.setTradingVolume(
+	                            new BigDecimal(tradingVolume)
+	                                    .divide(new BigDecimal("1000"), 0, RoundingMode.HALF_UP)
+	                                    .toString()
+	                    );
+	                }
+
+	                vo.setFiveMa(ObjectUtils.isNotEmpty(stockDayPrice.getFiveDaysMa())
+	                        ? new BigDecimal(stockDayPrice.getFiveDaysMa())
+	                        : new BigDecimal(0));
+	                vo.setTenMa(ObjectUtils.isNotEmpty(stockDayPrice.getTenDaysMa())
+	                        ? new BigDecimal(stockDayPrice.getTenDaysMa())
+	                        : new BigDecimal(0));
+	                vo.setTwentyMa(ObjectUtils.isNotEmpty(stockDayPrice.getTwentyDaysMa())
+	                        ? new BigDecimal(stockDayPrice.getTwentyDaysMa())
+	                        : new BigDecimal(0));
+	                vo.setSixtyMa(ObjectUtils.isNotEmpty(stockDayPrice.getSixtyDaysMa())
+	                        ? new BigDecimal(stockDayPrice.getSixtyDaysMa())
+	                        : new BigDecimal(0));
+	                vo.setOneTwentyMa(ObjectUtils.isNotEmpty(stockDayPrice.getOneTwentyDaysMa())
+	                        ? new BigDecimal(stockDayPrice.getOneTwentyDaysMa())
+	                        : new BigDecimal(0));
+	                vo.setTwoFourtyMa(ObjectUtils.isNotEmpty(stockDayPrice.getTwoFourtyDaysMa())
+	                        ? new BigDecimal(stockDayPrice.getTwoFourtyDaysMa())
+	                        : new BigDecimal(0));
+	                vo.setLineKvalue(ObjectUtils.isNotEmpty(stockDayPrice.getLineKvalue())
+	                        ? new BigDecimal(stockDayPrice.getLineKvalue())
+	                        : new BigDecimal(0));
+	                vo.setLineDvalue(ObjectUtils.isNotEmpty(stockDayPrice.getLineDvalue())
+	                        ? new BigDecimal(stockDayPrice.getLineDvalue())
+	                        : new BigDecimal(0));
+
+	                // =======================
+	                // ✅ merge 融資融券（同日）
+	                // =======================
+	                MarginTradingAndShortSellingInfo margin = marginMapByDay.get(tradingDateStr);
+	                if (margin != null) {
+	                    vo.setMarginPurchaseBalancePreviousDay(margin.getMarginPurchaseBalancePreviousDay());
+	                    vo.setMarginPurchase(margin.getMarginPurchase());
+	                    vo.setMarginSales(margin.getMarginSales());
+	                    vo.setCashRedemption(margin.getCashRedemption());
+	                    vo.setMarginPurchaseBalance(margin.getMarginPurchaseBalance());
+	                    vo.setMarginPurchaseQuota(margin.getMarginPurchaseQuota());
+
+	                    vo.setShortSaleBalancePreviousDay(margin.getShortSaleBalancePreviousDay());
+	                    vo.setShortSale(margin.getShortSale());
+	                    vo.setShortConvering(margin.getShortConvering());
+	                    vo.setStockRedemption(margin.getStockRedemption());
+	                    vo.setShortSaleBalance(margin.getShortSaleBalance());
+	                    vo.setShortSaleQuota(margin.getShortSaleQuota());
+
+	                    vo.setOffsetting(margin.getOffsetting());
+	                }
+
+	                return vo;
+	            })
+	            .toList();
+
+	    // 以下週/月先不要改
+	    List<SingleStockWeekPriceVo> singleStockWeekPriceVo = stockWeekPriceService
+	            .findStockCodeAndLimit(stockCode, 360).stream()
+	            .sorted(Comparator.comparing(StockWeekPrice::getWeekOfYear))
+	            .map(stockWeekPrice -> {
+	                SingleStockWeekPriceVo vo = new SingleStockWeekPriceVo();
+	                vo.setClosingPrice(stockWeekPrice.getClosingPrice().toString());
+	                vo.setOpeningPrice(stockWeekPrice.getOpeningPrice().toString());
+	                vo.setHighPrice(stockWeekPrice.getHighPrice().toString());
+	                vo.setLowPrice(stockWeekPrice.getLowPrice().toString());
+	                vo.setFirstTradingDate(sdf.format(stockWeekPrice.getFirstTradingDay()));
+	                vo.setStockCode(stockCode);
+	                String tradingVolume = stockWeekPrice.getTradingVolume().toString();
+	                if (StringUtils.isNotBlank(tradingVolume)) {
+	                    vo.setTradingVolume(new BigDecimal(tradingVolume)
+	                            .divide(new BigDecimal("1000"), 0, RoundingMode.HALF_UP).toString());
+	                }
+	                vo.setFiveMa(ObjectUtils.isNotEmpty(stockWeekPrice.getFiveWeekMa()) ? stockWeekPrice.getFiveWeekMa()
+	                        : new BigDecimal(0));
+	                vo.setTenMa(ObjectUtils.isNotEmpty(stockWeekPrice.getTenWeekMa()) ? stockWeekPrice.getTenWeekMa()
+	                        : new BigDecimal(0));
+	                vo.setTwentyMa(
+	                        ObjectUtils.isNotEmpty(stockWeekPrice.getTwentyWeekMa()) ? stockWeekPrice.getTenWeekMa()
+	                                : new BigDecimal(0));
+	                vo.setSixtyMa(
+	                        ObjectUtils.isNotEmpty(stockWeekPrice.getTwentyWeekMa()) ? stockWeekPrice.getTwentyWeekMa()
+	                                : new BigDecimal(0));
+	                vo.setOneTwentyMa(ObjectUtils.isNotEmpty(stockWeekPrice.getOneTwentyWeekMa())
+	                        ? stockWeekPrice.getOneTwentyWeekMa()
+	                        : new BigDecimal(0));
+	                vo.setTwoFourtyMa(ObjectUtils.isNotEmpty(stockWeekPrice.getTwoFourtyWeekMa())
+	                        ? stockWeekPrice.getTwoFourtyWeekMa()
+	                        : new BigDecimal(0));
+	                vo.setLineKvalue(
+	                        ObjectUtils.isNotEmpty(stockWeekPrice.getLineKValue()) ? stockWeekPrice.getLineKValue()
+	                                : new BigDecimal(0));
+	                vo.setLineDvalue(
+	                        ObjectUtils.isNotEmpty(stockWeekPrice.getLineDValue()) ? stockWeekPrice.getLineDValue()
+	                                : new BigDecimal(0));
+	                return vo;
+	            }).toList();
+
+	    List<SingleStockMonthPriceVo> singleStockMonthPriceVo = stockMonthPriceService
+	            .findStockCodeAndLimit(stockCode, 240).stream()
+	            .sorted(Comparator.comparing(StockMonthPrice::getYear).thenComparing(StockMonthPrice::getMonth))
+	            .map(stockMonthPrice -> {
+	                SingleStockMonthPriceVo vo = new SingleStockMonthPriceVo();
+	                vo.setClosingPrice(stockMonthPrice.getClosingPrice().toString());
+	                vo.setOpeningPrice(stockMonthPrice.getOpeningPrice().toString());
+	                vo.setHighPrice(stockMonthPrice.getHighPrice().toString());
+	                vo.setLowPrice(stockMonthPrice.getLowPrice().toString());
+	                vo.setFirstTradingDate(sdf.format(stockMonthPrice.getFirstTradingDay()));
+	                vo.setStockCode(stockCode);
+	                String tradingVolume = stockMonthPrice.getTradingVolume().toString();
+	                if (StringUtils.isNotBlank(tradingVolume)) {
+	                    vo.setTradingVolume(new BigDecimal(tradingVolume)
+	                            .divide(new BigDecimal("1000"), 0, RoundingMode.HALF_UP).toString());
+	                }
+	                vo.setFiveMa(ObjectUtils.isNotEmpty(stockMonthPrice.getFiveMonthMa()) ? stockMonthPrice.getFiveMonthMa()
+	                        : new BigDecimal(0));
+	                vo.setTenMa(ObjectUtils.isNotEmpty(stockMonthPrice.getTenMonthMa()) ? stockMonthPrice.getTenMonthMa()
+	                        : new BigDecimal(0));
+	                vo.setTwentyMa(ObjectUtils.isNotEmpty(stockMonthPrice.getTwentyMonthMa())
+	                        ? stockMonthPrice.getTwentyMonthMa()
+	                        : new BigDecimal(0));
+	                vo.setSixtyMa(ObjectUtils.isNotEmpty(stockMonthPrice.getTwentyMonthMa())
+	                        ? stockMonthPrice.getTwentyMonthMa()
+	                        : new BigDecimal(0));
+	                vo.setOneTwentyMa(ObjectUtils.isNotEmpty(stockMonthPrice.getOneTwentyMonthMa())
+	                        ? stockMonthPrice.getOneTwentyMonthMa()
+	                        : new BigDecimal(0));
+	                vo.setTwoFourtyMa(ObjectUtils.isNotEmpty(stockMonthPrice.getTwoFourtyMonthMa())
+	                        ? stockMonthPrice.getTwoFourtyMonthMa()
+	                        : new BigDecimal(0));
+	                vo.setLineKvalue(
+	                        ObjectUtils.isNotEmpty(stockMonthPrice.getLineKValue()) ? stockMonthPrice.getLineKValue()
+	                                : new BigDecimal(0));
+	                vo.setLineDvalue(
+	                        ObjectUtils.isNotEmpty(stockMonthPrice.getLineDValue()) ? stockMonthPrice.getLineDValue()
+	                                : new BigDecimal(0));
+	                return vo;
+	            }).toList();
+
+	    SingleStockPriceVo sspv = new SingleStockPriceVo();
+	    sspv.setSingleStockDayPriceVos(singleStockDayPriceVos);
+	    sspv.setSingleStockWeekPriceVos(singleStockWeekPriceVo);
+	    sspv.setSingleStockMonthPriceVos(singleStockMonthPriceVo);
+	    return sspv;
 	}
 
 	public List<StructureContinueIncreaseVo> getShareholderStructureContinueIncreaseLastTowWeeks() {
