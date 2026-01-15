@@ -70,21 +70,16 @@ public class GatewayController {
 
 	@Operation(summary = "依照查詢條件篩選符合的股票代碼", description = "")
 	@PostMapping("StockCodeByFilter")
-	public ResponseEntity<String> getStockCodeByFilter(@RequestBody List<DynamicFilterStockCodeVo> dynamicFilterStockCodeVos)  {
-		try {
-			if(ObjectUtils.isEmpty(dynamicFilterStockCodeVos) || dynamicFilterStockCodeVos.get(0).getConditions().isEmpty()) {
-				return ResponseEntity.ok().build();
-			}
-			ObjectMapper objectMapper = new ObjectMapper();
-			objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd"));
-			List<StockInfoVo> vos = bizService.getMatchStockCodeByCondition(dynamicFilterStockCodeVos);
-			String voString = objectMapper.writeValueAsString(vos);
+	public ResponseEntity<List<StockInfoVo>> getStockCodeByFilter(
+	        @RequestBody List<DynamicFilterStockCodeVo> dynamicFilterStockCodeVos) {
 
-			return ResponseEntity.ok(voString);
-		} catch ( JsonProcessingException e) {
-			log.error(e.getMessage(), e);
-			return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-		}
+	    if (ObjectUtils.isEmpty(dynamicFilterStockCodeVos)
+	            || dynamicFilterStockCodeVos.get(0).getConditions().isEmpty()) {
+	        return ResponseEntity.ok(List.of());
+	    }
+
+	    List<StockInfoVo> vos = bizService.getMatchStockCodeByCondition(dynamicFilterStockCodeVos);
+	    return ResponseEntity.ok(vos);
 	}
 	
 	@Operation(summary = "持股大戶連續2個星期增加的股票查詢", description = "")
