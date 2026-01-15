@@ -15,12 +15,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.function.Function;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
+import com.bigstock.biz.controller.GatewayController;
 import com.bigstock.biz.domain.StockDayPriceNativeQueryService;
 import com.bigstock.biz.domain.StockMonthPriceNativeQueryService;
 import com.bigstock.biz.domain.StockWeekPriceNativeQueryService;
@@ -36,6 +38,7 @@ import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockExchangeDetail;
+import com.bigstock.sharedComponent.entity.StockInfo;
 import com.bigstock.sharedComponent.entity.StockMonthPrice;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
 import com.bigstock.sharedComponent.service.MarginTradingAndShortSellingInfoService;
@@ -49,9 +52,11 @@ import com.google.common.collect.Lists;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BizService {
 
 	private static final List<String> MA_TYPE = List.of("five_ma_slope", "ten_ma_slope", "twenty_ma_slope",
@@ -292,41 +297,98 @@ public class BizService {
 
 	@Transactional
 	public List<StockInfoVo> getMatchStockCodeByCondition(List<DynamicFilterStockCodeVo> dynamicFilterStockCodeVos) {
-		return dynamicFilterStockCodeVos.stream().map(dynamicFilterStockCodeVo -> {
-			String aspect = dynamicFilterStockCodeVo.getAspect();
 
-			Map<String, List<DynamicFilterStockPriceCondition>> dynamicFilterStockPriceConditionsMap = dynamicFilterStockCodeVo
-					.getConditions().stream().collect(Collectors.groupingBy(DynamicFilterStockPriceCondition::getType));
+	    // ✅ 1) 先把 mapper 抽出來，明確告訴編譯器：輸入是 DynamicFilterStockCodeVo，輸出是 List<StockInfoVo>
+	    Function<DynamicFilterStockCodeVo, List<StockInfoVo>> mapper = (DynamicFilterStockCodeVo dynamicFilterStockCodeVo) -> {
 
-			List<StockDayPrice> stockDayPrices = stockDayPriceService
-					.findPreviousFiftyTowDaysBeforeLastestDayInfo("2330");
-			Date lastTradingDay = stockDayPrices.stream().findFirst().get().getTradingDay();
+	        String aspect = dynamicFilterStockCodeVo.getAspect();
 
-			List<String> matchStocks = switch (aspect) {
-			case "daily" -> processDaily(dynamicFilterStockPriceConditionsMap, lastTradingDay);
-			case "monthly" -> processMonthly(dynamicFilterStockPriceConditionsMap, lastTradingDay);
-			case "weekly" -> processWeekly(dynamicFilterStockPriceConditionsMap, lastTradingDay);
-			default -> throw new RuntimeException("視角不存在");
-			};
+	        Map<String, List<DynamicFilterStockPriceCondition>> dynamicFilterStockPriceConditionsMap =
+	                dynamicFilterStockCodeVo.getConditions()
+	                        .stream()
+	                        .collect(Collectors.groupingBy(DynamicFilterStockPriceCondition::getType));
 
-			return stockInfoService.findByIds(matchStocks).stream()
-					.filter(data -> StringUtils.isNotBlank(data.getStockType())).map(data -> {
-						StockInfoVo vo = new StockInfoVo();
-						vo.setStockCode(data.getStockCode());
-						vo.setStockName(data.getStockName());
-						switch (data.getStockType()) {
-						case "0" -> vo.setStockTypeName("上櫃");
-						case "1" -> vo.setStockTypeName("上市");
-						case "2" -> vo.setStockTypeName("興櫃");
-						default -> throw new RuntimeException("無法判斷個股上市櫃類型");
-						}
-						return vo;
-					}).toList();
-		}).reduce((list1, list2) -> {
-			List<StockInfoVo> mutableList = new ArrayList<>(list1);
-			mutableList.retainAll(list2);
-			return mutableList;
-		}).orElse(new ArrayList<StockInfoVo>());
+	        List<StockDayPrice> stockDayPrices =
+	                stockDayPriceService.findPreviousFiftyTowDaysBeforeLastestDayInfo("2330");
+	        Date lastTradingDay = stockDayPrices.stream().findFirst().get().getTradingDay();
+
+	        List<String> matchStocks = switch (aspect) {
+	            case "daily" -> processDaily(dynamicFilterStockPriceConditionsMap, lastTradingDay);
+	            case "monthly" -> processMonthly(dynamicFilterStockPriceConditionsMap, lastTradingDay);
+	            case "weekly" -> processWeekly(dynamicFilterStockPriceConditionsMap, lastTradingDay);
+	            default -> throw new RuntimeException("視角不存在");
+	        };
+
+	        // ✅ log：你到底拿了甚麼 stockId 再去 stock_info 查？
+	        if (matchStocks == null) {
+	            log.info("[StockCodeByFilter] aspect={}, matchStocks=null", aspect);
+	        } else {
+	            int preview = Math.min(matchStocks.size(), 20);
+	            log.info("[StockCodeByFilter] aspect={}, matchStocks.size={}, preview={}",
+	                    aspect, matchStocks.size(), matchStocks.subList(0, preview));
+	        }
+
+	        // ✅ 真正會查 stock_info 的地方：findAllById(ids)
+	        List<StockInfo> infos = stockInfoService.findByIds(matchStocks);
+
+	        // ✅ log：DB 撈回來的 stock_name/type 在後端是否正常（這能一刀兩斷判斷亂碼在哪）
+	        if (infos != null && !infos.isEmpty()) {
+	            StockInfo first = infos.get(0);
+	            log.info("[StockCodeByFilter] stock_info first: code={}, name={}, type={}",
+	                    safe(first.getStockCode()),
+	                    safe(first.getStockName()),
+	                    safe(first.getStockType()));
+	        } else {
+	            log.info("[StockCodeByFilter] stock_info result empty, ids.size={}",
+	                    matchStocks == null ? 0 : matchStocks.size());
+	        }
+
+	        // ✅ 原本邏輯 그대로：轉成 StockInfoVo
+	        return infos.stream()
+	                .filter(data -> StringUtils.isNotBlank(data.getStockType()))
+	                .map(data -> {
+	                    StockInfoVo vo = new StockInfoVo();
+	                    vo.setStockCode(data.getStockCode());
+	                    vo.setStockName(data.getStockName());
+	                    switch (data.getStockType()) {
+	                        case "0" -> vo.setStockTypeName("上櫃");
+	                        case "1" -> vo.setStockTypeName("上市");
+	                        case "2" -> vo.setStockTypeName("興櫃");
+	                        default -> throw new RuntimeException("無法判斷個股上市櫃類型");
+	                    }
+	                    return vo;
+	                })
+	                .collect(Collectors.toList());
+	    };
+
+	    // ✅ 2) 這裡 map(mapper) 就不會再推斷失敗
+	    List<List<StockInfoVo>> resultLists = dynamicFilterStockCodeVos.stream()
+	            .map(mapper)
+	            .collect(Collectors.toList());
+
+	    // ✅ 3) 交集邏輯（等價於你原本 reduce + retainAll）
+	    if (resultLists.isEmpty()) {
+	        return new ArrayList<>();
+	    }
+
+	    List<StockInfoVo> result = new ArrayList<>(resultLists.get(0));
+	    for (int i = 1; i < resultLists.size(); i++) {
+	        result.retainAll(resultLists.get(i));
+	    }
+	    return result;
+	}
+
+	private static String safe(String s) {
+	    return s == null ? "null" : s;
+	}
+
+	private static String toCodePoints(String s) {
+	    if (s == null) return "null";
+	    StringBuilder sb = new StringBuilder();
+	    for (int i = 0; i < s.length(); i++) {
+	        sb.append(String.format("\\u%04X", (int) s.charAt(i)));
+	    }
+	    return sb.toString();
 	}
 
 	private List<String> processDaily(Map<String, List<DynamicFilterStockPriceCondition>> conditionsMap,
