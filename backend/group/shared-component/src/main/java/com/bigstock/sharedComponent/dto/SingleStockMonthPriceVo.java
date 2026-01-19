@@ -10,6 +10,9 @@ public class SingleStockMonthPriceVo {
 	@Schema(name = "股票代號", description = "", example = "")
 	private String stockCode;
 	
+	@Schema(name = "股票名稱", description = "", example = "")
+	private String stockName;
+	
 	@Schema(name = "周開盤價", description = "", example = "")
 	private String openingPrice;
 

@@ -22,6 +22,7 @@ import java.util.function.Function;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.juli.logging.Log;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.biz.controller.GatewayController;
@@ -130,8 +131,15 @@ public class BizService {
 	    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 	    List<StockDayPrice> stockDayPrices = Lists.newArrayList();
 
+        // ✅ 真正會查 stock_info 的地方：findAllById(ids)
+	    List<String> singleStockId = Lists.newArrayList();
+	    singleStockId.add(stockCode);
+        List<StockInfo> singleInfos = Lists.newArrayList();
+        		
+        		//stockInfoService.findByIds(matchStocks);
 	    if (ObjectUtils.isEmpty(startDate) || ObjectUtils.isEmpty(endDate)) {
 	        stockDayPrices = stockDayPriceService.findStockCodeAndLimit(stockCode, 360);
+	        
 	    } else {
 	        stockDayPrices = stockDayPriceService.findByStockCodeAndStartDateAndEndDateCache(
 	                stockCode,
@@ -139,7 +147,9 @@ public class BizService {
 	                sdf.format(endDate)
 	        );
 	    }
-
+	    singleInfos = stockInfoService.findByIds(singleStockId);
+	    final String singleStockName = singleInfos.get(0).getStockName().toString();
+	    log.error("Thomas StockName = " +  singleStockName);
 	    // 新增：先用「日K本身」算出日期區間，再查融資融券，同日 merge
 	    Date lastTradingDay = null;   // 最新交易日
 	    Date firstTradingDay = null;  // 最舊交易日
@@ -185,13 +195,16 @@ public class BizService {
 	            .sorted(Comparator.comparing(StockDayPrice::getTradingDay).reversed())
 	            .map(stockDayPrice -> {
 
+	            	//String stockName = singleInfos.get(0).getStockName();
 	                String highPrice = stockDayPrice.getHighPrice();
 	                String lowPrice = stockDayPrice.getLowPrice();
 	                String openingPrice = stockDayPrice.getOpeningPrice();
 	                String closingPrice = stockDayPrice.getClosingPrice();
 
 	                SingleStockDayPriceVo vo = new SingleStockDayPriceVo();
-
+	               
+	                vo.setStockName(singleStockName);
+	                log.error("Thomas  sssssssssssss = " + singleStockName);
 	                vo.setClosingPrice(closingPrice == null ? null : closingPrice.replaceAll(",", ""));
 	                vo.setOpeningPrice(openingPrice == null ? null : openingPrice.replaceAll(",", ""));
 	                vo.setHighPrice(highPrice == null ? null : highPrice.replaceAll(",", ""));
@@ -260,6 +273,8 @@ public class BizService {
 	                return vo;
 	            })
 	            .toList();
+	    
+	    
 
 	    // 以下週/月先不要改
 	    List<SingleStockWeekPriceVo> singleStockWeekPriceVo = stockWeekPriceService
@@ -267,6 +282,7 @@ public class BizService {
 	            .sorted(Comparator.comparing(StockWeekPrice::getWeekOfYear))
 	            .map(stockWeekPrice -> {
 	                SingleStockWeekPriceVo vo = new SingleStockWeekPriceVo();
+	                vo.setStockName(singleStockName);
 	                vo.setClosingPrice(stockWeekPrice.getClosingPrice().toString());
 	                vo.setOpeningPrice(stockWeekPrice.getOpeningPrice().toString());
 	                vo.setHighPrice(stockWeekPrice.getHighPrice().toString());
@@ -308,6 +324,7 @@ public class BizService {
 	            .sorted(Comparator.comparing(StockMonthPrice::getYear).thenComparing(StockMonthPrice::getMonth))
 	            .map(stockMonthPrice -> {
 	                SingleStockMonthPriceVo vo = new SingleStockMonthPriceVo();
+	                vo.setStockName(singleStockName);
 	                vo.setClosingPrice(stockMonthPrice.getClosingPrice().toString());
 	                vo.setOpeningPrice(stockMonthPrice.getOpeningPrice().toString());
 	                vo.setHighPrice(stockMonthPrice.getHighPrice().toString());

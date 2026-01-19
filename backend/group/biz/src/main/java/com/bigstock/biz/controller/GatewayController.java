@@ -53,19 +53,22 @@ public class GatewayController {
 
 	//小小紀錄一下，如果要增加單個API Header作法，特別注意Authorization是保留字，加上去沒用 @Parameter(name = "Authorization1114", description = "jwt , start wih 'Bearer ....'", required = true, in = ParameterIn.HEADER)
 	@Operation(summary = "個別股票價格", description = "")
-	@PostMapping("SingleStockPrice")
-	public ResponseEntity<String> SingleStockPrice(@RequestBody SingleStockPriceBizVo singleStockPriceBizVo) {
-		try {
-			ObjectMapper objectMapper = new ObjectMapper();
-			objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd"));
-			SingleStockPriceVo vo = bizService.getSingleStockPrices(singleStockPriceBizVo.getStockCode(),
-					singleStockPriceBizVo.getSearchStartDate(), singleStockPriceBizVo.getSearchEndDate());
-			String voString = objectMapper.writeValueAsString(vo);
-			return ResponseEntity.ok(voString);
-		} catch (ParseException| IOException e) {
-			log.error(e.getMessage(), e);
-			return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-		}
+	@PostMapping(value = "SingleStockPrice", produces = "application/json; charset=UTF-8")
+	public ResponseEntity<SingleStockPriceVo> SingleStockPrice(@RequestBody SingleStockPriceBizVo singleStockPriceBizVo) {
+	    try {
+	        // ObjectMapper 其實可以不用在這裡 new（你原本習慣我先不動），日期格式你若靠 Jackson 全域設定更好
+	        SingleStockPriceVo vo = bizService.getSingleStockPrices(
+	                singleStockPriceBizVo.getStockCode(),
+	                singleStockPriceBizVo.getSearchStartDate(),
+	                singleStockPriceBizVo.getSearchEndDate()
+	        );
+
+	        return ResponseEntity.ok(vo);
+
+	    } catch (ParseException e) {
+	        log.error(e.getMessage(), e);
+	        return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+	    }
 	}
 
 	@Operation(summary = "依照查詢條件篩選符合的股票代碼", description = "")
