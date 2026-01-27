@@ -65,6 +65,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.redisson.api.RedissonClient;
+import org.redisson.api.RBucket;
+import org.redisson.client.codec.StringCodec;
+
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -80,6 +86,376 @@ public class ChromeDriverUtils {
 
 	static {
 		initializeColumnNames();
+	}
+
+	// =========================
+		// 三大法人（TWSE + TPEX）Cache & Parse
+		// =========================
+
+		public static class ThreeInstiSimpleRow {
+		    public String stockCode;
+		    public String stockName;
+
+		    public long foreignBuy;
+		    public long foreignSell;
+
+		    public long trustBuy;
+		    public long trustSell;
+
+		    public long dealerBuy;
+		    public long dealerSell;
+
+		    public String source;    // "TWSE" or "TPEX"
+		    public String tradeDate; // yyyyMMdd
+
+		    public ThreeInstiSimpleRow() {}
+		}
+		
+		private static List<com.bigstock.biz.dto.ThreeInstitutionalTradingResponse> toResponseDto(
+		        List<ThreeInstiSimpleRow> rows
+		) {
+		    List<com.bigstock.biz.dto.ThreeInstitutionalTradingResponse> out = new ArrayList<>();
+		    for (ThreeInstiSimpleRow r : rows) {
+		        com.bigstock.biz.dto.ThreeInstitutionalTradingResponse dto =
+		                new com.bigstock.biz.dto.ThreeInstitutionalTradingResponse();
+
+		        dto.setStockCode(r.stockCode);
+		        dto.setStockName(r.stockName);
+
+		        dto.setForeignBuy(r.foreignBuy);
+		        dto.setForeignSell(r.foreignSell);
+
+		        // DTO 欄位叫 investmentTrustBuy/Sell
+		        dto.setInvestmentTrustBuy(r.trustBuy);
+		        dto.setInvestmentTrustSell(r.trustSell);
+
+		        dto.setDealerBuy(r.dealerBuy);
+		        dto.setDealerSell(r.dealerSell);
+
+		        dto.setMarket(r.source); // "TWSE"/"TPEX"
+
+		        // 你 DTO 要 yyyy-MM-dd
+		        // 你的 r.tradeDate 是 yyyyMMdd
+		        String yyyyMMdd = r.tradeDate;
+		        String yyyyMmDd = yyyyMMdd.substring(0,4) + "-" + yyyyMMdd.substring(4,6) + "-" + yyyyMMdd.substring(6,8);
+		        dto.setTradeDate(yyyyMmDd);
+
+		        out.add(dto);
+		    }
+		    return out;
+		}
+
+		// ✅ JsonNode / Object 都能安全轉字串（不帶 JsonNode.toString() 的引號）
+		private static String safeText(Object v) {
+		    if (v == null) return "";
+		    if (v instanceof com.fasterxml.jackson.databind.JsonNode jn) {
+		        // asText() 不會帶雙引號
+		        return jn.isNull() ? "" : jn.asText("").trim();
+		    }
+		    return String.valueOf(v).trim();
+		}
+
+		// ✅ 寬鬆轉 long：支援 "308,094,596"、"-10,000"、"0"、"--"、以及 JsonNode(text)
+		private static long parseLongLoose(Object v) {
+		    String s = safeText(v);
+		    if (s.isEmpty()) return 0L;
+
+		    // 常見無資料符號
+		    if ("--".equals(s) || "null".equalsIgnoreCase(s) || "-".equals(s)) return 0L;
+
+		    // 去掉千分位、空白
+		    s = s.replace(",", "").replace(" ", "");
+
+		    // ✅ 再保險：如果上游還是有殘留引號，就移除
+		    s = s.replace("\"", "");
+
+		    // 有些資料可能會是 "+123"（雖然你這份通常不會），保險處理
+		    if (s.startsWith("+")) s = s.substring(1);
+
+		    try {
+		        return Long.parseLong(s);
+		    } catch (Exception ignore) {
+		        return 0L;
+		    }
+		}
+
+		private static String toSlashDate(String yyyyMMdd) {
+		    // yyyyMMdd -> yyyy/MM/dd（例如 20260123 -> 2026/01/23）
+		    return yyyyMMdd.substring(0, 4) + "/" + yyyyMMdd.substring(4, 6) + "/" + yyyyMMdd.substring(6, 8);
+		}
+
+		private static String cacheKey(String market, String yyyyMMdd, String type) {
+		    // type = raw | norm
+		    return "threeinsti:" + market + ":" + yyyyMMdd + ":" + type;
+		}
+
+		/**
+		 * 入口：同時抓 TWSE + TPEX，並把 raw + norm 都塞進 Redis cache（先不寫 DB）
+		 */
+		public static void cacheThreeInstiTwseAndTpex(
+		        RedissonClient redissonClient,
+		        String yyyyMMdd,
+		        Duration ttl
+		) {
+		    try {
+		        cacheThreeInstiTwse(redissonClient, yyyyMMdd, ttl);
+		    } catch (Exception e) {
+		        // 不中斷另一個市場
+		        log.warn("cacheThreeInstiTwse failed, yyyyMMdd={}, err={}", yyyyMMdd, e.getMessage(), e);
+		    }
+
+		    try {
+		        cacheThreeInstiTpex(redissonClient, yyyyMMdd, ttl);
+		    } catch (Exception e) {
+		        log.warn("cacheThreeInstiTpex failed, yyyyMMdd={}, err={}", yyyyMMdd, e.getMessage(), e);
+		    }
+		}
+
+		/**
+		 * TWSE：抓 T86，cache raw + norm
+		 *
+		 * 你的需求：
+		 * - 外資不分：外陸資(不含外資自營商) + 外資自營商  => foreignBuy/foreignSell
+		 * - 自營商不分：自行買賣 + 避險 => dealerBuy/dealerSell
+		 */
+		public static void cacheThreeInstiTwse(
+		        RedissonClient redissonClient,
+		        String yyyyMMdd,
+		        Duration ttl
+		) throws Exception {
+
+		    String url = "https://www.twse.com.tw/rwd/zh/fund/T86?date=" + yyyyMMdd
+		            + "&selectType=ALLBUT0999&response=json";
+
+		    String raw = fetchApiData(url);
+
+		    // raw cache
+		    RBucket<String> rawBucket = redissonClient.getBucket(cacheKey("twse", yyyyMMdd, "raw"));
+		    rawBucket.set(raw, ttl);
+
+		    ObjectMapper om = new ObjectMapper();
+		    JsonNode root = om.readTree(raw);
+
+		    // 有時會回 {"stat":"很抱歉，沒有符合條件的資料!","total":0}
+		    JsonNode dataNode = root.get("data");
+		    JsonNode fieldsNode = root.get("fields");
+		    if (dataNode == null || !dataNode.isArray() || dataNode.size() == 0
+		            || fieldsNode == null || !fieldsNode.isArray()) {
+
+		        // norm 也 cache 一個空陣列，方便你檢視
+		    	RBucket<String> normBucket = redissonClient.getBucket(cacheKey("twse", yyyyMMdd, "norm"), StringCodec.INSTANCE);
+		        normBucket.set("[]", ttl);
+		        return;
+		    }
+
+		    // 建欄位 index map：欄名 -> index
+		    Map<String, Integer> fieldIndex = new HashMap<>();
+		    for (int i = 0; i < fieldsNode.size(); i++) {
+		        fieldIndex.put(fieldsNode.get(i).asText(), i);
+		    }
+
+		    // TWSE 欄名
+		    final String F_CODE = "證券代號";
+		    final String F_NAME = "證券名稱";
+
+		    // 外資：外陸資(不含外資自營商) + 外資自營商
+		    final String F_FOREIGN_NON_DEALER_BUY  = "外陸資買進股數(不含外資自營商)";
+		    final String F_FOREIGN_NON_DEALER_SELL = "外陸資賣出股數(不含外資自營商)";
+		    final String F_FOREIGN_DEALER_BUY      = "外資自營商買進股數";
+		    final String F_FOREIGN_DEALER_SELL     = "外資自營商賣出股數";
+
+		    // 投信
+		    final String F_TRUST_BUY  = "投信買進股數";
+		    final String F_TRUST_SELL = "投信賣出股數";
+
+		    // 自營商：自行買賣 + 避險
+		    final String F_DEALER_SELF_BUY   = "自營商買進股數(自行買賣)";
+		    final String F_DEALER_SELF_SELL  = "自營商賣出股數(自行買賣)";
+		    final String F_DEALER_HEDGE_BUY  = "自營商買進股數(避險)";
+		    final String F_DEALER_HEDGE_SELL = "自營商賣出股數(避險)";
+
+		    List<ThreeInstiSimpleRow> rows = new ArrayList<>();
+
+		    for (JsonNode rowArr : dataNode) {
+		        if (rowArr == null || !rowArr.isArray()) continue;
+
+		        ThreeInstiSimpleRow r = new ThreeInstiSimpleRow();
+		        r.source = "TWSE";
+		        r.tradeDate = yyyyMMdd;
+
+		        r.stockCode = safeText(rowArr.get(fieldIndex.getOrDefault(F_CODE, 0)));
+		        r.stockName = safeText(rowArr.get(fieldIndex.getOrDefault(F_NAME, 1)));
+
+		        long foreignNonDealerBuy  = parseLongLoose(rowArr.get(fieldIndex.getOrDefault(F_FOREIGN_NON_DEALER_BUY, -1)));
+		        long foreignNonDealerSell = parseLongLoose(rowArr.get(fieldIndex.getOrDefault(F_FOREIGN_NON_DEALER_SELL, -1)));
+		        long foreignDealerBuy     = parseLongLoose(rowArr.get(fieldIndex.getOrDefault(F_FOREIGN_DEALER_BUY, -1)));
+		        long foreignDealerSell    = parseLongLoose(rowArr.get(fieldIndex.getOrDefault(F_FOREIGN_DEALER_SELL, -1)));
+
+		        r.foreignBuy  = foreignNonDealerBuy + foreignDealerBuy;
+		        r.foreignSell = foreignNonDealerSell + foreignDealerSell;
+
+		        r.trustBuy  = parseLongLoose(rowArr.get(fieldIndex.getOrDefault(F_TRUST_BUY, -1)));
+		        r.trustSell = parseLongLoose(rowArr.get(fieldIndex.getOrDefault(F_TRUST_SELL, -1)));
+
+		        long dealerSelfBuy  = parseLongLoose(rowArr.get(fieldIndex.getOrDefault(F_DEALER_SELF_BUY, -1)));
+		        long dealerSelfSell = parseLongLoose(rowArr.get(fieldIndex.getOrDefault(F_DEALER_SELF_SELL, -1)));
+		        long dealerHedgeBuy  = parseLongLoose(rowArr.get(fieldIndex.getOrDefault(F_DEALER_HEDGE_BUY, -1)));
+		        long dealerHedgeSell = parseLongLoose(rowArr.get(fieldIndex.getOrDefault(F_DEALER_HEDGE_SELL, -1)));
+
+		        r.dealerBuy  = dealerSelfBuy + dealerHedgeBuy;
+		        r.dealerSell = dealerSelfSell + dealerHedgeSell;
+
+		        // 防呆：避免空代號（有些表會出現合計列）
+		        if (r.stockCode != null && !r.stockCode.isBlank()) {
+		            rows.add(r);
+		        }
+		    }
+
+		    String norm = om.writeValueAsString(toResponseDto(rows));
+		    RBucket<String> normBucket = redissonClient.getBucket(cacheKey("twse", yyyyMMdd, "norm"), StringCodec.INSTANCE);
+		    normBucket.set(norm, ttl);
+		}
+
+		/**
+		 * TPEX：改成你指定的 POST
+		 *
+		 * POST https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade
+		 * form:
+		 *  type=Daily
+		 *  sect=EW
+		 *  date=yyyy/MM/dd
+		 *  id=
+		 *  response=json
+		 *
+		 * 你提供的回傳結構：
+		 *  root.tables[0].fields / root.tables[0].data (array row)
+		 *
+		 * 欄位順序（你給的 fields）是「代號、名稱」後面一堆 3欄一組：
+		 *  group0, group1, group2, group3, group4, group5, group6 ... 最後是合計
+		 *
+		 * 我用穩健策略：
+		 * - 外資：優先用 group2（外資合計），若為 0 再 fallback group0+group1
+		 * - 投信：用 group3
+		 * - 自營商：優先用 group6（自營商合計），若為 0 再 fallback group4+group5
+		 */
+		public static void cacheThreeInstiTpex(
+		        RedissonClient redissonClient,
+		        String yyyyMMdd,
+		        Duration ttl
+		) throws Exception {
+
+		    String url = "https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade";
+
+		    Map<String, String> form = new HashMap<>();
+		    form.put("type", "Daily");
+		    form.put("sect", "EW");
+		    form.put("date", toSlashDate(yyyyMMdd)); // 2026/01/23
+		    form.put("id", "");
+		    form.put("response", "json");
+
+		    String raw = fetchApiData(url, form);
+
+		    // raw cache
+		    RBucket<String> rawBucket = redissonClient.getBucket(cacheKey("tpex", yyyyMMdd, "raw"), StringCodec.INSTANCE);
+		    rawBucket.set(raw, ttl);
+
+		    ObjectMapper om = new ObjectMapper();
+		    JsonNode root = om.readTree(raw);
+
+		    JsonNode tables = root.get("tables");
+		    if (tables == null || !tables.isArray() || tables.size() == 0) {
+		    	RBucket<String> normBucket = redissonClient.getBucket(cacheKey("tpex", yyyyMMdd, "norm"), StringCodec.INSTANCE);
+		        normBucket.set("[]", ttl);
+		        return;
+		    }
+
+		    JsonNode table0 = tables.get(0);
+		    JsonNode dataNode = table0.get("data");
+		    if (dataNode == null || !dataNode.isArray() || dataNode.size() == 0) {
+		        RBucket<String> normBucket = redissonClient.getBucket(cacheKey("tpex", yyyyMMdd, "norm"), StringCodec.INSTANCE);
+		        normBucket.set("[]", ttl);
+		        return;
+		    }
+
+		    // data row: [code,name, g0b,g0s,g0n, g1b,g1s,g1n, g2b,g2s,g2n, g3b,g3s,g3n, g4b,g4s,g4n, g5b,g5s,g5n, g6b,g6s,g6n, totalNet]
+		    final int CODE = 0;
+		    final int NAME = 1;
+
+		    // group base offsets
+		    final int G0 = 2;
+		    final int G1 = 5;
+		    final int G2 = 8;   // foreign total
+		    final int G3 = 11;  // trust
+		    final int G4 = 14;  // dealer proprietary
+		    final int G5 = 17;  // dealer hedge
+		    final int G6 = 20;  // dealer total
+
+		    List<ThreeInstiSimpleRow> rows = new ArrayList<>();
+
+		    for (JsonNode rowArr : dataNode) {
+		        if (rowArr == null || !rowArr.isArray()) continue;
+
+		        // ✅ 用 path() + asText()，避免 get(1) 缺欄位時回 null
+		        String stockCode = rowArr.path(CODE).asText("").trim();
+		        if (stockCode.isBlank()) {
+		        	log.error("TPEX row missing name, code={}, rowSize={}, row={}", stockCode, rowArr.size(), rowArr);
+		        	continue;
+		        }
+
+		        String stockName = rowArr.path(NAME).asText("").trim();
+
+		        ThreeInstiSimpleRow r = new ThreeInstiSimpleRow();
+		        r.source = "TPEX";
+		        r.tradeDate = yyyyMMdd;
+		        r.stockCode = stockCode;
+		        r.stockName = stockName; // ✅ 這裡就不會再因為 JsonNode.toString() / 欄位不足而掉
+
+		        // foreign total (prefer group2)
+		        long foreignBuyTotal = parseLongLoose(rowArr.get(G2));
+		        long foreignSellTotal = parseLongLoose(rowArr.get(G2 + 1));
+		        if (foreignBuyTotal == 0 && foreignSellTotal == 0) {
+		            long g0b = parseLongLoose(rowArr.get(G0));
+		            long g0s = parseLongLoose(rowArr.get(G0 + 1));
+		            long g1b = parseLongLoose(rowArr.get(G1));
+		            long g1s = parseLongLoose(rowArr.get(G1 + 1));
+		            foreignBuyTotal = g0b + g1b;
+		            foreignSellTotal = g0s + g1s;
+		        }
+		        r.foreignBuy = foreignBuyTotal;
+		        r.foreignSell = foreignSellTotal;
+
+		        // trust group3
+		        r.trustBuy = parseLongLoose(rowArr.get(G3));
+		        r.trustSell = parseLongLoose(rowArr.get(G3 + 1));
+
+		        // dealer total (prefer group6)
+		        long dealerBuyTotal = parseLongLoose(rowArr.get(G6));
+		        long dealerSellTotal = parseLongLoose(rowArr.get(G6 + 1));
+		        if (dealerBuyTotal == 0 && dealerSellTotal == 0) {
+		            long g4b = parseLongLoose(rowArr.get(G4));
+		            long g4s = parseLongLoose(rowArr.get(G4 + 1));
+		            long g5b = parseLongLoose(rowArr.get(G5));
+		            long g5s = parseLongLoose(rowArr.get(G5 + 1));
+		            dealerBuyTotal = g4b + g5b;
+		            dealerSellTotal = g4s + g5s;
+		        }
+		        r.dealerBuy = dealerBuyTotal;
+		        r.dealerSell = dealerSellTotal;
+
+		        rows.add(r);
+		    }
+
+		    String norm = om.writeValueAsString(toResponseDto(rows));
+		    RBucket<String> normBucket = redissonClient.getBucket(cacheKey("tpex", yyyyMMdd, "norm"), StringCodec.INSTANCE);
+		    normBucket.set(norm, ttl);
+		}
+
+	private static Object firstNonNull(Object... arr) {
+	    if (arr == null) return null;
+	    for (Object o : arr) {
+	        if (o != null) return o;
+	    }
+	    return null;
 	}
 
 	
