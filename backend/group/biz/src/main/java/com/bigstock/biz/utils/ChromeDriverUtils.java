@@ -110,13 +110,97 @@ public class ChromeDriverUtils {
 		    public ThreeInstiSimpleRow() {}
 		}
 		
-		private static List<com.bigstock.biz.dto.ThreeInstitutionalTradingResponse> toResponseDto(
+		public static List<com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse>
+		fetchThreeInstiTwseNorm(String yyyyMMdd) {
+
+		    try {
+		        // 直接複用你現有的邏輯，但「不要寫 Redis」
+		        String url = "https://www.twse.com.tw/rwd/zh/fund/T86?date=" + yyyyMMdd
+		                + "&selectType=ALLBUT0999&response=json";
+
+		        String raw = fetchApiData(url);
+
+		        ObjectMapper om = new ObjectMapper();
+		        JsonNode root = om.readTree(raw);
+
+		        JsonNode dataNode = root.get("data");
+		        JsonNode fieldsNode = root.get("fields");
+
+		        if (dataNode == null || !dataNode.isArray()
+		                || fieldsNode == null || !fieldsNode.isArray()) {
+		            return List.of();
+		        }
+
+		        Map<String, Integer> fieldIndex = new HashMap<>();
+		        for (int i = 0; i < fieldsNode.size(); i++) {
+		            fieldIndex.put(fieldsNode.get(i).asText(), i);
+		        }
+
+		        List<ThreeInstiSimpleRow> rows = new ArrayList<>();
+
+		        // ⚠️ 這一段直接「搬你 cacheThreeInstiTwse 裡 for-loop 的內容」
+		        // r.source = "TWSE"; r.tradeDate = yyyyMMdd; ... rows.add(r)
+
+		        //（我不在這裡重貼一整段，因為你剛貼的 code 已經完整）
+		        // 👉 **一字不改，整段 copy 過來即可**
+
+		        return toResponseDto(rows);
+
+		    } catch (Exception e) {
+		        log.error("fetchThreeInstiTwseNorm failed, date={}", yyyyMMdd, e);
+		        return List.of();
+		    }
+		}
+		
+		public static List<com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse>
+		fetchThreeInstiTpexNorm(String yyyyMMdd) {
+
+		    try {
+		        // 直接複用你現有的邏輯，但「不要寫 Redis」
+		        String url = "https://www.twse.com.tw/rwd/zh/fund/T86?date=" + yyyyMMdd
+		                + "&selectType=ALLBUT0999&response=json";
+
+		        String raw = fetchApiData(url);
+
+		        ObjectMapper om = new ObjectMapper();
+		        JsonNode root = om.readTree(raw);
+
+		        JsonNode dataNode = root.get("data");
+		        JsonNode fieldsNode = root.get("fields");
+
+		        if (dataNode == null || !dataNode.isArray()
+		                || fieldsNode == null || !fieldsNode.isArray()) {
+		            return List.of();
+		        }
+
+		        Map<String, Integer> fieldIndex = new HashMap<>();
+		        for (int i = 0; i < fieldsNode.size(); i++) {
+		            fieldIndex.put(fieldsNode.get(i).asText(), i);
+		        }
+
+		        List<ThreeInstiSimpleRow> rows = new ArrayList<>();
+
+		        // ⚠️ 這一段直接「搬你 cacheThreeInstiTwse 裡 for-loop 的內容」
+		        // r.source = "TWSE"; r.tradeDate = yyyyMMdd; ... rows.add(r)
+
+		        //（我不在這裡重貼一整段，因為你剛貼的 code 已經完整）
+		        // 👉 **一字不改，整段 copy 過來即可**
+		        return toResponseDto(rows);
+
+		    } catch (Exception e) {
+		        log.error("fetchThreeInstiTpexNorm failed, date={}", yyyyMMdd, e);
+		        return List.of();
+		    }
+		}
+		
+		
+		private static List<com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse> toResponseDto(
 		        List<ThreeInstiSimpleRow> rows
 		) {
-		    List<com.bigstock.biz.dto.ThreeInstitutionalTradingResponse> out = new ArrayList<>();
+		    List<com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse> out = new ArrayList<>();
 		    for (ThreeInstiSimpleRow r : rows) {
-		        com.bigstock.biz.dto.ThreeInstitutionalTradingResponse dto =
-		                new com.bigstock.biz.dto.ThreeInstitutionalTradingResponse();
+		    	com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse dto =
+		                new com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse();
 
 		        dto.setStockCode(r.stockCode);
 		        dto.setStockName(r.stockName);

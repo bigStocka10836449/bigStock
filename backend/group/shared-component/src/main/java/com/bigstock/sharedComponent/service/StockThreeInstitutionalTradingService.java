@@ -14,7 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -81,6 +83,56 @@ public class StockThreeInstitutionalTradingService {
             out.add(e);
         }
         return out;
+    }
+    
+    @Transactional
+    public SyncResult upsertFromNormList(
+            String yyyyMMdd,
+            List<ThreeInstitutionalTradingResponse> twse,
+            List<ThreeInstitutionalTradingResponse> tpex
+    ) {
+        Map<StockThreeInstitutionalTradingId, StockThreeInstitutionalTrading> uniq = new LinkedHashMap<>();
+
+        putAll(uniq, twse);
+        putAll(uniq, tpex);
+
+        if (!uniq.isEmpty()) {
+            repository.saveAll(uniq.values()); // 同 PK → update；無 PK → 你一定要補 DB unique/PK
+        }
+
+        return new SyncResult(yyyyMMdd, twse.size(), tpex.size(), uniq.size());
+    }
+    
+    private void putAll(
+            Map<StockThreeInstitutionalTradingId, StockThreeInstitutionalTrading> uniq,
+            List<ThreeInstitutionalTradingResponse> list
+    ) {
+        for (ThreeInstitutionalTradingResponse dto : list) {
+            if (dto == null) continue;
+
+            String stockCode = safe(dto.getStockCode());
+            String market = safe(dto.getMarket()).toUpperCase();
+
+            if (stockCode.isBlank() || market.isBlank()) continue;
+
+            // dto.tradeDate = yyyy-MM-dd
+            LocalDate tradeDate = LocalDate.parse(dto.getTradeDate());
+
+            StockThreeInstitutionalTradingId id =
+                    new StockThreeInstitutionalTradingId(tradeDate, market, stockCode);
+
+            StockThreeInstitutionalTrading e = new StockThreeInstitutionalTrading(id);
+            e.setStockName(safe(dto.getStockName()));
+            e.setForeignBuy(dto.getForeignBuy());
+            e.setForeignSell(dto.getForeignSell());
+            e.setInvestmentTrustBuy(dto.getInvestmentTrustBuy());
+            e.setInvestmentTrustSell(dto.getInvestmentTrustSell());
+            e.setDealerBuy(dto.getDealerBuy());
+            e.setDealerSell(dto.getDealerSell());
+
+            // ✅ 同 key 覆蓋：只留最新
+            uniq.put(id, e);
+        }
     }
 
     private static String safe(String s) {
