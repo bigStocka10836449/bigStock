@@ -1,10 +1,12 @@
 package com.bigstock.biz.service;
 
 import java.time.Duration;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse;
 import com.bigstock.biz.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.service.StockThreeInstitutionalTradingService;
 
@@ -33,5 +35,30 @@ public class ThreeInstiService {
 
         // ② 再把 Redis norm 同步寫入 DB（新增功能）
         return stockThreeInstiService.syncFromRedisToDb(yyyyMMdd);
+    }
+    
+    public StockThreeInstitutionalTradingService.SyncResult fetchAndUpsertDb(
+            String yyyyMMdd,
+            boolean debugToRedis
+    ) {
+        // 1) 抓 + 解析成 norm list
+        List<ThreeInstitutionalTradingResponse> twseNorm =
+                ChromeDriverUtils.fetchThreeInstiTwseNorm(yyyyMMdd);
+
+        List<ThreeInstitutionalTradingResponse> tpexNorm =
+                ChromeDriverUtils.fetchThreeInstiTpexNorm(yyyyMMdd);
+
+        // 2) 直接寫 DB（upsert）
+        StockThreeInstitutionalTradingService.SyncResult result =
+        		stockThreeInstiService.upsertFromNormList(yyyyMMdd, twseNorm, tpexNorm);
+
+        // 3) Redis 旁路：debug / 重放
+        if (debugToRedis) {
+            // 你可以選擇只存 norm，或 raw+norm
+            // redisRepository.saveNormList("twse", yyyyMMdd, twseNorm, ttl);
+            // redisRepository.saveNormList("tpex", yyyyMMdd, tpexNorm, ttl);
+        }
+
+        return result;
     }
 }
