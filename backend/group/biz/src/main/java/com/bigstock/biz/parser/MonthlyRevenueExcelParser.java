@@ -46,72 +46,52 @@ public class MonthlyRevenueExcelParser {
         }
     }
 
-    // =========================
-    // 1) GENERAL (TPEX 常見)：
-    //    header 同一列包含「公司名稱」+「本月」
-    // =========================
-    private ParseResult tryParseGeneral(Sheet sheet, String date, String market) {
-        int headerRowIdx = findHeaderRowIndexGeneral(sheet);
-        if (headerRowIdx < 0) return null;
+ // =========================
+ // 1) GENERAL (TPEX 常見)：多列表頭（公司名稱/本月不在同一列）
+//     我們改成：把前 N 列的每欄 header 文字拼起來，再找欄位 index
+ // =========================
+ private ParseResult tryParseGeneral(Sheet sheet, String date, String market) {
 
-        Row headerRow = sheet.getRow(headerRowIdx);
-        Map<String, Integer> colMap = buildColumnMap(headerRow);
+	 TpexLocate tl = locateTpexColumnsByMergedHeaders(sheet, date);
+     if (tl == null) return null;
 
-        Integer colName = findCol(colMap, "公司名稱");
-        Integer colRevenue = findCol(colMap, "本月");
-        Integer colCode = findCol(colMap, "公司代號"); // 可能沒有
+     int codeNameCol = tl.codeNameCol;
+     int revenueCol = tl.revenueCol;
+     int dataStartRow = tl.dataStartRow;
 
-        if (colName == null || colRevenue == null) return null;
+     List<MonthlyRevenueVo> out = new ArrayList<>();
 
-        List<MonthlyRevenueVo> out = new ArrayList<>();
+     for (int r = dataStartRow; r <= sheet.getLastRowNum(); r++) {
+         Row row = sheet.getRow(r);
+         if (row == null) continue;
 
-        for (int r = headerRowIdx + 1; r <= sheet.getLastRowNum(); r++) {
-            Row row = sheet.getRow(r);
-            if (row == null) continue;
+         String codeName = ExcelCellUtils.getCellString(row.getCell(codeNameCol));
+         if (codeName == null || codeName.isBlank()) continue;
 
-            String nameCell = ExcelCellUtils.getCellString(row.getCell(colName));
-            if (nameCell == null || nameCell.isBlank()) continue;
+         String codeNameTrim = codeName.trim();
 
-            String nameTrim = nameCell.trim();
-            if (containsAny(nameTrim, "合計", "總計", "小計")) continue;
+         // 跳過產業分類列：例如 "02 食品工業"（只有 2 位代號）
+         // 只吃真正股票列：4~6 位代號 + 空白 + 名稱
+         Matcher m = CODE_NAME_PATTERN.matcher(codeNameTrim);
+         if (!m.find()) continue;
 
-            String stockId = null;
-            String stockName = null;
+         String stockId = m.group(1).trim();
+         String stockName = m.group(2).trim();
 
-            // 先用公司代號欄
-            if (colCode != null) {
-                String codeCell = ExcelCellUtils.getCellString(row.getCell(colCode));
-                if (codeCell != null && codeCell.trim().matches("^\\d{4,6}$")) {
-                    stockId = codeCell.trim();
-                    stockName = nameTrim;
-                }
-            }
+         Long revenue = ExcelCellUtils.getCellLong(row.getCell(revenueCol));
 
-            // 沒代號欄就從公司名稱拆
-            if (stockId == null) {
-                Matcher m = CODE_NAME_PATTERN.matcher(nameTrim);
-                if (m.find()) {
-                    stockId = m.group(1).trim();
-                    stockName = m.group(2).trim();
-                } else {
-                    stockName = nameTrim;
-                }
-            }
+         MonthlyRevenueVo vo = new MonthlyRevenueVo();
+         vo.setStockId(stockId);
+         vo.setStockName(stockName);
+         vo.setRevenue(revenue);
+         vo.setDate(date);
+         vo.setMarket(market);
+         out.add(vo);
+     }
 
-            Long revenue = ExcelCellUtils.getCellLong(row.getCell(colRevenue));
-
-            MonthlyRevenueVo vo = new MonthlyRevenueVo();
-            vo.setStockId(stockId);
-            vo.setStockName(stockName);
-            vo.setRevenue(revenue);
-            vo.setDate(date);
-            vo.setMarket(market);
-            out.add(vo);
-        }
-
-        return new ParseResult(out);
-    }
-
+     if (out.isEmpty()) return null;
+     return new ParseResult(out);
+ }
     private int findHeaderRowIndexGeneral(Sheet sheet) {
         int maxScan = Math.min(80, sheet.getLastRowNum());
         for (int r = 0; r <= maxScan; r++) {
@@ -190,38 +170,59 @@ public class MonthlyRevenueExcelParser {
     private HeaderLocate locateTwseHeader(Sheet sheet, String targetMonthAbbr) {
         int maxScan = Math.min(120, sheet.getLastRowNum());
 
+        // TWSE 營收區通常在前幾欄：A=Code&Name, B~F=本年度/上年度營收等
+        // 右側背書保證區通常在更右邊的欄（例如 I、J 或更後面）
+        // 我們只在營收區範圍（col 1~5）找月份，避免誤判
+        final int REVENUE_MONTH_COL_START = 1;
+        final int REVENUE_MONTH_COL_END = 5;
+
         for (int r = 0; r <= maxScan; r++) {
             Row row = sheet.getRow(r);
             if (row == null) continue;
 
-            // 找出此列每個 cell 的文字
             int last = row.getLastCellNum();
             if (last <= 0) continue;
 
+            // 1) 在營收區 col 1~5 計算「月份縮寫」出現數量
+            int monthHits = 0;
             int revenueCol = -1;
 
-            // 找第一個目標月份縮寫欄
-            for (int c = 0; c < last; c++) {
+            for (int c = REVENUE_MONTH_COL_START; c <= REVENUE_MONTH_COL_END && c < last; c++) {
                 String t = ExcelCellUtils.getCellString(row.getCell(c));
                 if (t == null) continue;
-                if (normalize(t).equals(targetMonthAbbr)) {
+
+                String norm = normalize(t);
+                if (isMonthAbbr(norm)) {
+                    monthHits++;
+                }
+
+                // 2) 在營收區 col 1~5 找「第一個 targetMonthAbbr」作為本年度本月欄
+                if (revenueCol < 0 && norm.equals(targetMonthAbbr)) {
                     revenueCol = c;
-                    break; // 第一個命中就是本年度本月
                 }
             }
 
+            // 必須：這列像月份表頭（至少有兩個月份縮寫，例如 OCT./NOV.）
+            if (monthHits < 2) continue;
+
+            // 必須：在營收區命中目標月份
             if (revenueCol < 0) continue;
 
-            // 嘗試找 Code & Name 欄（有些檔第一欄就是公司代號+名稱）
-            int codeNameCol = 0; // fallback
-            // 往上/本列找一下是否有 "Code & Name" or "Security" 文字
-            // 但很多檔是合併儲存格，實際上抓不到，故預設 0 最穩
-            // 若你之後遇到不是 0，也可以再強化這邊
+            // Code & Name 通常在第 0 欄（A 欄），用 0 最穩
+            int codeNameCol = 0;
 
             return new HeaderLocate(r, codeNameCol, revenueCol);
         }
 
         return null;
+    }
+
+    private static boolean isMonthAbbr(String s) {
+        // 允許 "NOV." / "NOV" / "Nov." 等
+        String t = s.replace(".", "").toUpperCase(Locale.ROOT);
+        return t.equals("JAN") || t.equals("FEB") || t.equals("MAR") || t.equals("APR")
+                || t.equals("MAY") || t.equals("JUN") || t.equals("JUL") || t.equals("AUG")
+                || t.equals("SEP") || t.equals("OCT") || t.equals("NOV") || t.equals("DEC");
     }
 
     private static String normalize(String s) {
@@ -283,5 +284,126 @@ public class MonthlyRevenueExcelParser {
             this.codeNameColIdx = codeNameColIdx;
             this.revenueColIdx = revenueColIdx;
         }
+    }
+    
+    private static class TpexLocate {
+        final int codeNameCol;
+        final int revenueCol;
+        final int dataStartRow;
+
+        private TpexLocate(int codeNameCol, int revenueCol, int dataStartRow) {
+            this.codeNameCol = codeNameCol;
+            this.revenueCol = revenueCol;
+            this.dataStartRow = dataStartRow;
+        }
+    }
+
+    /**
+     * 針對 TPEX xls：
+     * - 表頭分散在多列（公司名稱/本月不在同一列）
+     * - 需避免抓到右側「背書保證金額」的本月份
+     *
+     * 做法：
+     * 1) 掃描前 40 列，把每一欄的 header 文字做拼接（含換行）
+     * 2) codeNameCol：header 含 "CODE & NAME" 或 "公司名稱"
+     * 3) revenueCol：header 同時含 "SALES AMOUNT"/"營業額" 且含 "本月" 且不含 "ENDORSED"/"背書"
+     * 4) dataStartRow：找到第一列出現 "上月" 且 "本月" 的那列之後再 +1（通常是 20~26 行附近）
+     */
+    private TpexLocate locateTpexColumnsByMergedHeaders(Sheet sheet, String date) {
+        int maxHeaderScan = Math.min(80, sheet.getLastRowNum()); // TPEX 表頭有時比 40 還深
+        int maxCol = 0;
+
+        for (int r = 0; r <= maxHeaderScan; r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            maxCol = Math.max(maxCol, row.getLastCellNum());
+        }
+        if (maxCol <= 0) return null;
+
+        String[] merged = new String[maxCol];
+        Arrays.fill(merged, "");
+
+        // 拼接每一欄的 header 文字（跨多列）
+        for (int r = 0; r <= maxHeaderScan; r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            for (int c = 0; c < maxCol; c++) {
+                String s = ExcelCellUtils.getCellString(row.getCell(c));
+                if (s == null || s.isBlank()) continue;
+                merged[c] = (merged[c] + " " + s).replace("\n", " ").trim();
+            }
+        }
+
+        // 依 date 推出英文月份縮寫（去掉點後的版本：NOV / OCT / SEP）
+        int month = Integer.parseInt(date.substring(5, 7));
+        String monthToken = MONTH_ABBR[month - 1].replace(".", ""); // e.g. "NOV"
+
+        int codeNameCol = -1;
+        List<Integer> revenueCandidates = new ArrayList<>();
+
+        for (int c = 0; c < maxCol; c++) {
+            String h = normalizeHeader(merged[c]); // 會變成大寫、去點
+
+            // Code & Name 欄
+            if (codeNameCol < 0 && (h.contains("CODE & NAME") || h.contains("公司名稱"))) {
+                codeNameCol = c;
+            }
+
+            // revenue 欄候選：
+            // - 必須含「本月」（或 THIS MONTH）
+            // - 必須含該月英文縮寫（NOV/OCT/...）
+            // - 必須排除背書保證區（ENDORSED / 背書 / 保證）
+            boolean isThisMonth = h.contains("本月") || h.contains("THIS MONTH");
+            boolean hasMonthToken = h.contains(monthToken);
+            boolean isEndorsed = h.contains("ENDORSED") || h.contains("背書") || h.contains("保證");
+
+            if (isThisMonth && hasMonthToken && !isEndorsed) {
+                revenueCandidates.add(c);
+            }
+        }
+
+        if (codeNameCol < 0 || revenueCandidates.isEmpty()) {
+            // 讓你 debug 時可以快速看每欄 header 拼接結果
+            // System.out.println("[TPEX] codeNameCol=" + codeNameCol + ", revenueCandidates=" + revenueCandidates);
+            // for (int i = 0; i < merged.length; i++) System.out.println("[TPEX] col=" + i + " header=" + merged[i]);
+            return null;
+        }
+
+        // 選最靠近 codeNameCol 右側的那個「本月」欄（通常就是 Sales Amount 本月）
+        int revenueCol = -1;
+        for (int c : revenueCandidates) {
+            if (c > codeNameCol) {
+                revenueCol = c;
+                break;
+            }
+        }
+        if (revenueCol < 0) {
+            // 如果全部都在左邊，取最小的
+            revenueCol = revenueCandidates.get(0);
+        }
+
+        // dataStartRow：不要猜，直接找第一筆符合 4~6 位代號的列當資料起點
+        int dataStartRow = -1;
+        for (int r = 0; r <= sheet.getLastRowNum(); r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            String codeName = ExcelCellUtils.getCellString(row.getCell(codeNameCol));
+            if (codeName == null) continue;
+            if (CODE_NAME_PATTERN.matcher(codeName.trim()).find()) {
+                dataStartRow = r;
+                break;
+            }
+        }
+        if (dataStartRow < 0) return null;
+
+        return new TpexLocate(codeNameCol, revenueCol, dataStartRow);
+    }
+
+    private static String normalizeHeader(String s) {
+        if (s == null) return "";
+        return s.replace(".", "")              // 去掉月份後的點（NOV. -> NOV）
+                .replace("\u00A0", " ")
+                .trim()
+                .toUpperCase(Locale.ROOT);
     }
 }
