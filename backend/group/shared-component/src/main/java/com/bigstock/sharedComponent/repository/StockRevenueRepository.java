@@ -13,47 +13,47 @@ import java.util.List;
 
 public interface StockRevenueRepository extends JpaRepository<StockRevenue, StockRevenueId> {
 
-    // 查單一股票區間（月營收）
+    // ✅ 永遠不以 market 過濾，但保留 :market 參數避免 Spring 啟動期檢查失敗
     @Query("""
             SELECT e
             FROM StockRevenue e
             WHERE e.id.stockId = :stockId
-              AND (:market IS NULL OR e.id.market = :market)
+              AND (:market IS NULL OR :market IS NOT NULL)
               AND e.id.revenueMonth BETWEEN :startMonth AND :endMonth
             ORDER BY e.id.revenueMonth ASC
            """)
     List<StockRevenue> findByStockIdAndMonthRange(
             @Param("stockId") String stockId,
-            @Param("market") String market,                 // nullable
+            @Param("market") String market,
             @Param("startMonth") LocalDate startMonth,
             @Param("endMonth") LocalDate endMonth
     );
 
-    // 查某月份（可分頁）
+    // ✅ 永遠不以 market 過濾（分頁查某月份）
     @Query("""
             SELECT e
             FROM StockRevenue e
             WHERE e.id.revenueMonth = :revenueMonth
-              AND (:market IS NULL OR e.id.market = :market)
+              AND (:market IS NULL OR :market IS NOT NULL)
             ORDER BY e.id.market ASC, e.id.stockId ASC
            """)
     Page<StockRevenue> findByRevenueMonth(
             @Param("revenueMonth") LocalDate revenueMonth,
-            @Param("market") String market,                 // nullable
+            @Param("market") String market,
             Pageable pageable
     );
 
-    // 排行：某月份（依 revenue DESC）
+    // ✅ 永遠不以 market 過濾（排行）
     @Query("""
             SELECT e
             FROM StockRevenue e
             WHERE e.id.revenueMonth = :revenueMonth
-              AND (:market IS NULL OR e.id.market = :market)
+              AND (:market IS NULL OR :market IS NOT NULL)
             ORDER BY e.revenue DESC, e.id.stockId ASC
            """)
     Page<StockRevenue> rankByRevenue(
             @Param("revenueMonth") LocalDate revenueMonth,
-            @Param("market") String market,                 // nullable
+            @Param("market") String market,
             Pageable pageable
     );
 }
