@@ -1,6 +1,8 @@
 package com.bigstock.sharedComponent.repository;
 
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialResponse;
+import com.esotericsoftware.minlog.Log;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -22,7 +24,7 @@ public class StockQuarterFinancialUpsertRepository {
             unit,
             operating_revenue, operating_profit, non_operating_income_expense, net_profit_after_tax,
             capital_stock_end_period, earnings_per_share, net_asset_value_per_share,
-            quick_ratio, current_ratio,
+            quick_ratio, current_ratio, depn,
             updated_at
         ) VALUES (
             :stock_id, :stock_name, :market,
@@ -30,7 +32,7 @@ public class StockQuarterFinancialUpsertRepository {
             :unit,
             :operating_revenue, :operating_profit, :non_operating_income_expense, :net_profit_after_tax,
             :capital_stock_end_period, :earnings_per_share, :net_asset_value_per_share,
-            :quick_ratio, :current_ratio,
+            :quick_ratio, :current_ratio, :depn,
             NOW()
         )
         ON CONFLICT (stock_id, market, year, quarter)
@@ -51,7 +53,7 @@ public class StockQuarterFinancialUpsertRepository {
 
             quick_ratio   = EXCLUDED.quick_ratio,
             current_ratio = EXCLUDED.current_ratio,
-
+    		depn = EXCLUDED.depn,
             updated_at = NOW()
         """;
 
@@ -89,6 +91,9 @@ public class StockQuarterFinancialUpsertRepository {
 
             p.addValue("quick_ratio", round2(dto.getQuickRatio()));
             p.addValue("current_ratio", round2(dto.getCurrentRatio()));
+            
+            p.addValue("depn", round2(dto.getDepn()));
+            
 
             params.add(p);
         }

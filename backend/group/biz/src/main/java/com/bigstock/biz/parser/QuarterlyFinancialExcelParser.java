@@ -85,7 +85,7 @@ public class QuarterlyFinancialExcelParser {
                 vo.setNetAssetValuePerShare(readRatio(row, cl.netAssetValuePerShareCol));
                 vo.setQuickRatio(readRatio(row, cl.quickRatioCol));
                 vo.setCurrentRatio(readRatio(row, cl.currentRatio));
-                
+                vo.setDepn(readRatio(row, cl.depn));;
                 out.add(vo);
             }
 
@@ -182,6 +182,11 @@ public class QuarterlyFinancialExcelParser {
             if (cl.currentRatio < 0 && containsAny(h,
                     "流動比", "流動比率", "CURRENTRATIO")) {
                 cl.currentRatio = c;
+            }
+            
+            if (cl.depn < 0 && containsAny(h,
+                    "淨值佔總資產", "淨值佔總資產比率", "DEPN")) {
+                cl.depn = c;
             }
         }
 
@@ -463,5 +468,6 @@ public class QuarterlyFinancialExcelParser {
 
         int quickRatioCol = -1;
         int currentRatio = -1;
+        int depn = -1;
     }
 }

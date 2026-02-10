@@ -91,7 +91,7 @@ public class QuarterlyFinancialRedisService {
 
         d.setQuickRatio(v.getQuickRatio());
         d.setCurrentRatio(v.getCurrentRatio());
-
+        d.setDepn(v.getDepn());
         return d;
     }
 }
