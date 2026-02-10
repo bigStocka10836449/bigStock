@@ -37,4 +37,5 @@ public class QuarterlyFinancialResponse {
     // Ratios (% , keep 2 decimals)
     private Double quickRatio;                  // 速動比率
     private Double currentRatio;                // 流動比率
+    private Double depn;                           // 淨值佔總資產比(1 - depn = 負債比)    
 }

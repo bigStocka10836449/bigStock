@@ -101,6 +101,7 @@ public class StockQuarterFinancialQueryService {
 
         d.setQuickRatio((Double) rs.getObject("quick_ratio"));
         d.setCurrentRatio((Double) rs.getObject("current_ratio"));
+        d.setDepn((Double) rs.getObject("depn"));
         return d;
     }
 
