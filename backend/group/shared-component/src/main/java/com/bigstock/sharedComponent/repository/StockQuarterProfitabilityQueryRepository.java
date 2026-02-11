@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 
@@ -29,13 +30,22 @@ public class StockQuarterProfitabilityQueryRepository {
         LIMIT :limit
         """;
 
-    public List<QuarterlyProfitabilityRawResponse> queryByStockLatestN(String stockId, String market, int limit) {
+    public List<QuarterlyProfitabilityRawResponse> queryByStockLatestN(
+            String stockId,
+            String market,
+            int limit
+    ) {
         String sid = safe(stockId);
         if (sid.isBlank() || limit <= 0) return Collections.emptyList();
 
         MapSqlParameterSource p = new MapSqlParameterSource()
                 .addValue("stock_id", sid)
-                .addValue("market", (market == null || market.trim().isBlank()) ? null : market.trim().toUpperCase())
+                .addValue(
+                        "market",
+                        (market == null || market.trim().isBlank())
+                                ? null
+                                : market.trim().toUpperCase()
+                )
                 .addValue("limit", limit);
 
         return jdbc.query(SQL_LATEST_N, p, (rs, i) -> {
@@ -45,9 +55,14 @@ public class StockQuarterProfitabilityQueryRepository {
             d.setMarket(rs.getString("market"));
             d.setYear(rs.getInt("year"));
             d.setQuarter(rs.getInt("quarter"));
+
             d.setOperatingProfit((Long) rs.getObject("operating_profit"));
             d.setNonOperatingIncomeExpense((Long) rs.getObject("non_operating_income_expense"));
-            d.setEarningsPerShare((Double) rs.getObject("earnings_per_share"));
+
+            // ✅ numeric / decimal → BigDecimal → Double
+            BigDecimal epsBd = rs.getBigDecimal("earnings_per_share");
+            d.setEarningsPerShare(epsBd == null ? null : epsBd.doubleValue());
+
             return d;
         });
     }
