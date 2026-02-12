@@ -14,21 +14,27 @@ import java.util.List;
 @RequiredArgsConstructor
 public class StockBasicInfoQueryController {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(StockBasicInfoQueryController.class);
+
     private final StockBasicInfoQueryService stockBasicInfoQueryService;
 
-    @Operation(summary = "查DB：個股基本資料（給App/Web顯示用，不會外抓）")
-    @GetMapping("/db")  // ✅ 改這裡：避免跟你原本 GET /api/stock/basic-info 撞到
+    @GetMapping("/db")
     public ResponseEntity<?> queryDb(
             @RequestParam String stockId,
             @RequestParam(required = false) String market
     ) {
+        log.info("[BASIC_DB] hit controller, stockId='{}', market='{}'", stockId, market);
+
         if (market != null && !market.isBlank()) {
-            return stockBasicInfoQueryService.queryOne(stockId, market)
-                    .<ResponseEntity<?>>map(ResponseEntity::ok)
+            var opt = stockBasicInfoQueryService.queryOne(stockId, market);
+            log.info("[BASIC_DB] queryOne present={}", opt.isPresent());
+            return opt.<ResponseEntity<?>>map(ResponseEntity::ok)
                     .orElseGet(() -> ResponseEntity.notFound().build());
         }
 
-        List<StockBasicInfoResponse> list = stockBasicInfoQueryService.queryAllMarkets(stockId);
+        var list = stockBasicInfoQueryService.queryAllMarkets(stockId);
+        log.info("[BASIC_DB] queryAllMarkets size={}", list.size());
         return ResponseEntity.ok(list);
     }
 }
