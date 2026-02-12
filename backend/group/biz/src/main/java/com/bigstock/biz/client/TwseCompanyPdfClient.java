@@ -28,6 +28,11 @@ public class TwseCompanyPdfClient {
             String text = extractText(pdf);
             if (text == null || text.isBlank()) return null;
 
+            String[] lines = text.split("\\R");
+            for (int i = 0; i < Math.min(lines.length, 120); i++) {
+                System.out.printf("%03d | %s%n", i, lines[i]);
+            }
+            
             // ✅ 這些 label 在 TWSE PDF 都是「公司基本資料」區塊的欄位
             String companyName = findValueSmart(text, "公司名稱");
             String industry = findValueSmart(text, "產業類別");
@@ -50,8 +55,10 @@ public class TwseCompanyPdfClient {
 
     private static String extractText(byte[] pdfBytes) throws Exception {
         try (PDDocument doc = PDDocument.load(new ByteArrayInputStream(pdfBytes))) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            return stripper.getText(doc);
+        	PDFTextStripper stripper = new PDFTextStripper();
+        	stripper.setSortByPosition(true);
+        	return stripper.getText(doc);
+
         }
     }
 
@@ -69,6 +76,8 @@ public class TwseCompanyPdfClient {
             if (pos < 0) continue;
 
             String after = s.substring(pos + label.length()).trim();
+            after = cutBeforeNextLabel(after,
+                    "公司名稱","上市日期","產業類別","公司網址","實收資本額","總機","發言人","主要經營業務");
             if (!after.isBlank()) return after;
 
             // fallback: 下一行像「值」的才取（避免抓到別的 label）
@@ -85,6 +94,17 @@ public class TwseCompanyPdfClient {
             return null;
         }
         return null;
+    }
+    
+    private static String cutBeforeNextLabel(String s, String... labels) {
+        if (s == null) return null;
+        int cut = s.length();
+        for (String lb : labels) {
+            int p = s.indexOf(lb);
+            if (p >= 0 && p < cut) cut = p;
+        }
+        String out = s.substring(0, cut).trim();
+        return out;
     }
 
     private static String findDateSmart(String text, String label) {
