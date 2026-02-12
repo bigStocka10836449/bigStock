@@ -48,12 +48,19 @@ public class TwseCompanyPdfClient {
 
     private static String findValueByLabel(String text, String label) {
         String[] lines = text.split("\\r?\\n");
-        for (String line : lines) {
-            String s = line == null ? "" : line.trim();
-            if (s.contains(label)) {
-                String after = s.substring(s.indexOf(label) + label.length()).trim();
-                if (!after.isBlank()) return after;
+        for (int i = 0; i < lines.length; i++) {
+            String s = lines[i] == null ? "" : lines[i].trim();
+            if (!s.contains(label)) continue;
+
+            String after = s.substring(s.indexOf(label) + label.length()).trim();
+            if (!after.isBlank()) return after;
+
+            // ✅ fallback：抓下一行非空
+            for (int j = i + 1; j < lines.length; j++) {
+                String next = lines[j] == null ? "" : lines[j].trim();
+                if (!next.isBlank()) return next;
             }
+            return null;
         }
         return null;
     }
