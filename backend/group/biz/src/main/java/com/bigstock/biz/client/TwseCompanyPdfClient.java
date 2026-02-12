@@ -6,10 +6,14 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
-import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class TwseCompanyPdfClient {
+
+    // ✅ 抓日期：1994/09/05 或 1994-09-05 或 1994/9/5
+    private static final Pattern YMD_PATTERN = Pattern.compile("(\\d{4})[/-](\\d{1,2})[/-](\\d{1,2})");
 
     public CompanyInfo fetch(String stockId) {
         String sid = stockId == null ? "" : stockId.trim();
@@ -24,17 +28,21 @@ public class TwseCompanyPdfClient {
             String text = extractText(pdf);
             if (text == null || text.isBlank()) return null;
 
-            String industry = findValueByLabel(text, "產業類別");
-            String listingDate = findDateByLabel(text, "上市日期");
-            String mainBiz = extractMainBusinessBlock(text);
+            // ✅ 這些 label 在 TWSE PDF 都是「公司基本資料」區塊的欄位
+            String companyName = findValueSmart(text, "公司名稱");
+            String industry = findValueSmart(text, "產業類別");
+            String listingDate = findDateSmart(text, "上市日期");
+            String mainBiz = findValueBlockSmart(text, "主要經營業務");
 
             CompanyInfo out = new CompanyInfo();
             out.setStockId(sid);
             out.setMarket("TWSE");
+            out.setStockName(clean(companyName));
             out.setIndustryCategory(clean(industry));
             out.setListingDate(clean(listingDate));
             out.setMainBusiness(clean(mainBiz));
             return out;
+
         } catch (Exception e) {
             return null;
         }
@@ -42,69 +50,102 @@ public class TwseCompanyPdfClient {
 
     private static String extractText(byte[] pdfBytes) throws Exception {
         try (PDDocument doc = PDDocument.load(new ByteArrayInputStream(pdfBytes))) {
-            return new PDFTextStripper().getText(doc);
+            PDFTextStripper stripper = new PDFTextStripper();
+            return stripper.getText(doc);
         }
     }
 
-    private static String findValueByLabel(String text, String label) {
+    /**
+     * 更穩的 label 取值：
+     * 1) 同行 label 後面有值就取
+     * 2) 否則取下一行（但只取像值的那行）
+     */
+    private static String findValueSmart(String text, String label) {
         String[] lines = text.split("\\r?\\n");
         for (int i = 0; i < lines.length; i++) {
-            String s = lines[i] == null ? "" : lines[i].trim();
-            if (!s.contains(label)) continue;
+            String s = norm(lines[i]);
+            if (s.isBlank()) continue;
+            int pos = s.indexOf(label);
+            if (pos < 0) continue;
 
-            String after = s.substring(s.indexOf(label) + label.length()).trim();
+            String after = s.substring(pos + label.length()).trim();
             if (!after.isBlank()) return after;
 
-            // ✅ fallback：抓下一行非空
+            // fallback: 下一行像「值」的才取（避免抓到別的 label）
             for (int j = i + 1; j < lines.length; j++) {
-                String next = lines[j] == null ? "" : lines[j].trim();
-                if (!next.isBlank()) return next;
+                String next = norm(lines[j]);
+                if (next.isBlank()) continue;
+
+                // 若下一行本身又包含很多欄位 label 關鍵字，就不要當值
+                if (containsAny(next, "公司名稱", "上市日期", "產業類別", "公司網址", "實收資本額", "總機", "發言人", "主要經營業務")) {
+                    break;
+                }
+                return next;
             }
             return null;
         }
         return null;
     }
 
-    private static String findDateByLabel(String text, String label) {
-        String v = findValueByLabel(text, label);
+    private static String findDateSmart(String text, String label) {
+        String v = findValueSmart(text, label);
         if (v == null) return null;
-        v = v.replace('/', '-').trim();
-        if (v.contains(" ")) v = v.substring(0, v.indexOf(' ')).trim();
-        return v;
+
+        // ✅ 從字串中抽出日期片段，避免 "1994/09/05上市日期" 這種污染
+        Matcher m = YMD_PATTERN.matcher(v);
+        if (m.find()) {
+            int y = Integer.parseInt(m.group(1));
+            int mo = Integer.parseInt(m.group(2));
+            int d = Integer.parseInt(m.group(3));
+            return String.format("%04d-%02d-%02d", y, mo, d);
+        }
+        return null;
     }
 
     /**
-     * 「主要經營業務」通常是標題行，內容散在它上方數行（你之前也確認是文字 PDF）
-     * 這裡做 best-effort：向上收集，遇到其他欄位標題就停。
+     * 主要經營業務常常會很長，可能跨多行。
+     * 做法：找到 label 後，收集同一行 label 後面的值 + 後續幾行，直到遇到下一個欄位 label。
      */
-    private static String extractMainBusinessBlock(String text) {
-        List<String> lines = Arrays.asList(text.split("\\r?\\n"));
-        int idx = -1;
-        for (int i = 0; i < lines.size(); i++) {
-            String s = lines.get(i) == null ? "" : lines.get(i).trim();
-            if (s.contains("主要經營業務")) { idx = i; break; }
-        }
-        if (idx < 0) return null;
-
-        Set<String> stopKeys = Set.of("公司名稱", "上市日期", "產業類別", "公司網址", "實收資本額", "總機", "發言人");
-
-        List<String> buf = new ArrayList<>();
-        for (int i = idx - 1; i >= 0; i--) {
-            String s = lines.get(i) == null ? "" : lines.get(i).trim();
+    private static String findValueBlockSmart(String text, String label) {
+        String[] lines = text.split("\\r?\\n");
+        for (int i = 0; i < lines.length; i++) {
+            String s = norm(lines[i]);
             if (s.isBlank()) continue;
 
-            boolean stop = false;
-            for (String k : stopKeys) {
-                if (s.contains(k)) { stop = true; break; }
-            }
-            if (stop) break;
+            int pos = s.indexOf(label);
+            if (pos < 0) continue;
 
-            buf.add(s);
-            if (buf.size() >= 10) break;
+            StringBuilder sb = new StringBuilder();
+            String after = s.substring(pos + label.length()).trim();
+            if (!after.isBlank()) sb.append(after);
+
+            // 往下抓最多 8 行（可調），直到遇到其他欄位 label
+            for (int j = i + 1; j < lines.length && j <= i + 8; j++) {
+                String next = norm(lines[j]);
+                if (next.isBlank()) continue;
+
+                if (containsAny(next, "公司名稱", "上市日期", "產業類別", "公司網址", "實收資本額", "總機", "發言人")) {
+                    break;
+                }
+                sb.append(next);
+            }
+
+            String out = sb.toString().trim();
+            return out.isBlank() ? null : out;
         }
-        Collections.reverse(buf);
-        String joined = String.join("", buf).trim();
-        return joined.isBlank() ? null : joined;
+        return null;
+    }
+
+    private static boolean containsAny(String s, String... keys) {
+        for (String k : keys) {
+            if (s.contains(k)) return true;
+        }
+        return false;
+    }
+
+    private static String norm(String s) {
+        if (s == null) return "";
+        return s.replace("\u0000", "").trim();
     }
 
     private static String clean(String s) {
