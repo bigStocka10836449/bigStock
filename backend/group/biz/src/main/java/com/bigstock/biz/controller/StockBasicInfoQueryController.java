@@ -17,8 +17,8 @@ public class StockBasicInfoQueryController {
     private final StockBasicInfoQueryService stockBasicInfoQueryService;
 
     @Operation(summary = "查DB：個股基本資料（給App/Web顯示用，不會外抓）")
-    @GetMapping
-    public ResponseEntity<?> query(
+    @GetMapping("/db")  // ✅ 改這裡：避免跟你原本 GET /api/stock/basic-info 撞到
+    public ResponseEntity<?> queryDb(
             @RequestParam String stockId,
             @RequestParam(required = false) String market
     ) {
