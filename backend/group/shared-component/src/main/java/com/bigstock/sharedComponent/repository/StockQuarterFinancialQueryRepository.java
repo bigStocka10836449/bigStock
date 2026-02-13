@@ -6,6 +6,9 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
 
@@ -76,7 +79,7 @@ public class StockQuarterFinancialQueryRepository {
         return jdbc.query(sql, p, (rs, i) -> map(rs));
     }
 
-    private static QuarterlyFinancialResponse map(java.sql.ResultSet rs) throws java.sql.SQLException {
+    private static QuarterlyFinancialResponse map(ResultSet rs) throws SQLException {
         QuarterlyFinancialResponse d = new QuarterlyFinancialResponse();
         d.setStockId(rs.getString("stock_id"));
         d.setStockName(rs.getString("stock_name"));
@@ -89,19 +92,25 @@ public class StockQuarterFinancialQueryRepository {
 
         d.setUnit(rs.getString("unit"));
 
+        // bigint / int8：用 getObject 轉 Long OK（也可改 rs.getLong + wasNull）
         d.setOperatingRevenue((Long) rs.getObject("operating_revenue"));
         d.setOperatingProfit((Long) rs.getObject("operating_profit"));
         d.setNonOperatingIncomeExpense((Long) rs.getObject("non_operating_income_expense"));
         d.setNetProfitAfterTax((Long) rs.getObject("net_profit_after_tax"));
-
         d.setCapitalStockEndPeriod((Long) rs.getObject("capital_stock_end_period"));
-        d.setEarningsPerShare((Double) rs.getObject("earnings_per_share"));
-        d.setNetAssetValuePerShare((Double) rs.getObject("net_asset_value_per_share"));
 
-        d.setQuickRatio((Double) rs.getObject("quick_ratio"));
-        d.setCurrentRatio((Double) rs.getObject("current_ratio"));
-        d.setDepn((Double) rs.getObject("depn"));
+        // ✅ numeric(18,2)：Postgres driver 會回 BigDecimal，必須這樣轉
+        d.setEarningsPerShare(toDouble(rs.getBigDecimal("earnings_per_share")));
+        d.setNetAssetValuePerShare(toDouble(rs.getBigDecimal("net_asset_value_per_share")));
+        d.setQuickRatio(toDouble(rs.getBigDecimal("quick_ratio")));
+        d.setCurrentRatio(toDouble(rs.getBigDecimal("current_ratio")));
+        d.setDepn(toDouble(rs.getBigDecimal("depn")));
+
         return d;
+    }
+
+    private static Double toDouble(BigDecimal bd) {
+        return bd == null ? null : bd.doubleValue();
     }
 
     private static String safe(String s) {
