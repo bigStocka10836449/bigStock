@@ -25,7 +25,6 @@ public class StockQuarterProfitabilityQueryRepository {
             earnings_per_share
         FROM bstock.stock_quarter_financial
         WHERE stock_id = :stock_id
-          AND (:market IS NULL OR market = :market)
         ORDER BY year DESC, quarter DESC
         LIMIT :limit
         """;
@@ -40,12 +39,12 @@ public class StockQuarterProfitabilityQueryRepository {
 
         MapSqlParameterSource p = new MapSqlParameterSource()
                 .addValue("stock_id", sid)
-                .addValue(
+                /*.addValue(
                         "market",
                         (market == null || market.trim().isBlank())
                                 ? null
                                 : market.trim().toUpperCase()
-                )
+                )*/
                 .addValue("limit", limit);
 
         return jdbc.query(SQL_LATEST_N, p, (rs, i) -> {
