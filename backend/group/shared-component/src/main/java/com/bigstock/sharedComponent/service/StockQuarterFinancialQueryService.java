@@ -17,7 +17,7 @@ public class StockQuarterFinancialQueryService {
 
     private static final String BASE_SELECT = """
         SELECT
-            stock_id, stock_name, market,
+            stock_id, stock_name,
             year, quarter, period_start_month, period_end_month,
             unit,
             operating_revenue, operating_profit, non_operating_income_expense, net_profit_after_tax,
@@ -32,14 +32,13 @@ public class StockQuarterFinancialQueryService {
 
         String sql = BASE_SELECT + """
             WHERE stock_id = :stock_id
-              AND (:market IS NULL OR market = :market)
             ORDER BY year DESC, quarter DESC
             LIMIT :limit
             """;
 
         MapSqlParameterSource p = new MapSqlParameterSource()
                 .addValue("stock_id", sid)
-                .addValue("market", (market == null || market.trim().isBlank()) ? null : market.trim().toUpperCase())
+                //.addValue("market", (market == null || market.trim().isBlank()) ? null : market.trim().toUpperCase())
                 .addValue("limit", limit);
 
         return jdbc.query(sql, p, (rs, i) -> map(rs));
@@ -64,14 +63,13 @@ public class StockQuarterFinancialQueryService {
 
         String sql = BASE_SELECT + """
             WHERE stock_id = :stock_id
-              AND (:market IS NULL OR market = :market)
               AND (year * 4 + quarter) BETWEEN :sIdx AND :eIdx
             ORDER BY year ASC, quarter ASC
             """;
 
         MapSqlParameterSource p = new MapSqlParameterSource()
                 .addValue("stock_id", sid)
-                .addValue("market", (market == null || market.trim().isBlank()) ? null : market.trim().toUpperCase())
+                //.addValue("market", (market == null || market.trim().isBlank()) ? null : market.trim().toUpperCase())
                 .addValue("sIdx", sIdx)
                 .addValue("eIdx", eIdx);
 
