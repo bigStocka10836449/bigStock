@@ -96,9 +96,10 @@ jobs:
           # The tag from your GitHub push (e.g., vtest0.0.2)
           NEW_TAG="${{ github.ref_name }}"
           ENV_ID="${{ secrets.ZEABUR_ENV_ID }}"
+          PROJECT_ID="${{ secrets.ZEABUR_BIZ_PROJECT_ID }}"
           SERVICE_ID="${{ secrets.ZEABUR_BIZ_SERVICE_ID }}"
           echo "Updating $SERVICE_ID to use $REPO_NAME:$NEW_TAG from Docker Hub..."
-
+          npx zeabur@latest context set project --id $PROJECT_ID -i=false
 
           
           npx zeabur@latest service update tag --id $SERVICE_ID --env-id $ENV_ID --tag $NEW_TAG -i=false
