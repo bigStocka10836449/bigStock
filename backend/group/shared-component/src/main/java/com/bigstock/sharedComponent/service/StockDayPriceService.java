@@ -2,6 +2,8 @@ package com.bigstock.sharedComponent.service;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -15,14 +17,23 @@ import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.annotation.BigStockCacheableWithLock;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
+import com.bigstock.sharedComponent.entity.StockDayPriceRank;
+import com.bigstock.sharedComponent.entity.StockMonthPriceRank;
+import com.bigstock.sharedComponent.repository.StockDayPriceRankRepository;
 import com.bigstock.sharedComponent.repository.StockDayPriceRepository;
 
+import jakarta.persistence.EntityManager;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class StockDayPriceService {
 	private final StockDayPriceRepository stockDayPriceRepository;
+	
+	private final StockDayPriceRankRepository stockDayPriceRankRepository;
+	
+	private final EntityManager entityManager;
 
 	@CacheEvict(value = { "shortLivedCache", "longLivedCache", "defaultCache" }, allEntries = true)
 	public StockDayPrice save(StockDayPrice stockDayPrice) {
@@ -113,10 +124,6 @@ public class StockDayPriceService {
 		return stockDayPriceRepository.findTodateReachLimitUp(endDate);
 	}
 
-	public List<String> findListStockCode() {
-		return stockDayPriceRepository.findListStockCode();
-	}
-
 	public List<StockDayPrice> findByWeekOfYear(String weekOfYear) {
 		return stockDayPriceRepository.findByWeekOfYear(weekOfYear);
 	}
@@ -131,5 +138,98 @@ public class StockDayPriceService {
 
 	private StockDayPriceService getSelf() {
 		return (StockDayPriceService) AopContext.currentProxy();
+	}
+	
+	@Transactional
+	public void batchInsertDayRankPrices(List<StockDayPriceRank> monthPrices) {
+
+		int batchSize = 100;
+
+		for (int i = 0; i < monthPrices.size(); i++) {
+			entityManager.persist(monthPrices.get(i));
+
+			if (i > 0 && i % batchSize == 0) {
+				entityManager.flush();
+				entityManager.clear();
+			}
+		}
+
+		entityManager.flush();
+		entityManager.clear();
+	}
+	
+	public void deleteRankByStockCode(String stockCode) {
+		stockDayPriceRankRepository.deleteByStockCode(stockCode);
+	}
+
+	public List<StockDayPriceRank> buildRanks(String stockCode, List<StockDayPrice> monthPrices) {
+
+		// 依 年 + 月 由新到舊排序
+		List<StockDayPrice> sorted = monthPrices.stream()
+				.sorted(Comparator.comparing(StockDayPrice::getTradingDay).reversed())
+				.limit(720).toList();
+
+		List<StockDayPriceRank> ranks = new ArrayList<>(sorted.size());
+
+		int rankNo = 1;
+		for (StockDayPrice p : sorted) {
+
+			StockDayPriceRank r = new StockDayPriceRank();
+
+		    // =========================
+		    // 🔹 PK / Business Key
+		    // =========================
+		    r.setStockCode(p.getStockCode());
+		    r.setWeekOfYear(p.getWeekOfYear());
+		    r.setMonthOfYear(p.getMonthOfYear());
+
+		    // =========================
+		    // 🔹 時間相關欄位
+		    // =========================
+		    r.setMonthOfYear(p.getMonthOfYear());
+		    r.setTradingDay(p.getTradingDay()); 
+		    // 若你擔心 Date 被修改，可改成：
+		    // new Date(p.getFirstTradingDay().getTime())
+
+		    // =========================
+		    // 🔹 價格資訊（完整快照）
+		    // =========================
+		    r.setOpeningPrice(p.getOpeningPrice());
+		    r.setClosingPrice(p.getClosingPrice());
+		    r.setHighPrice(p.getHighPrice());
+		    r.setLowPrice(p.getLowPrice());
+
+		    // =========================
+		    // 🔹 成交 / 變動
+		    // =========================
+		    r.setTradingVolume(p.getTradingVolume());
+		    r.setChangeRate(p.getChangeRate());
+
+		    // =========================
+		    // 🔹 技術指標（KD / RSV）
+		    // =========================
+		    r.setLineKvalue(p.getLineKvalue());
+		    r.setLineDvalue(p.getLineDvalue());
+		    r.setLineRSVvalue(p.getLineRSVvalue());
+
+		    // =========================
+		    // 🔹 均線（MA）
+		    // =========================
+		    r.setFiveDaysMa(p.getFiveDaysMa());
+		    r.setTenDaysMa(p.getTenDaysMa());
+		    r.setTwentyDaysMa(p.getTwentyDaysMa());
+		    r.setSixtyDaysMa(p.getSixtyDaysMa());
+		    r.setOneTwentyDaysMa(p.getOneTwentyDaysMa());
+		    r.setTwoFourtyDaysMa(p.getTwoFourtyDaysMa());
+
+		    // =========================
+		    // 🔹 Rank only（唯一新產生）
+		    // =========================
+		    r.setRankNo(rankNo++);
+
+		    ranks.add(r);
+		}
+
+		return ranks;
 	}
 }

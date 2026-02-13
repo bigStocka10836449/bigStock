@@ -54,8 +54,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class BizService {
 
-	private static final List<String> MA_TYPE = List.of("five_days_slope", "ten_days_slope", "twenty_days_slope",
-			"sixty_days_slope", "one_twenty_days_slope", "two_fourty_days_slope");
+	private static final List<String> MA_TYPE = List.of("five_ma_slope", "ten_ma_slope", "twenty_ma_slope",
+			"sixty_ma_slope", "one_twenty_ma_slope", "two_fourty_ma_slope");
 
 	private final ShareholderStructureService shareholderStructureService;
 

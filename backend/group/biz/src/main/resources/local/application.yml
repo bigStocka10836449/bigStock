@@ -35,7 +35,11 @@ spring:
       ddl-auto: none
     properties:
       hibernate:
-        show-sql: true   
+        show-sql: true  
+        jdbc:
+          batch_size: 100
+        order_inserts: true
+        order_updates: true     
   redis:
     host: 43.153.144.80
     lettuce:

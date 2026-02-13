@@ -102,23 +102,7 @@ public class GatewayController {
 			return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
 		}
 	}
-	
-	@Operation(summary = "個別股票價格，版本2作法，直接打給MQ,然後前端再透過查詢進度的方式抓到當前進度", description = "")
-	@PostMapping("sse/singleStockPrice")
-	public ResponseEntity<String> SingleStockPriceSSE(@RequestBody SingleStockPriceBizVo singleStockPriceBizVo) {
-		try {
-			ObjectMapper objectMapper = new ObjectMapper();
-			objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd"));
-			SingleStockPriceVo vo = bizService.getSingleStockPrices(singleStockPriceBizVo.getStockCode(),
-					singleStockPriceBizVo.getSearchStartDate(), singleStockPriceBizVo.getSearchEndDate());
 
-			String voString = objectMapper.writeValueAsString(vo);
-			return ResponseEntity.ok(voString);
-		} catch (ParseException | IOException  e) {
-			log.error(e.getMessage(), e);
-			return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-		}
-	}
 
 
 //	@PostMapping("sse/session")

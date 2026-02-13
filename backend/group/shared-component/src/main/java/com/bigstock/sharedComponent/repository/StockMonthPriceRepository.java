@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.bigstock.sharedComponent.entity.StockMonthPrice;
+import com.bigstock.sharedComponent.entity.StockMonthPriceRank;
 
 public interface StockMonthPriceRepository extends JpaRepository<StockMonthPrice, StockMonthPrice.StockMonthPriceId> {
 	
@@ -23,5 +24,6 @@ public interface StockMonthPriceRepository extends JpaRepository<StockMonthPrice
 			+ " order by smp.year , smp.month  desc  limit :limit", nativeQuery = true)
 	List<StockMonthPrice> findStockCodeAndLimit(@Param("stockCode") String stockCode,@Param("limit") Integer limit);
 	
+	List<StockMonthPrice> findByStockCode(String stockCode);
 }
 
