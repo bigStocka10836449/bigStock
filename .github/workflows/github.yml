@@ -62,7 +62,7 @@ jobs:
       # ---------------------------------------
       # Setup Node (ensures npx exists)
       # ---------------------------------------
-      - name: Setup Node
+            - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -77,7 +77,12 @@ jobs:
       # Login to Zeabur
       # ---------------------------------------
       - name: Login to Zeabur
-        run: npx zeabur auth login --token ${{ secrets.ZEABUR_TOKEN }}
+        env:
+          ZEABUR_TOKEN: ${{ secrets.ZEABUR_TOKEN }}
+        run: |
+            npx zeabur@latest auth login --token "$ZEABUR_TOKEN" --interactive=false && break || \
+            (echo "Login failed, retrying in 10s..." && sleep 10);
+
 
       # ---------------------------------------
       # Update Image
@@ -92,4 +97,4 @@ jobs:
       # Redeploy Service
       # ---------------------------------------
       - name: Redeploy Service
-        run: npx zeabur service redeploy bigstock-biz        
+        run: npx zeabur service redeploy bigstock-biz                
