@@ -37,7 +37,7 @@ spec:
             default: postgresql
 
           SPRING_REDIS_HOST:
-            default: redis.zeabur.internal
+            default: redis-euls.zeabur.internal
 
           SPRING_REDIS_PORT:
             default: "6379"

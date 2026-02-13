@@ -45,26 +45,26 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class GraspStockPrice {
-	@Value("${schedule.chromeDriverPath.windows.active}")
-	private boolean windowsActive;
+//	@Value("${schedule.chromeDriverPath.windows.active}")
+//	private boolean windowsActive;
 
-	@Value("${schedule.chromeDriverPath.windows.path}")
-	private String windowsChromeDriverPath;
+//	@Value("${schedule.chromeDriverPath.windows.path}")
+//	private String windowsChromeDriverPath;
 
-	@Value("${schedule.chromeDriverPath.linux.active}")
-	private boolean linuxActive;
+//	@Value("${schedule.chromeDriverPath.linux.active}")
+//	private boolean linuxActive;
 
-	@Value("${schedule.chromeDriverPath.linux.driver-path}")
-	private String linuxChromeDriverPath;
+//	@Value("${schedule.chromeDriverPath.linux.driver-path}")
+//	private String linuxChromeDriverPath;
 
-	@Value("${schedule.chromeDriverPath.download-path}")
-	private String downloadPath;
+//	@Value("${schedule.chromeDriverPath.download-path}")
+//	private String downloadPath;
 
-	@Value("${schedule.bpython-url}")
-	private String bpythonUrl;
+//	@Value("${schedule.bpython-url}")
+//	private String bpythonUrl;
 
-	@Value("${schedule.credentials-pathl}")
-	private String credentialsPath;
+//	@Value("${schedule.credentials-pathl}")
+//	private String credentialsPath;
 
 	private final GraspHistoryStockPrice graspHistoryStockPrice;
 

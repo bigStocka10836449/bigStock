@@ -30,14 +30,14 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class GraspShareholderStructureService {
 
-	@Value("${schedule.chromeDriverPath.windows.active}")
-	private boolean windowsActive;
+//	@Value("${schedule.chromeDriverPath.windows.active}")
+//	private boolean windowsActive;
 
 //	@Value("${schedule.chromeDriverPath.windows.path}")
 //	private String windowsChromeDriverPath;
 
-	@Value("${schedule.chromeDriverPath.linux.active}")
-	private boolean linuxActive;
+//	@Value("${schedule.chromeDriverPath.linux.active}")
+//	private boolean linuxActive;
 //
 //	@Value("${schedule.chromeDriverPath.linux.driver-path}")
 //	private String linuxChromeDriverPath;
@@ -45,11 +45,11 @@ public class GraspShareholderStructureService {
 //	@Value("${schedule.task.scheduling.cron.expression.sync-start-date}")
 //	private String syncStartDate;
 	
-	@Value("${schedule.tdccQryStockUrl}")
-	private String tdccQryStockUrl;
+//	@Value("${schedule.tdccQryStockUrl}")
+//	private String tdccQryStockUrl;
 
-	@Value("${schedule.overTheCounterUrl}")
-	private String overTheCounterUrl;
+//	@Value("${schedule.overTheCounterUrl}")
+//	private String overTheCounterUrl;
 
 	private final ShareholderStructureService shareholderStructureService;
 
