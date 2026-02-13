@@ -36,7 +36,7 @@ jobs:
           echo test, and deploy your project.
       - name: Build with Maven
         working-directory: backend/group
-        run: mvn clean install -DskipTests=true
+        run: mvn clean package -Denv=dev -DskipTests=true
       # ---------------------------------------------------
       # Log in to Docker registry
       # (Docker Hub / GHCR / Harbor 都可)
@@ -58,4 +58,38 @@ jobs:
       - name: Push Docker image
         run: |
           IMAGE_TAG=${{ github.ref_name }}
-          docker push isaac0410/bstock-all-in-one:${IMAGE_TAG}             
+          docker push isaac0410/bstock-all-in-one:${IMAGE_TAG} 
+      # ---------------------------------------
+      # Setup Node (ensures npx exists)
+      # ---------------------------------------
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # ---------------------------------------
+      # Install Zeabur CLI (local install)
+      # ---------------------------------------
+      - name: Install Zeabur CLI
+        run: npm install @zeabur/cli
+
+      # ---------------------------------------
+      # Login to Zeabur
+      # ---------------------------------------
+      - name: Login to Zeabur
+        run: npx zeabur auth login --token ${{ secrets.ZEABUR_TOKEN }}
+
+      # ---------------------------------------
+      # Update Image
+      # ---------------------------------------
+      - name: Update Service Image
+        run: |
+          IMAGE_TAG=${{ github.ref_name }}
+          npx zeabur service update bigstock-biz \
+            --image isaac0410/bstock-all-in-one:${IMAGE_TAG}
+
+      # ---------------------------------------
+      # Redeploy Service
+      # ---------------------------------------
+      - name: Redeploy Service
+        run: npx zeabur service redeploy bigstock-biz        

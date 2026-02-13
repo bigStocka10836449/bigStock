@@ -1,0 +1,61 @@
+apiVersion: zeabur.com/v1
+kind: Template
+
+metadata:
+  name: bigstock-biz
+
+spec:
+  description: BigStock Backend Service
+
+  variables:
+    - key: BIGSTOCK_IMAGE
+      type: STRING
+      name: BigStock Docker Image
+      description: Full docker image reference
+
+  services:
+    - name: bigstock-biz
+      template: PREBUILT
+
+      spec:
+        source:
+          image: isaac0410/bstock-all-in-one::${IMAGE_TAG}
+
+        ports:
+          - id: http
+            port: 18080
+            type: HTTP
+
+        env:
+          SPRING_DATASOURCE_URL:
+            default: jdbc:postgresql://bstock-postgresql.zeabur.internal:5432/bstock
+
+          SPRING_DATASOURCE_USERNAME:
+            default: bstockuser
+
+          SPRING_DATASOURCE_PASSWORD:
+            default: postgresql
+
+          SPRING_REDIS_HOST:
+            default: redis.zeabur.internal
+
+          SPRING_REDIS_PORT:
+            default: "6379"
+
+          SPRING_RABBITMQ_HOST:
+            default: rabbitmq
+
+          SPRING_RABBITMQ_PORT:
+            default: "5672"
+
+          SPRING_RABBITMQ_USERNAME:
+            default: admin
+
+          SPRING_RABBITMQ_PASSWORD:
+            default: rabbitmq
+
+          JAVA_COMMAND_STR:
+            default: "-Xms800M -Xmx800M"
+            
+          JAR_NAME: 
+            default: bigstock-biz.jar    
