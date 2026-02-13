@@ -1,0 +1,11 @@
+.project
+*.prefs
+*.classpath
+*.factorypath
+/target/
+*/target
+backend/group/auth/target/
+backend/group/biz/target/
+backend/group/gateway/target/
+backend/group/schedule/target/
+backend/group/shared-component/target/classes/

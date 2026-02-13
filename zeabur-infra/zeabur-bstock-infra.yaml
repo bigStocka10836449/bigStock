@@ -1,0 +1,50 @@
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: big-stock-stack
+
+spec:
+  description: Big Stock backend infrastructure
+
+  services:
+    - name: bstock-postgresql
+      template: PREBUILT
+      spec:
+        source:
+          image: postgres:15-alpine
+
+        ports:
+          - id: postgres
+            port: 5432
+            type: TCP
+
+        env:
+          POSTGRES_USER:
+            default: postgres
+          POSTGRES_PASSWORD:
+            default: postgresql
+          POSTGRES_SHARED_BUFFERS:
+            default: "256MB"
+
+        volumes:
+          - id: postgres-data
+            dir: /var/lib/postgresql/data
+
+    - name: redis
+      template: PREBUILT
+      spec:
+        source:
+          image: redis:7.2.4
+
+        ports:
+          - id: redis
+            port: 6379
+            type: TCP
+
+        volumes:
+          - id: redis-config
+            dir: /etc/redis
+
+        command:
+          - redis-server
+          - /etc/redis/redis.conf
