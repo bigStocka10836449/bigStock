@@ -92,7 +92,7 @@ jobs:
           # The name of your service in Zeabur
           SERVICE_NAME="bigstock-biz"
           # Your Docker Hub repository
-          REPO_NAME="${{ ZEABUR_BIZ_REPO_NAME }}"
+          REPO_NAME="${{ secrets.ZEABUR_BIZ_REPO_NAME }}"
           # The tag from your GitHub push (e.g., vtest0.0.2)
           NEW_TAG="${{ github.ref_name }}"
           ENV_ID="${{ secrets.ZEABUR_ENV_ID }}"
