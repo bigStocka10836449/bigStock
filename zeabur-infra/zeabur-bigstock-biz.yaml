@@ -19,7 +19,7 @@ spec:
 
       spec:
         source:
-          image: isaac0410/bstock-all-in-one::${IMAGE_TAG}
+          image: isaac0410/bstock-all-in-one:vt0.0.4
 
         ports:
           - id: http
@@ -28,7 +28,7 @@ spec:
 
         env:
           SPRING_DATASOURCE_URL:
-            default: jdbc:postgresql://bstock-postgresql.zeabur.internal:5432/bstock
+            default: jdbc:postgresql://bstock-postgresql-hic.zeabur.internal:5432/bstock
 
           SPRING_DATASOURCE_USERNAME:
             default: bstockuser

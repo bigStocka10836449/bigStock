@@ -9,3 +9,4 @@ backend/group/biz/target/
 backend/group/gateway/target/
 backend/group/schedule/target/
 backend/group/shared-component/target/classes/
+backend/group/shared-component/target/
