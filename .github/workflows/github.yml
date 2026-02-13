@@ -77,7 +77,7 @@ jobs:
       # Login to Zeabur
       # ---------------------------------------
       - name: Login to Zeabur
-        run: npx zeabur auth login --token ${{ secrets.ZEABUR_TOKEN }}
+        run: npx zeabur auth login --token ${{ secrets.ZEABUR_TOKEN }} -i=false
 
       # ---------------------------------------
       # Update Image
