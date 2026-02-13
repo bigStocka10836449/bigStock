@@ -89,9 +89,20 @@ jobs:
       # ---------------------------------------
       - name: Update Service Image
         run: |
-          IMAGE_TAG=${{ github.ref_name }}
-          npx zeabur service update bigstock-biz \
-            --image isaac0410/bstock-all-in-one:${IMAGE_TAG}
+          # The name of your service in Zeabur
+          SERVICE_NAME="bigstock-biz"
+          # Your Docker Hub repository
+          REPO_NAME="isaac0410/bstock-all-in-one"
+          # The tag from your GitHub push (e.g., vtest0.0.2)
+          NEW_TAG="${{ github.ref_name }}"
+
+          echo "Updating $SERVICE_NAME to use $REPO_NAME:$NEW_TAG from Docker Hub..."
+
+          # 1. Update the Repository (Ensure it points to Docker Hub)
+          npx zeabur@latest service update --name $SERVICE_NAME --repo $REPO_NAME -i=false
+          
+          # 2. Update the Tag (Triggers the actual pull and restart)
+          npx zeabur@latest service update --name $SERVICE_NAME --tag $NEW_TAG -i=false
 
       # ---------------------------------------
       # Redeploy Service
