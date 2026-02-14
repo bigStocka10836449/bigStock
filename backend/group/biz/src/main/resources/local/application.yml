@@ -23,7 +23,7 @@ spring:
   main:
     allow-bean-definition-overriding: true
   datasource:
-    url: jdbc:postgresql://127.0.0.1:15432/bstock
+    url: jdbc:postgresql://43.153.144.80:31482/bstock
     username: bstockuser
     password: postgresql
     driver-class-name: org.postgresql.Driver
@@ -37,14 +37,14 @@ spring:
       hibernate:
         show-sql: true   
   redis:
-    host: 127.0.0.1
+    host: 43.153.144.80
     lettuce:
       pool:
         max-active: 200
         max-idle: 500
         min-idle: 10
         max-wait: 100000
-    port: 6379
+    port: 30815
   mail:
     host: smtp.gmail.com
     port: 587
