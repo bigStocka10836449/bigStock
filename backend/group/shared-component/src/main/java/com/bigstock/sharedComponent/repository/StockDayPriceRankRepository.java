@@ -14,8 +14,16 @@ public interface StockDayPriceRankRepository extends JpaRepository<StockDayPrice
 
 	@Modifying
 	@Query("""
-			DELETE FROM StockDayPriceRank r WHERE r.stockCode = :stockCode
+			DELETE FROM StockDayPriceRank r WHERE r.rankNo >= 361
 			""")
-	void deleteByStockCode(@Param("stockCode") String stockCode);
+	void deleteByRankNoLessThanZero();
+	
+	
+	@Modifying
+	@Query("""
+			Update StockDayPriceRank set rankNo = rankNo + 1
+			""")
+	void updateRankNo();
+	
 	
 }

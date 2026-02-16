@@ -24,7 +24,7 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 			    and sdp.closing_price::numeric = sdp.lmit_up::numeric
 			  order by sdp.stock_code asc
 			""", nativeQuery = true)
-	List<StockDayPrice> findTodateReachLimitUp(@Param("endDate") Date endDate);
+	List<StockDayPrice> findTodateReachLimitUp(@Param("tradingDay") Date endDate);
 
 	@Query("select t from StockDayPrice t where t.stockCode = :stockCode and t.weekOfYear = :weekOfYear order by t.tradingDay asc")
 	List<StockDayPrice> findThisWeekStockDayPrices(@Param("stockCode") String stockCode,
@@ -78,16 +78,28 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 			@Param("stockCode") String stockCode, @Param("endDate") Date endDate);
 
 	@Query(value = """
-			  select sdp.*
-			  from bstock.stock_day_price sdp
-			  where sdp.stock_code = :stockCode
-			    and sdp.trading_day <= :endDate
-			    and sdp.closing_price ~ '^[0-9]+(\\.[0-9]+)?$'
-			  order by sdp.trading_day desc
-			  limit 240
+			select *
+			from bstock.stock_day_price
+			where trading_day between :startDateMinus360 and :endDate
+			and stock_code between '0000' and '9999'
+			and closing_price not in ('--', '----', '')
+			and closing_price is not null
+			order by stock_code, trading_day desc
 			""", nativeQuery = true)
-	List<StockDayPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(@Param("stockCode") String stockCode,
+	List<StockDayPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(@Param("startDateMinus360") Date startDateMinus360,
 			@Param("endDate") Date endDate);
+	
+//	@Query(value = """
+//			  select sdp.*
+//			  from bstock.stock_day_price sdp
+//			  where sdp.stock_code = :stockCode
+//			    and sdp.trading_day <= :endDate
+//			    and sdp.closing_price ~ '^[0-9]+(\\.[0-9]+)?$'
+//			  order by sdp.trading_day desc
+//			  limit 240
+//			""", nativeQuery = true)
+//	List<StockDayPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(@Param("stockCode") String stockCode,
+//			@Param("endDate") Date endDate);
 
 	Optional<StockDayPrice> findByStockCodeAndTradingDay(String stockCode, Date tradingDay);
 

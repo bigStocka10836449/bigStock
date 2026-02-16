@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -55,9 +54,9 @@ public class GraspShareholderStructureService {
 
 	private final StockInfoService stockInfoService;
 
-	@PostConstruct
+//	@PostConstruct
 	// 每天晚上8點更新
-//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}")
+	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}", zone= "Asia/Taipei")
 	public void updateShareholderStructure()
 			throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException {
 		// 先抓DB裡面全部的代號資料
@@ -67,6 +66,9 @@ public class GraspShareholderStructureService {
 		stockCodeWeekInfos.stream().forEach(stockCodeWeekInfo -> {
 			String stockCode = stockCodeWeekInfo.get(37);
 			try {
+//				if(!stockCode.matches("\\d{4}")) {
+//					return;
+//				}
 				if(stockCode.trim().equals("2330")) {
 					log.info(stockCode);
 				}
@@ -84,6 +86,9 @@ public class GraspShareholderStructureService {
 			}
 		});
 		shareholderStructureService.insert(shareholderStructures);
+		List<StockInfo> stockInfos = ChromeDriverUtils
+				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2");
+		stockInfoService.insertAll(stockInfos);
 	}
 
 	private ShareholderStructure refreshStockLatestInfo(String stockCode, String stockName,
@@ -143,8 +148,8 @@ public class GraspShareholderStructureService {
 		return shareholderStructure;
 	}
 
-//	@PostConstruct
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-stock-info}")
+	@PostConstruct
+	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-stock-info}", zone= "Asia/Taipei")
 	public void updateStockInfo() throws InterruptedException, JsonMappingException, RestClientException,
 			JsonProcessingException, URISyntaxException {
 		List<StockInfo> stockInfos = ChromeDriverUtils

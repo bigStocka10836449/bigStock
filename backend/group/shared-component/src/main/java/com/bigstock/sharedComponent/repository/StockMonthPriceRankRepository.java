@@ -13,8 +13,16 @@ public interface StockMonthPriceRankRepository
 		extends JpaRepository<StockMonthPriceRank, StockMonthPriceRank.StockMonthPriceRankId> {
 	@Modifying
 	@Query("""
-			DELETE FROM StockMonthPriceRank r WHERE r.stockCode = :stockCode
+			DELETE FROM StockMonthPriceRank r WHERE r.rankNo >= 361
 			""")
-	void deleteByStockCode(@Param("stockCode") String stockCode);
+	void deleteByRankNoLessThanZero();
+	
+	
+	@Modifying
+	@Query("""
+			Update StockMonthPriceRank set rankNo = rankNo + 1
+			""")
+	void updateRankNo();
+	
 	 
 }

@@ -9,10 +9,19 @@ import com.bigstock.sharedComponent.entity.StockWeekPriceRank;
 
 public interface StockWeekPriceRankRepository
 		extends JpaRepository<StockWeekPriceRank, StockWeekPriceRank.StockWeekPriceRankId> {
+
 	@Modifying
 	@Query("""
-			DELETE FROM StockWeekPriceRank r WHERE r.stockCode = :stockCode
+			DELETE FROM StockWeekPriceRank r WHERE r.rankNo >= 361
 			""")
-	void deleteByStockCode(@Param("stockCode") String stockCode);
+	void deleteByRankNoLessThanZero();
+	
+	
+	@Modifying
+	@Query("""
+			Update StockWeekPriceRank set rankNo = rankNo + 1
+			""")
+	void updateRankNo();
+	
 	 
 }

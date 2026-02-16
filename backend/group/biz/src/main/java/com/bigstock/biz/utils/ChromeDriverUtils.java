@@ -562,10 +562,10 @@ public class ChromeDriverUtils {
 		List<Map<String, String>> responseList = objectMapper
 				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
 				}).stream()
-//				.filter(data -> {
-//					String code = data.get("Code").toString();
-//					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
-//				})
+				.filter(data -> {
+					String code = data.get("Code").toString();
+					return code.trim().length() < 5 && !code.matches(".*[a-zA-Z].*");
+				})
 				.collect(Collectors.toList());
 		LocalDate today = tradeDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 
@@ -695,10 +695,10 @@ public class ChromeDriverUtils {
 		List<Map<String, String>> responseList = objectMapper
 				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
 				}).stream()
-//				.filter(data -> {
-//					String code = data.get("SecuritiesCompanyCode").toString();
-//					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
-//				})
+				.filter(data -> {
+					String code = data.get("SecuritiesCompanyCode").toString();
+					return code.trim().length() < 5 && !code.matches(".*[a-zA-Z].*");
+				})
 				.collect(Collectors.toList());
 
 		return responseList.stream().map(map -> {
@@ -743,10 +743,10 @@ public class ChromeDriverUtils {
 		List<Map<String, String>> responseList = objectMapper
 				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
 				}).stream()
-//		.filter(data -> {
-//			String code = data.get("SecuritiesCompanyCode").toString();
-//			return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
-//		})
+		.filter(data -> {
+			String code = data.get("SecuritiesCompanyCode").toString();
+			return code.trim().length() < 5 && !code.matches(".*[a-zA-Z].*");
+		})
 				.collect(Collectors.toList());
 		return responseList.stream().map(map -> {
 			// 指定日期字符串格式
@@ -822,10 +822,10 @@ public class ChromeDriverUtils {
 		List<Map<String, String>> responseList = objectMapper
 				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
 				}).stream()
-//				.filter(data -> {
-//					String code = data.get("SecuritiesCompanyCode").toString();
-//					return code.length() < 5 && !code.matches(".*[a-zA-Z].*");
-//				})
+				.filter(data -> {
+					String code = data.get("SecuritiesCompanyCode").toString();
+					return code.trim().length() < 5 && !code.matches(".*[a-zA-Z].*");
+				})
 				.collect(Collectors.toList());
 		return responseList.stream().map(map -> {
 			// 指定日期字符串格式

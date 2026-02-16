@@ -11,9 +11,9 @@ import com.bigstock.sharedComponent.entity.StockMonthPriceRank;
 
 public interface StockMonthPriceRepository extends JpaRepository<StockMonthPrice, StockMonthPrice.StockMonthPriceId> {
 	
-	@Query(value = "select smp.* from bstock.bstock.stock_month_price smp where smp.stock_code =:stockCode and smp.month_of_year <= :monthOfYear order by smp.month_of_year desc limit 240", 
+	@Query(value = "select    smp.*   from bstock.bstock.stock_month_price smp where  smp.month_of_year <= :monthOfYear order by smp.month_of_year desc ", 
 		    nativeQuery = true)
-	List<StockMonthPrice> findByStockCodeAndMmonthOfYearBeforEqualLimitTwoFourty(@Param("stockCode")String stockCode, @Param("monthOfYear") String monthOfYear);
+	List<StockMonthPrice> findByMmonthOfYearAndDesc(@Param("monthOfYear") String monthOfYear);
 	
 	@Query(value = "select smp.* from bstock.bstock.stock_month_price smp where  smp.month_of_year = :monthOfYear", 
 		    nativeQuery = true)

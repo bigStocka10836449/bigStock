@@ -5,6 +5,7 @@ import java.util.Date;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -23,14 +24,16 @@ import lombok.NoArgsConstructor;
 @IdClass(StockWeekPriceRank.StockWeekPriceRankId.class)
 public class StockWeekPriceRank {
 
+	@Id
 	@Column(name = "stock_code")
 	private String stockCode;
 
+	@Id
 	@Column(name = "week_of_year")
 	private String weekOfYear;
 
-	/** year 是 SQL keyword */
-	@Column(name = "year", length = 4)
+	@Id
+	@Column(name = "year")
 	private String year;
 
 	@Column(name = "month")
