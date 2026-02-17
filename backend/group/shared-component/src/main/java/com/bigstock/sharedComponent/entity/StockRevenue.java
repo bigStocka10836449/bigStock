@@ -22,10 +22,10 @@ public class StockRevenue {
     @Column(name = "revenue", nullable = false)
     private long revenue;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at")
     private Instant updatedAt;
 
     public StockRevenue() {}

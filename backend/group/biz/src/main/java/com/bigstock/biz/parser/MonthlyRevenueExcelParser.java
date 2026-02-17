@@ -111,55 +111,54 @@ public class MonthlyRevenueExcelParser {
     //    header 會有月份縮寫：JAN. FEB. ... 且同月會出現兩次（本年度、上年度）
     //    我們要「第一個 目標月份縮寫」那一欄
     // =========================
-    private ParseResult tryParseTwse(Sheet sheet, String date, String market) {
-        // date = yyyy-MM
-        int month = Integer.parseInt(date.substring(5, 7)); // 01~12
-        String targetMonthAbbr = MONTH_ABBR[month - 1];
+ // =========================
+ // 2) TWSE 格式：
+ // =========================
+ private ParseResult tryParseTwse(Sheet sheet, String date, String market) {
+     int month = Integer.parseInt(date.substring(5, 7)); // 01~12
 
-        // 找到「月份欄所在的 header row」與「目標月份欄 index」
-        HeaderLocate hl = locateTwseHeader(sheet, targetMonthAbbr);
-        if (hl == null) return null;
+     // ✅ 關鍵：把月份 token 去點，跟 normalize() 一致
+     String targetMonthAbbr = MONTH_ABBR[month - 1].replace(".", ""); // e.g. "MAY"
 
-        int dataStartRow = hl.headerRowIdx + 1;
-        int codeNameCol = hl.codeNameColIdx;
-        int revenueCol = hl.revenueColIdx;
+     HeaderLocate hl = locateTwseHeader(sheet, targetMonthAbbr);
+     if (hl == null) return null;
 
-        List<MonthlyRevenueVo> out = new ArrayList<>();
+     int dataStartRow = hl.headerRowIdx + 1;
+     int codeNameCol = hl.codeNameColIdx;
+     int revenueCol = hl.revenueColIdx;
 
-        for (int r = dataStartRow; r <= sheet.getLastRowNum(); r++) {
-            Row row = sheet.getRow(r);
-            if (row == null) continue;
+     List<MonthlyRevenueVo> out = new ArrayList<>();
 
-            String codeName = ExcelCellUtils.getCellString(row.getCell(codeNameCol));
-            if (codeName == null || codeName.isBlank()) continue;
+     for (int r = dataStartRow; r <= sheet.getLastRowNum(); r++) {
+         Row row = sheet.getRow(r);
+         if (row == null) continue;
 
-            String codeNameTrim = codeName.trim();
+         String codeName = ExcelCellUtils.getCellString(row.getCell(codeNameCol));
+         if (codeName == null || codeName.isBlank()) continue;
 
-            // 只吃真正股票列：必須是「4~6位數 + 空白 + 名稱」
-            Matcher m = CODE_NAME_PATTERN.matcher(codeNameTrim);
-            if (!m.find()) {
-                // 像「01 水泥工業類」「Foods」這種分類列，跳過
-                continue;
-            }
+         String codeNameTrim = codeName.trim();
 
-            String stockId = m.group(1).trim();
-            String stockName = m.group(2).trim();
+         Matcher m = CODE_NAME_PATTERN.matcher(codeNameTrim);
+         if (!m.find()) continue;
 
-            Long revenue = ExcelCellUtils.getCellLong(row.getCell(revenueCol));
+         String stockId = m.group(1).trim();
+         String stockName = m.group(2).trim();
 
-            MonthlyRevenueVo vo = new MonthlyRevenueVo();
-            vo.setStockId(stockId);
-            vo.setStockName(stockName);
-            vo.setRevenue(revenue);
-            vo.setDate(date);
-            vo.setMarket(market);
-            out.add(vo);
-        }
+         Long revenue = ExcelCellUtils.getCellLong(row.getCell(revenueCol));
 
-        // 有抓到資料才算成功，避免誤判
-        if (out.isEmpty()) return null;
-        return new ParseResult(out);
-    }
+         MonthlyRevenueVo vo = new MonthlyRevenueVo();
+         vo.setStockId(stockId);
+         vo.setStockName(stockName);
+         vo.setRevenue(revenue);
+         vo.setDate(date);
+         vo.setMarket(market);
+         out.add(vo);
+     }
+
+     if (out.isEmpty()) return null;
+     return new ParseResult(out);
+ }
+
 
     /**
      * 掃描前 120 列，找到：
@@ -167,55 +166,51 @@ public class MonthlyRevenueExcelParser {
      * 2) 同一列中找「第一個 targetMonthAbbr」作為 revenue 欄
      * 3) 同時找出「Code & Name」欄（若找不到，預設用第一欄）
      */
-    private HeaderLocate locateTwseHeader(Sheet sheet, String targetMonthAbbr) {
-        int maxScan = Math.min(120, sheet.getLastRowNum());
+ private HeaderLocate locateTwseHeader(Sheet sheet, String targetMonthAbbr) {
+	    int maxScan = Math.min(120, sheet.getLastRowNum());
 
-        // TWSE 營收區通常在前幾欄：A=Code&Name, B~F=本年度/上年度營收等
-        // 右側背書保證區通常在更右邊的欄（例如 I、J 或更後面）
-        // 我們只在營收區範圍（col 1~5）找月份，避免誤判
-        final int REVENUE_MONTH_COL_START = 1;
-        final int REVENUE_MONTH_COL_END = 5;
+	    // ✅ 202505 可能表頭偏移，放寬範圍避免 miss
+	    final int REVENUE_MONTH_COL_START = 1;
+	    final int REVENUE_MONTH_COL_END = 12;
 
-        for (int r = 0; r <= maxScan; r++) {
-            Row row = sheet.getRow(r);
-            if (row == null) continue;
+	    // ✅ 保底：targetMonthAbbr 也去點（就算你上層忘了 replace）
+	    final String target = targetMonthAbbr.replace(".", "").toUpperCase(Locale.ROOT);
 
-            int last = row.getLastCellNum();
-            if (last <= 0) continue;
+	    for (int r = 0; r <= maxScan; r++) {
+	        Row row = sheet.getRow(r);
+	        if (row == null) continue;
 
-            // 1) 在營收區 col 1~5 計算「月份縮寫」出現數量
-            int monthHits = 0;
-            int revenueCol = -1;
+	        int last = row.getLastCellNum();
+	        if (last <= 0) continue;
 
-            for (int c = REVENUE_MONTH_COL_START; c <= REVENUE_MONTH_COL_END && c < last; c++) {
-                String t = ExcelCellUtils.getCellString(row.getCell(c));
-                if (t == null) continue;
+	        int monthHits = 0;
+	        int revenueCol = -1;
 
-                String norm = normalize(t);
-                if (isMonthAbbr(norm)) {
-                    monthHits++;
-                }
+	        for (int c = REVENUE_MONTH_COL_START; c <= REVENUE_MONTH_COL_END && c < last; c++) {
+	            String t = ExcelCellUtils.getCellString(row.getCell(c));
+	            if (t == null) continue;
 
-                // 2) 在營收區 col 1~5 找「第一個 targetMonthAbbr」作為本年度本月欄
-                if (revenueCol < 0 && norm.equals(targetMonthAbbr)) {
-                    revenueCol = c;
-                }
-            }
+	            String norm = normalize(t); // 已去點 + 大寫
 
-            // 必須：這列像月份表頭（至少有兩個月份縮寫，例如 OCT./NOV.）
-            if (monthHits < 2) continue;
+	            if (isMonthAbbr(norm)) {
+	                monthHits++;
+	            }
 
-            // 必須：在營收區命中目標月份
-            if (revenueCol < 0) continue;
+	            // ✅ 關鍵：norm / target 都是 "MAY" 這種 token
+	            if (revenueCol < 0 && norm.equals(target)) {
+	                revenueCol = c;
+	            }
+	        }
 
-            // Code & Name 通常在第 0 欄（A 欄），用 0 最穩
-            int codeNameCol = 0;
+	        if (monthHits < 2) continue;
+	        if (revenueCol < 0) continue;
 
-            return new HeaderLocate(r, codeNameCol, revenueCol);
-        }
+	        int codeNameCol = 0;
+	        return new HeaderLocate(r, codeNameCol, revenueCol);
+	    }
 
-        return null;
-    }
+	    return null;
+	}
 
     private static boolean isMonthAbbr(String s) {
         // 允許 "NOV." / "NOV" / "Nov." 等
@@ -226,7 +221,7 @@ public class MonthlyRevenueExcelParser {
     }
 
     private static String normalize(String s) {
-        return s.trim().toUpperCase(Locale.ROOT);
+        return s.replace(".", "").trim().toUpperCase(Locale.ROOT);
     }
 
     // =========================
