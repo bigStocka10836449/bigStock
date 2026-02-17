@@ -23,19 +23,21 @@ public class StockDayPriceNativeQueryService {
 
 	private final EntityManager em;
 
-	private static final String FIND_K_VALUE_CONTINUE_UNDER_TEWNTY_BY_RANGE = "SELECT  "
-			+ "    ranked_data.stock_code, " + "    MAX(ranked_data.trading_day) AS start_day, "
-			+ "    MIN(ranked_data.trading_day) AS end_day, " + "    COUNT(*) AS total_days, "
-			+ "    SUM(CASE WHEN CAST(ranked_data.line_k_value AS NUMERIC) <= 20 THEN 1 ELSE 0 END) AS required_count "
-			+ "FROM ( " + "    SELECT  " + "        sdp.stock_code, " + "        sdp.trading_day, "
-			+ "        CAST(sdp.line_k_value AS NUMERIC) AS line_k_value, "
-			+ "        ROW_NUMBER() OVER (PARTITION BY sdp.stock_code ORDER BY sdp.trading_day DESC) AS rn "
-			+ "    FROM  " + "        bstock.bstock.stock_day_price sdp " + "    WHERE  "
-			+ "        sdp.trading_day <= :tradingDate " + "        AND sdp.closing_price NOT LIKE '%-%' "
-			+ "        AND sdp.closing_price != '' " + ") AS ranked_data " + "WHERE rn <= :limit "
-			+ "GROUP BY ranked_data.stock_code " + "HAVING COUNT(*) = :limit "
-			+ "AND SUM(CASE WHEN CAST(line_k_value AS NUMERIC) <= 20 THEN 1 ELSE 0 END) = COUNT(*) "
-			+ "ORDER BY ranked_data.stock_code, start_day ";
+	private static final String FIND_K_VALUE_CONTINUE_UNDER_TEWNTY_BY_RANGE ="""
+			SELECT
+			    sdp.stock_code,
+			    MAX(sdp.trading_day) AS start_day,
+			    MIN(sdp.trading_day) AS end_day,
+			    COUNT(*) AS total_days,
+			    SUM(CASE WHEN sdp.line_k_value <= 20 THEN 1 ELSE 0 END) AS required_count
+			FROM bstock.stock_day_price sdp
+			WHERE sdp.rank_no <= :limit
+			  AND sdp.trading_day <= :tradingDate
+			GROUP BY sdp.stock_code
+			HAVING COUNT(*) = :limit
+			   AND SUM(CASE WHEN sdp.line_k_value <= 20 THEN 1 ELSE 0 END) = COUNT(*)
+			ORDER BY sdp.stock_code
+			""";
 
 	private static final String FIND_K_VALUE_CONTINUE_UPPER_EIGHTY_TEWNTY_BY_RANGE = "SELECT  " + "    stock_code, "
 			+ "    MAX(trading_day) AS start_day, " + "    MIN(trading_day) AS end_day, "

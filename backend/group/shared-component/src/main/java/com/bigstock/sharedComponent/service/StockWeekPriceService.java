@@ -194,57 +194,46 @@ public class StockWeekPriceService {
 		entityManager.clear();
 	}
 	
-	public StockWeekPriceRank buildRanks(String stockCode, List<StockWeekPrice> WeekPrices) {
+	public StockWeekPriceRank buildRanks(String stockCode, StockWeekPrice stockWeekPrice) {
 
 		// 依 年 + 交易日期排序 由新到舊排序
-		List<StockWeekPrice> sorted = WeekPrices.stream()
-				.sorted(Comparator.comparing(StockWeekPrice::getFirstTradingDay).reversed())
-				.limit(720).toList();
 
-		List<StockWeekPriceRank> ranks = new ArrayList<>(sorted.size());
-
-		int rankNo = 1;
-		for (StockWeekPrice p : sorted) {
 
 			StockWeekPriceRank r = new StockWeekPriceRank();
 
 
-		    r.setStockCode(p.getStockCode());
-		    r.setYear(p.getYear());
-		    r.setMonth(p.getMonth());
+		    r.setStockCode(stockWeekPrice.getStockCode());
+		    r.setYear(stockWeekPrice.getYear());
+		    r.setMonth(stockWeekPrice.getMonth());
 
 
-		    r.setWeekOfYear(p.getWeekOfYear());
-		    r.setFirstTradingDay(p.getFirstTradingDay()); 
+		    r.setWeekOfYear(stockWeekPrice.getWeekOfYear());
+		    r.setFirstTradingDay(stockWeekPrice.getFirstTradingDay()); 
 
-		    r.setOpeningPrice(p.getOpeningPrice());
-		    r.setClosingPrice(p.getClosingPrice());
-		    r.setHighPrice(p.getHighPrice());
-		    r.setLowPrice(p.getLowPrice());
+		    r.setOpeningPrice(stockWeekPrice.getOpeningPrice());
+		    r.setClosingPrice(stockWeekPrice.getClosingPrice());
+		    r.setHighPrice(stockWeekPrice.getHighPrice());
+		    r.setLowPrice(stockWeekPrice.getLowPrice());
 
-		    r.setTradingVolume(p.getTradingVolume());
-		    r.setChangeRate(p.getChangeRate());
+		    r.setTradingVolume(stockWeekPrice.getTradingVolume());
+		    r.setChangeRate(stockWeekPrice.getChangeRate());
 
 	
-		    r.setLineKValue(p.getLineKValue());
-		    r.setLineDValue(p.getLineDValue());
-		    r.setLineRsvValue(p.getLineRsvValue());
+		    r.setLineKValue(stockWeekPrice.getLineKValue());
+		    r.setLineDValue(stockWeekPrice.getLineDValue());
+		    r.setLineRsvValue(stockWeekPrice.getLineRsvValue());
 
 
-		    r.setFiveWeekMa(p.getFiveWeekMa());
-		    r.setTenWeekMa(p.getTenWeekMa());
-		    r.setTwentyWeekMa(p.getTwentyWeekMa());
-		    r.setSixtyWeekMa(p.getSixtyWeekMa());
-		    r.setOneTwentyWeekMa(p.getOneTwentyWeekMa());
-		    r.setTwoFourtyWeekMa(p.getTwoFourtyWeekMa());
+		    r.setFiveWeekMa(stockWeekPrice.getFiveWeekMa());
+		    r.setTenWeekMa(stockWeekPrice.getTenWeekMa());
+		    r.setTwentyWeekMa(stockWeekPrice.getTwentyWeekMa());
+		    r.setSixtyWeekMa(stockWeekPrice.getSixtyWeekMa());
+		    r.setOneTwentyWeekMa(stockWeekPrice.getOneTwentyWeekMa());
+		    r.setTwoFourtyWeekMa(stockWeekPrice.getTwoFourtyWeekMa());
 
 
-		    r.setRankNo(rankNo);
-		    rankNo = rankNo +1;
-		    ranks.add(r);
-		}
 
-		return ranks.get(0);
+		return r;
 	}
 	@Transactional
 	public void updateRankNo() {

@@ -148,7 +148,7 @@ public class GraspShareholderStructureService {
 		return shareholderStructure;
 	}
 
-	@PostConstruct
+//	@PostConstruct
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-stock-info}", zone= "Asia/Taipei")
 	public void updateStockInfo() throws InterruptedException, JsonMappingException, RestClientException,
 			JsonProcessingException, URISyntaxException {

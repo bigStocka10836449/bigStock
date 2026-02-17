@@ -20,9 +20,23 @@ public interface StockDayPriceRankRepository extends JpaRepository<StockDayPrice
 	
 	
 	@Modifying
-	@Query("""
-			Update StockDayPriceRank set rankNo = rankNo + 1
-			""")
+	@Query(value ="""
+				             
+	  UPDATE bstock.stock_day_price_rank t
+		SET rank_no = r.new_rank
+		FROM (
+		    SELECT 
+		        stock_code,
+		        trading_day,
+		        ROW_NUMBER() OVER (
+		            PARTITION BY stock_code
+		            ORDER BY trading_day DESC
+		        ) AS new_rank
+		    FROM bstock.stock_day_price_rank
+		) r
+		WHERE t.stock_code = r.stock_code
+		  AND t.trading_day = r.trading_day
+			""", nativeQuery = true)
 	void updateRankNo();
 	
 	

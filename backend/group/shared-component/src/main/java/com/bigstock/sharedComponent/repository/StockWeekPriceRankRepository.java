@@ -18,9 +18,24 @@ public interface StockWeekPriceRankRepository
 	
 	
 	@Modifying
-	@Query("""
-			Update StockWeekPriceRank set rankNo = rankNo + 1
-			""")
+	@Query(value = """
+			UPDATE bstock.stock_week_price_rank t
+				SET rank_no = r.new_rank
+				FROM (
+				  SELECT 
+				    stock_code,
+				    year,
+				    week_of_year,
+				    RANK() OVER (
+				        PARTITION BY stock_code
+				        ORDER BY first_trading_day DESC
+				    ) AS new_rank
+				FROM bstock.stock_week_price_rank
+				) r
+				WHERE t.stock_code = r.stock_code
+				  AND t.year = r.year
+				  AND t.week_of_year= r.week_of_year
+			""", nativeQuery = true)
 	void updateRankNo();
 	
 	 

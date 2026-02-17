@@ -440,75 +440,62 @@ public class StockDayPriceService {
 	    }
 	
 
-	public StockDayPriceRank buildRanks(String stockCode, List<StockDayPrice> monthPrices) {
+	public StockDayPriceRank buildRanks(String stockCode, StockDayPrice stockDayPrice) {
 
 		// 依 年 + 月 由新到舊排序
-		List<StockDayPrice> sorted = monthPrices.stream()
-				.sorted(Comparator.comparing(StockDayPrice::getTradingDay).reversed())
-				.limit(720).toList();
 
-		List<StockDayPriceRank> ranks = new ArrayList<>(sorted.size());
 
-		int rankNo = 1;
-		for (StockDayPrice p : sorted) {
 			StockDayPriceRank r = new StockDayPriceRank();
 
 		    // =========================
 		    // 🔹 PK / Business Key
 		    // =========================
-		    r.setStockCode(p.getStockCode());
-		    r.setWeekOfYear(p.getWeekOfYear());
-		    r.setMonthOfYear(p.getMonthOfYear());
+		    r.setStockCode(stockDayPrice.getStockCode());
+		    r.setWeekOfYear(stockDayPrice.getWeekOfYear());
+		    r.setMonthOfYear(stockDayPrice.getMonthOfYear());
 
 		    // =========================
 		    // 🔹 時間相關欄位
 		    // =========================
-		    r.setTradingDay(p.getTradingDay()); 
-		    r.setStartOfWeekDate(p.getStartOfWeekDate());
-		    r.setEndOfWeekDate(p.getEndOfWeekDate());
+		    r.setTradingDay(stockDayPrice.getTradingDay()); 
+		    r.setStartOfWeekDate(stockDayPrice.getStartOfWeekDate());
+		    r.setEndOfWeekDate(stockDayPrice.getEndOfWeekDate());
 		    // 若你擔心 Date 被修改，可改成：
 		    // new Date(p.getFirstTradingDay().getTime())
 
 		    // =========================
 		    // 🔹 價格資訊（完整快照）
 		    // =========================
-		    r.setOpeningPrice(p.getOpeningPrice());
-		    r.setClosingPrice(p.getClosingPrice());
-		    r.setHighPrice(p.getHighPrice());
-		    r.setLowPrice(p.getLowPrice());
-		    r.setChange(p.getChange());
+		    r.setOpeningPrice(stockDayPrice.getOpeningPrice());
+		    r.setClosingPrice(stockDayPrice.getClosingPrice());
+		    r.setHighPrice(stockDayPrice.getHighPrice());
+		    r.setLowPrice(stockDayPrice.getLowPrice());
+		    r.setChange(stockDayPrice.getChange());
 		    // =========================
 		    // 🔹 成交 / 變動
 		    // =========================
-		    r.setTradingVolume(p.getTradingVolume());
-		    r.setChangeRate(p.getChangeRate());
-		    r.setLimitUp(p.getLimitUp());
-		    r.setLimitDown(p.getLimitDown());
+		    r.setTradingVolume(stockDayPrice.getTradingVolume());
+		    r.setChangeRate(stockDayPrice.getChangeRate());
+		    r.setLimitUp(stockDayPrice.getLimitUp());
+		    r.setLimitDown(stockDayPrice.getLimitDown());
 		    // =========================
 		    // 🔹 技術指標（KD / RSV）
 		    // =========================
-		    r.setLineKvalue(p.getLineKvalue());
-		    r.setLineDvalue(p.getLineDvalue());
-		    r.setLineRSVvalue(p.getLineRSVvalue());
+		    r.setLineKvalue(stockDayPrice.getLineKvalue());
+		    r.setLineDvalue(stockDayPrice.getLineDvalue());
+		    r.setLineRSVvalue(stockDayPrice.getLineRSVvalue());
 
 		    // =========================
 		    // 🔹 均線（MA）
 		    // =========================
-		    r.setFiveDaysMa(p.getFiveDaysMa());
-		    r.setTenDaysMa(p.getTenDaysMa());
-		    r.setTwentyDaysMa(p.getTwentyDaysMa());
-		    r.setSixtyDaysMa(p.getSixtyDaysMa());
-		    r.setOneTwentyDaysMa(p.getOneTwentyDaysMa());
-		    r.setTwoFourtyDaysMa(p.getTwoFourtyDaysMa());
+		    r.setFiveDaysMa(stockDayPrice.getFiveDaysMa());
+		    r.setTenDaysMa(stockDayPrice.getTenDaysMa());
+		    r.setTwentyDaysMa(stockDayPrice.getTwentyDaysMa());
+		    r.setSixtyDaysMa(stockDayPrice.getSixtyDaysMa());
+		    r.setOneTwentyDaysMa(stockDayPrice.getOneTwentyDaysMa());
+		    r.setTwoFourtyDaysMa(stockDayPrice.getTwoFourtyDaysMa());
 
-		    // =========================
-		    // 🔹 Rank only（唯一新產生）
-		    // =========================
-		    r.setRankNo(rankNo);
-		    rankNo = rankNo +1;
-		    ranks.add(r);
-		}
 
-		return ranks.get(0);
+		return r;
 	}
 }
