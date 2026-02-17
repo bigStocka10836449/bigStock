@@ -22,68 +22,194 @@ import lombok.RequiredArgsConstructor;
 public class StockMonthPriceNativeQueryService {
 	private final EntityManagerFactory entityManagerFactory;
 
-	private static final String FIND_K_VALUE_CONTINUE_UNDER_TEWNTY_BY_RANGE = "SELECT  "
-			+ "    ranked_data.stock_code,  " + "    MAX(ranked_data.first_trading_day) AS start_day,  "
-			+ "    MIN(ranked_data.first_trading_day) AS end_day,  " + "    COUNT(*) AS total_days,  "
-			+ "    SUM(CASE WHEN CAST(ranked_data.line_k_value AS NUMERIC) <= 20 THEN 1 ELSE 0 END) AS required_count  "
-			+ "FROM (  " + "    SELECT  " + "        swp.stock_code,  " + "        swp.first_trading_day,  "
-			+ "        CAST(swp.line_k_value AS NUMERIC) AS line_k_value,  "
-			+ "        ROW_NUMBER() OVER (PARTITION BY swp.stock_code ORDER BY swp.first_trading_day DESC) AS rn  "
-			+ "    FROM  " + "        bstock.bstock.stock_month_price swp  " + "    WHERE  "
-			+ "        swp.first_trading_day <= :tradingDay  " + ") AS ranked_data  " + "WHERE rn <= :limit  "
-			+ "GROUP BY ranked_data.stock_code  " + "HAVING COUNT(*) = :limit "
-			+ "AND SUM(CASE WHEN CAST(line_k_value AS NUMERIC) <= 20 THEN 1 ELSE 0 END) = COUNT(*)  "
-			+ "ORDER BY ranked_data.stock_code, start_day;";
+	private static final String FIND_K_VALUE_CONTINUE_UNDER_TEWNTY_BY_RANGE = """
+		    SELECT
+		        smpr.stock_code,
+		        MAX(smpr.first_trading_day) AS start_day,
+		        MIN(smpr.first_trading_day) AS end_day,
+		        COUNT(*) AS total_days,
+		        SUM(CASE 
+		                WHEN CAST(smpr.line_k_value AS NUMERIC) <= 20 THEN 1 
+		                ELSE 0 
+		            END) AS required_count
+		    FROM bstock.stock_month_price_rank smpr
+		    WHERE smpr.first_trading_day <= :tradingDay
+		      AND smpr.rank_no <= :limit
+		    GROUP BY smpr.stock_code
+		    HAVING COUNT(*) = :limit
+		       AND SUM(CASE 
+		                   WHEN CAST(smpr.line_k_value AS NUMERIC) <= 20 THEN 1 
+		                   ELSE 0 
+		               END) = :limit
+		    ORDER BY smpr.stock_code, start_day
+		    """;
 
-	private static final String FIND_K_VALUE_CONTINUE_UPPER_EIGHTY_TEWNTY_BY_RANGE = "SELECT  "
-			+ "    ranked_data.stock_code,  " + "    MAX(ranked_data.first_trading_day) AS start_day,  "
-			+ "    MIN(ranked_data.first_trading_day) AS end_day,  " + "    COUNT(*) AS total_days,  "
-			+ "    SUM(CASE WHEN CAST(ranked_data.line_k_value AS NUMERIC) <= 20 THEN 1 ELSE 0 END) AS required_count  "
-			+ "FROM (  " + "    SELECT  " + "        swp.stock_code,  " + "        swp.first_trading_day,  "
-			+ "        CAST(swp.line_k_value AS NUMERIC) AS line_k_value,  "
-			+ "        ROW_NUMBER() OVER (PARTITION BY swp.stock_code ORDER BY swp.first_trading_day DESC) AS rn  "
-			+ "    FROM  " + "        bstock.bstock.stock_month_price swp  " + "    WHERE  "
-			+ "        swp.first_trading_day <= :tradingDay  " + ") AS ranked_data  " + "WHERE rn <= :limit  "
-			+ "GROUP BY ranked_data.stock_code  " + "HAVING COUNT(*) = :limit "
-			+ "AND SUM(CASE WHEN CAST(line_k_value AS NUMERIC) >= 80 THEN 1 ELSE 0 END) = COUNT(*)  "
-			+ "ORDER BY ranked_data.stock_code, start_day";
+	private static final String FIND_K_VALUE_CONTINUE_UPPER_EIGHTY_TEWNTY_BY_RANGE = """
+		    SELECT
+		        smpr.stock_code,
+		        MAX(smpr.first_trading_day) AS start_day,
+		        MIN(smpr.first_trading_day) AS end_day,
+		        COUNT(*) AS total_days,
+		        COUNT(*) FILTER (
+		        
+		            WHERE CAST(smpr.line_k_value AS NUMERIC) >= 80
+		        ) AS required_count
+		    FROM bstock.stock_month_price_rank smpr
+		    WHERE smpr.first_trading_day <= :tradingDay
+		      AND smpr.rank_no <= :limit
+		    GROUP BY smpr.stock_code
+		    HAVING COUNT(*) = :limit
+		       AND COUNT(*) FILTER (
+		               WHERE CAST(smpr.line_k_value AS NUMERIC) >= 80
+		           ) = :limit
+		    ORDER BY smpr.stock_code, start_day
+		    """;
 
-	private static final String FIND_DATE_RANGE_MA_TREND_QUERY = "SELECT *  " + "FROM ( " + "    SELECT   "
-			+ "        stock_code,  " + "        MIN(first_trading_day) AS first_day,  "
-			+ "        MAX(first_trading_day) AS last_day,  " + "        CASE   "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(five_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :fiveDaysSlopeLimit THEN CAST(five_ma AS NUMERIC) END) = 0 THEN 'flat' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(five_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :fiveDaysSlopeLimit THEN CAST(five_ma AS NUMERIC) END) > 1 THEN 'up' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(five_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :fiveDaysSlopeLimit THEN CAST(five_ma AS NUMERIC) END) < 1 THEN 'down' "
-			+ "            ELSE 'flat' " + "        END AS five_ma_slope,  " + "        CASE   "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(ten_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :tenDaysSlopeLimit THEN CAST(ten_ma AS NUMERIC) END) = 0 THEN 'flat' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(ten_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :tenDaysSlopeLimit THEN CAST(ten_ma AS NUMERIC) END) > 1 THEN 'up' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(ten_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :tenDaysSlopeLimit THEN CAST(ten_ma AS NUMERIC) END) < 1 THEN 'down' "
-			+ "            ELSE 'flat' " + "        END AS ten_ma_slope, " + "        CASE   "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(twenty_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :twentyDaysSlopeLimit THEN CAST(twenty_ma AS NUMERIC) END) = 0 THEN 'flat' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(twenty_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :twentyDaysSlopeLimit THEN CAST(twenty_ma AS NUMERIC) END) > 1 THEN 'up' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(twenty_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :twentyDaysSlopeLimit THEN CAST(twenty_ma AS NUMERIC) END) < 1 THEN 'down' "
-			+ "            ELSE 'flat' " + "        END AS twenty_ma_slope, " + "        CASE   "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(sixty_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :sixtyDaysSlopeLimit THEN CAST(sixty_ma AS NUMERIC) END) = 0 THEN 'flat' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(sixty_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :sixtyDaysSlopeLimit THEN CAST(sixty_ma AS NUMERIC) END) > 1 THEN 'up' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(sixty_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :sixtyDaysSlopeLimit THEN CAST(sixty_ma AS NUMERIC) END) < 1 THEN 'down' "
-			+ "            ELSE 'flat' " + "        END AS sixty_ma_slope, " + "        CASE   "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(one_twenty_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :oneTwentyDaysSlopeLimit THEN CAST(one_twenty_ma AS NUMERIC) END) = 0 THEN 'flat' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(one_twenty_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :oneTwentyDaysSlopeLimit THEN CAST(one_twenty_ma AS NUMERIC) END) > 1 THEN 'up' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(one_twenty_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :oneTwentyDaysSlopeLimit THEN CAST(one_twenty_ma AS NUMERIC) END) < 1 THEN 'down' "
-			+ "            ELSE 'down' " + "        END AS one_twenty_ma_slope, " + "        CASE   "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(two_fourty_ma AS NUMERIC) END) = 0 OR MIN(CASE WHEN rn = :twoFourtyDaysSlopeLimit THEN CAST(two_fourty_ma AS NUMERIC) END) = 0 THEN 'flat' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(two_fourty_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :twoFourtyDaysSlopeLimit THEN CAST(two_fourty_ma AS NUMERIC) END) > 1 THEN 'up' "
-			+ "            WHEN MIN(CASE WHEN rn = 1 THEN CAST(two_fourty_ma AS NUMERIC) END) / MIN(CASE WHEN rn = :twoFourtyDaysSlopeLimit THEN CAST(two_fourty_ma AS NUMERIC) END) < 1 THEN 'down' "
-			+ "            ELSE 'flat' " + "        END AS two_fourty_ma_slope " + "    FROM (  "
-			+ "        SELECT   " + "            stock_code,  " + "            first_trading_day,  "
-			+ "            five_ma,  " + "            ten_ma,  " + "            twenty_ma,  "
-			+ "            sixty_ma,  " + "            one_twenty_ma,  " + "            two_fourty_ma,  "
-			+ "            ROW_NUMBER() OVER (PARTITION BY stock_code ORDER BY trading_day DESC) AS rn  "
-			+ "        FROM   " + "            bstock.bstock.stock_month_price sdp  " + "        WHERE   "
-			+ "            sdp.first_trading_day <= :tradingDay " 
-			+ "    ) AS ranked_data  " + "    WHERE 1 = 1  "
-			+ "    GROUP BY stock_code  " + ") AS ma_results  " + "WHERE 1 = 1 %dynanicCondition "
-			+ "ORDER BY stock_code ";
+	private static final String FIND_DATE_RANGE_MA_TREND_QUERY = """
+		    SELECT *
+		    FROM (
+		        SELECT
+		            smpr.stock_code,
+		            MIN(smpr.first_trading_day) AS first_day,
+		            MAX(smpr.first_trading_day) AS last_day,
+
+		            /* 5 MA */
+		            CASE
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.five_ma AS NUMERIC) END) = 0
+		                  OR MAX(CASE WHEN smpr.rank_no = :fiveDaysSlopeLimit 
+		                              THEN CAST(smpr.five_ma AS NUMERIC) END) = 0
+		                THEN 'flat'
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.five_ma AS NUMERIC) END)
+		                   / MAX(CASE WHEN smpr.rank_no = :fiveDaysSlopeLimit 
+		                              THEN CAST(smpr.five_ma AS NUMERIC) END) > 1
+		                THEN 'up'
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.five_ma AS NUMERIC) END)
+		                   / MAX(CASE WHEN smpr.rank_no = :fiveDaysSlopeLimit 
+		                              THEN CAST(smpr.five_ma AS NUMERIC) END) < 1
+		                THEN 'down'
+		                ELSE 'flat'
+		            END AS five_ma_slope,
+
+		            /* 10 MA */
+		            CASE
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.ten_ma AS NUMERIC) END) = 0
+		                  OR MAX(CASE WHEN smpr.rank_no = :tenDaysSlopeLimit 
+		                              THEN CAST(smpr.ten_ma AS NUMERIC) END) = 0
+		                THEN 'flat'
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.ten_ma AS NUMERIC) END)
+		                   / MAX(CASE WHEN smpr.rank_no = :tenDaysSlopeLimit 
+		                              THEN CAST(smpr.ten_ma AS NUMERIC) END) > 1
+		                THEN 'up'
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.ten_ma AS NUMERIC) END)
+		                   / MAX(CASE WHEN smpr.rank_no = :tenDaysSlopeLimit 
+		                              THEN CAST(smpr.ten_ma AS NUMERIC) END) < 1
+		                THEN 'down'
+		                ELSE 'flat'
+		            END AS ten_ma_slope,
+
+		            /* 20 MA */
+		            CASE
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.twenty_ma AS NUMERIC) END) = 0
+		                  OR MAX(CASE WHEN smpr.rank_no = :twentyDaysSlopeLimit 
+		                              THEN CAST(smpr.twenty_ma AS NUMERIC) END) = 0
+		                THEN 'flat'
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.twenty_ma AS NUMERIC) END)
+		                   / MAX(CASE WHEN smpr.rank_no = :twentyDaysSlopeLimit 
+		                              THEN CAST(smpr.twenty_ma AS NUMERIC) END) > 1
+		                THEN 'up'
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.twenty_ma AS NUMERIC) END)
+		                   / MAX(CASE WHEN smpr.rank_no = :twentyDaysSlopeLimit 
+		                              THEN CAST(smpr.twenty_ma AS NUMERIC) END) < 1
+		                THEN 'down'
+		                ELSE 'flat'
+		            END AS twenty_ma_slope,
+
+		            /* 60 MA */
+		            CASE
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.sixty_ma AS NUMERIC) END) = 0
+		                  OR MAX(CASE WHEN smpr.rank_no = :sixtyDaysSlopeLimit 
+		                              THEN CAST(smpr.sixty_ma AS NUMERIC) END) = 0
+		                THEN 'flat'
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.sixty_ma AS NUMERIC) END)
+		                   / MAX(CASE WHEN smpr.rank_no = :sixtyDaysSlopeLimit 
+		                              THEN CAST(smpr.sixty_ma AS NUMERIC) END) > 1
+		                THEN 'up'
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.sixty_ma AS NUMERIC) END)
+		                   / MAX(CASE WHEN smpr.rank_no = :sixtyDaysSlopeLimit 
+		                              THEN CAST(smpr.sixty_ma AS NUMERIC) END) < 1
+		                THEN 'down'
+		                ELSE 'flat'
+		            END AS sixty_ma_slope,
+
+		            /* 120 MA */
+		            CASE
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.one_twenty_ma AS NUMERIC) END) = 0
+		                  OR MAX(CASE WHEN smpr.rank_no = :oneTwentyDaysSlopeLimit 
+		                              THEN CAST(smpr.one_twenty_ma AS NUMERIC) END) = 0
+		                THEN 'flat'
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.one_twenty_ma AS NUMERIC) END)
+		                   / MAX(CASE WHEN smpr.rank_no = :oneTwentyDaysSlopeLimit 
+		                              THEN CAST(smpr.one_twenty_ma AS NUMERIC) END) > 1
+		                THEN 'up'
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.one_twenty_ma AS NUMERIC) END)
+		                   / MAX(CASE WHEN smpr.rank_no = :oneTwentyDaysSlopeLimit 
+		                              THEN CAST(smpr.one_twenty_ma AS NUMERIC) END) < 1
+		                THEN 'down'
+		                ELSE 'flat'
+		            END AS one_twenty_ma_slope,
+
+		            /* 240 MA */
+		            CASE
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.two_fourty_ma AS NUMERIC) END) = 0
+		                  OR MAX(CASE WHEN smpr.rank_no = :twoFourtyDaysSlopeLimit 
+		                              THEN CAST(smpr.two_fourty_ma AS NUMERIC) END) = 0
+		                THEN 'flat'
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.two_fourty_ma AS NUMERIC) END)
+		                   / MAX(CASE WHEN smpr.rank_no = :twoFourtyDaysSlopeLimit 
+		                              THEN CAST(smpr.two_fourty_ma AS NUMERIC) END) > 1
+		                THEN 'up'
+		                WHEN MAX(CASE WHEN smpr.rank_no = 1 
+		                              THEN CAST(smpr.two_fourty_ma AS NUMERIC) END)
+		                   / MAX(CASE WHEN smpr.rank_no = :twoFourtyDaysSlopeLimit 
+		                              THEN CAST(smpr.two_fourty_ma AS NUMERIC) END) < 1
+		                THEN 'down'
+		                ELSE 'flat'
+		            END AS two_fourty_ma_slope
+
+		        FROM bstock.stock_month_price_rank smpr
+		        WHERE smpr.first_trading_day <= :tradingDay
+		          AND smpr.rank_no IN (
+		                1,
+		                :fiveDaysSlopeLimit,
+		                :tenDaysSlopeLimit,
+		                :twentyDaysSlopeLimit,
+		                :sixtyDaysSlopeLimit,
+		                :oneTwentyDaysSlopeLimit,
+		                :twoFourtyDaysSlopeLimit
+		          )
+		        GROUP BY smpr.stock_code
+		    ) AS ma_results
+		    WHERE 1 = 1
+		    %dynamicCondition
+		    ORDER BY stock_code
+		    """;
 
 	public List<String> findKvalueUnderTwentyByDateRange(Date startDate, Integer limit) {
 		StringBuilder sb = new StringBuilder(FIND_K_VALUE_CONTINUE_UNDER_TEWNTY_BY_RANGE);
@@ -115,9 +241,9 @@ public class StockMonthPriceNativeQueryService {
 		maConditions.stream().forEach(maCondition -> {
 			dynamicConditionSb.append(buildConditionClause(StringUtils.EMPTY, maCondition, queryConditionMap));
 		});
-		int start = sb.indexOf("%dynanicCondition");
+		int start = sb.indexOf("%dynamicCondition");
 		if (start != -1) {
-			sb.replace(start, start + "%dynanicCondition".length(), dynamicConditionSb.toString());
+			sb.replace(start, start + "%dynamicCondition".length(), dynamicConditionSb.toString());
 		}
 		EntityManager em = entityManagerFactory.createEntityManager();
 		Query query = em.createNativeQuery(sb.toString(), Tuple.class);

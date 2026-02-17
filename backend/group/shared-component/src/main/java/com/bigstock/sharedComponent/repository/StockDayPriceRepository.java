@@ -21,7 +21,7 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 			  where sdp.trading_day = :tradingDay
 			    and sdp.closing_price ~ '^[0-9]+(\\.[0-9]+)?$'
 			    and sdp.lmit_up       ~ '^[0-9]+(\\.[0-9]+)?$'
-			    and sdp.closing_price::numeric = sdp.lmit_up::numeric
+			    and cast(sdp.closing_price as numeric) = cast(sdp.lmit_up as numeric)
 			  order by sdp.stock_code asc
 			""", nativeQuery = true)
 	List<StockDayPrice> findTodateReachLimitUp(@Param("tradingDay") Date endDate);
