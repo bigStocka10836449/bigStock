@@ -9,8 +9,6 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -146,9 +144,9 @@ public class StockDayPriceService {
 		    );
 	}
 	
-//	public List<StockDayPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(String stockCode, Date endDate) {
-//		return stockDayPriceRepository.findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(stockCode, endDate);
-//	}
+	public Date getCurrentTradeDate() {
+		return stockDayPriceRankRepository.findByIdStockCode("2330").get(0).getTradingDay();
+	}
 
 	public Optional<StockDayPrice> findByStockCodeAndTradingDayBeforeAndClosePriceIsValidLimitOne(String stockCode,
 			Date endDate) {

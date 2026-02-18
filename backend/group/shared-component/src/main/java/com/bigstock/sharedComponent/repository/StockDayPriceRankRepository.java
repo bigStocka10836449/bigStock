@@ -12,10 +12,16 @@ import com.bigstock.sharedComponent.entity.StockDayPriceRank;
 
 public interface StockDayPriceRankRepository extends JpaRepository<StockDayPriceRank, StockDayPriceRank.StockDayPriceRankId> {
 
+	@Query(value = """
+			select s.* from bstock.stock_day_price_rank s where s.stock_Code = :stockCode order by s.rank_No desc
+			""", nativeQuery = true)
+	List<StockDayPriceRank> findByIdStockCode(String stockCode);
+	
+	
 	@Modifying
-	@Query("""
-			DELETE FROM StockDayPriceRank r WHERE r.rankNo >= 361
-			""")
+	@Query(value = """
+			DELETE FROM bstock.stock_day_price_rank r WHERE r.rank_No >= 361
+			""", nativeQuery = true)
 	void deleteByRankNoLessThanZero();
 	
 	

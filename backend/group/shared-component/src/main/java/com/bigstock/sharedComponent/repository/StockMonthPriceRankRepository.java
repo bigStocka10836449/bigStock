@@ -12,9 +12,9 @@ import com.bigstock.sharedComponent.entity.StockMonthPriceRank;
 public interface StockMonthPriceRankRepository
 		extends JpaRepository<StockMonthPriceRank, StockMonthPriceRank.StockMonthPriceRankId> {
 	@Modifying
-	@Query("""
-			DELETE FROM StockMonthPriceRank r WHERE r.rankNo >= 361
-			""")
+	@Query(value = """
+			DELETE FROM bstock.stock_month_price_rank r WHERE r.rank_No >= 361
+			""", nativeQuery = true )
 	void deleteByRankNoLessThanZero();
 	
 	

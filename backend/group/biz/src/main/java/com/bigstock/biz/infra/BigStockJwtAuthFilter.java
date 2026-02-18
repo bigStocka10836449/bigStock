@@ -50,7 +50,7 @@ public class BigStockJwtAuthFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/refresh-token")
                 || path.contains("/swagger")
                 || path.contains("/webjars")||
-                path.contains("/auth/")) {
+                path.contains("/auth/") || path.contains("/stockShareholderStructure")) {
 
             filterChain.doFilter(request, response);
             return;

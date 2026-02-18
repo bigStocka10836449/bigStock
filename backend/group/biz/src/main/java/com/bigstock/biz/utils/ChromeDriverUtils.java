@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -85,8 +86,8 @@ public class ChromeDriverUtils {
 	public static List<TmpExDividendsExRightInfo> grepTmpExDividendsExRightInfo(Date tradingMonth) throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException{
 		List<TmpExDividendsExRightInfo> allInfos = Lists.newArrayList();
 		ObjectMapper objectMapper = new ObjectMapper();
-		LocalDate today = tradingMonth.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-		DateTimeFormatter tpexDateFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+		LocalDate today = tradingMonth.toInstant().atZone(ZoneId.of("Asia/Taipei")).toLocalDate();
+		DateTimeFormatter tpexDateFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd").withZone(ZoneId.of("Asia/Taipei"));
 		 // 設置本月的第一天
         LocalDate startOfMonth = today.withDayOfYear(1);
 
@@ -118,6 +119,7 @@ public class ChromeDriverUtils {
 			// 构造公历日期字符串
 			String gregorianDateStr = year + "/" + month + "/" + day;
 			SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
+			sdf.setTimeZone(TimeZone.getTimeZone(ZoneId.of("Asia/Taipei")));
 			Date tradingDate;
 			try {
 				tradingDate = sdf.parse(gregorianDateStr);
@@ -135,7 +137,7 @@ public class ChromeDriverUtils {
 		}).toList();
 		allInfos.addAll(tpexInfos);
 		//https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate=20241205&endDate=20241212&response=json&_=1733885812391
-		DateTimeFormatter twseDateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+		DateTimeFormatter twseDateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd").withZone(ZoneId.of("Asia/Taipei"));
 		String teseUrl = String.format(
 				"https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate=%1s&endDate=%2s&response=json&_=1733885812391",
 				startOfMonth.format(twseDateFormatter), endOfMonth.format(twseDateFormatter));
@@ -158,6 +160,7 @@ public class ChromeDriverUtils {
 				// 构造公历日期字符串
 				String gregorianDateStr = year + "/" + month + "/" + day;
 				SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
+				sdf.setTimeZone(TimeZone.getTimeZone(ZoneId.of("Asia/Taipei")));
 				Date tradingDate;
 				try {
 					tradingDate = sdf.parse(gregorianDateStr);
@@ -189,370 +192,7 @@ public class ChromeDriverUtils {
 		return stockCodes.get(randomIndex);
 	}
 
-	// 爬蟲暫時取消不做
-//	public static void grepCanvas(String chromeDriverPath, List<String> stockCodes,
-//			Date tradingDate, StockExchangeDetailService stockExchangeDetailService) throws InterruptedException {
-//		ChromeDriverService service = new ChromeDriverService.Builder()
-//				.usingDriverExecutable(new File(chromeDriverPath)).usingAnyFreePort().build();
-//		ChromeOptions options = new ChromeOptions();
-//		options.addArguments("--no-sandbox"); // 取消沙盒模式
-//		//options.addArguments("--headless"); // 設定無頭模式
-//		options.addArguments("--disable-dev-shm-usage"); // 解決共享記憶體問題
-//		WebDriver driver = new ChromeDriver(service, options);
-//		
-//		driver.manage().window().maximize();
-//		
-//		//為鼓勵 123  啟點 400高
-//		 driver.get("https://scantrader.com/v2/stock/6573");
-//		 WebElement chartDiv = driver.findElement(By.xpath("//*[@id='__layout']/div/div/main/div/div/div/div[1]/section/div/div/div"));
-//		   JavascriptExecutor js = (JavascriptExecutor) driver;
-//		   js.executeScript("arguments[0].scrollIntoView(true);", chartDiv);
-//		   js.executeScript("arguments[0].focus();", chartDiv);
-////		   Double x = (Double) js.executeScript("return arguments[0].getBoundingClientRect().left + window.scrollX;", chartDiv);
-////		      Double y = (Double) js.executeScript("return arguments[0].getBoundingClientRect().top + window.scrollY;", chartDiv);
-//		      Actions actions = new Actions(driver);
-//		      actions.moveByOffset(123, 400).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      actions.moveByOffset(1, 0).click().perform();
-//		      
-//		      
-//		//cnyes 版本 565起點
-//		
-////		 driver.get("https://www.cnyes.com/twstock/6573");
-////		 
-////		 WebElement chartDiv = driver.findElement(By.xpath("//*[@id='anue-ga-wrapper']/div[4]/div[2]/div[1]/div[1]/div[2]/div/div[2]/div[1]/div/div/div/div[2]/table/tr[1]/td[2]/div"));
-////		   JavascriptExecutor js = (JavascriptExecutor) driver;
-////		   js.executeScript("arguments[0].scrollIntoView(true);", chartDiv);
-////		   js.executeScript("arguments[0].focus();", chartDiv);
-////		   Double x = (Double) js.executeScript("return arguments[0].getBoundingClientRect().left + window.scrollX;", chartDiv);
-////		      Double y = (Double) js.executeScript("return arguments[0].getBoundingClientRect().top + window.scrollY;", chartDiv);
-////		      Actions actions = new Actions(driver);
-////		      actions.moveByOffset(565, 200).click().perform();
-////		      actions.moveByOffset(1, 0).click().perform();
-////		      actions.moveByOffset(1, 0).click().perform();
-////		      actions.moveByOffset(1, 0).click().perform();
-////		      actions.moveByOffset(1, 0).click().perform();
-////		      actions.moveByOffset(1, 0).click().perform();
-////		      actions.moveByOffset(1, 0).click().perform();
-////		      actions.moveByOffset(1, 0).click().perform();
-//		
-//        // cmoney版本
-////        driver.get("https://www.cmoney.tw/finance/2330/f00025");
-////           // 找到表格中的 canvas 元素
-////         // 找到目标 div 元素
-////
-////        // Locate the <div> element with id "chart0"
-////        WebElement chartDiv = driver.findElement(By.id("chart0"));
-////
-////        // Get the location of the element
-////        // Use JavaScript to get the element's position relative to the entire page
-////        JavascriptExecutor js = (JavascriptExecutor) driver;
-////        js.executeScript("arguments[0].scrollIntoView(true);", chartDiv);
-////        js.executeScript("arguments[0].focus();", chartDiv);
-////        Dimension windowSize = driver.manage().window().getSize();
-////        int width = windowSize.getWidth();
-////        int height = windowSize.getHeight();
-////        
-////        Double x = (Double) js.executeScript("return arguments[0].getBoundingClientRect().left + window.scrollX;", chartDiv);
-////        Double y = (Double) js.executeScript("return arguments[0].getBoundingClientRect().top + window.scrollY;", chartDiv);
-////
-////           // 使用 Actions 模拟鼠标移动并点击
-////           Actions actions = new Actions(driver);
-////           //372  634
-////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-////           for(int offset = 372 ; offset <= 634 ; offset++) {
-////        	   if(offset == 372) {
-////        		   actions.moveByOffset(offset, 40).click().perform();
-////        	   } else {
-////        		   actions.moveByOffset(1, 0).click().perform();
-////        	   }
-////        	   //
-//////        	              // Now locate the element inside the iframe
-////        	              WebElement targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-////        	   //
-//////        	              // Perform actions on the element (e.g., get text or click)
-////        	              String text = targetElement.getText();
-////        	              log.info(text);
-////           }
-////           actions.moveByOffset(1, 0).click().perform();
-////           actions.moveByOffset(1, 0).click().perform();
-////           actions.moveByOffset(1, 0).click().perform();
-////           actions.moveByOffset(1, 0).click().perform();
-////           actions.moveByOffset(1, 0).click().perform();
-////           actions.moveByOffset(1, 0).click().perform();
-////           actions.moveByOffset(1, 0).click().perform();
-////           actions.moveByOffset(1, 0).click().perform();
-////           actions.moveByOffset(1, 0).click().perform();
-////           actions.moveByOffset(1, 0).click().perform();
-////           actions.moveByOffset(1, 0).click().perform();
-////           actions.moveByOffset(1, 1).click().perform();
-////           actions.moveByOffset(1, 1).click().perform();
-////           actions.moveByOffset(1, 1).click().perform();
-////           actions.moveByOffset(1, 2).click().perform();
-////           actions.moveByOffset(1, 3).click().perform();
-////           actions.moveToElement(chartDiv, 20, 10).click().perform();
-////           String script = "var event = new MouseEvent('mouseover', { " +
-////                   "view: window, " +
-////                   "bubbles: true, " +
-////                   "cancelable: true " +
-////                   "}); " +
-////                   "arguments[0].dispatchEvent(event);";
-////           js.executeScript(script, chartDiv);
-////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-////
-////           // Now locate the element inside the iframe
-////           WebElement targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-////
-////           // Perform actions on the element (e.g., get text or click)
-////           String text = targetElement.getText();
-////           driver.switchTo().parentFrame();
-////           actions.moveToElement(chartDiv, 25, 10).click().perform();
-////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-////           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-////
-////           // Perform actions on the element (e.g., get text or click)
-////            text = targetElement.getText();
-////            driver.switchTo().parentFrame();
-////           actions.moveToElement(chartDiv, 25, 0).click().perform();
-////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-////           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-////
-////           // Perform actions on the element (e.g., get text or click)
-////            text = targetElement.getText();
-////            driver.switchTo().parentFrame();
-////           actions.moveToElement(chartDiv, 25, 40).click().perform();
-////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-////           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-////
-////           // Perform actions on the element (e.g., get text or click)
-////            text = targetElement.getText();
-////            driver.switchTo().parentFrame();
-////           actions.moveToElement(chartDiv, 30, 40).click().perform();
-////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-////           
-////           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-////
-////           // Perform actions on the element (e.g., get text or click)
-////            text = targetElement.getText();
-////            driver.switchTo().parentFrame();
-////            actions.moveToElement(chartDiv, 70, 40).click().perform();
-////           
-////            driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-////            targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-////
-////            // Perform actions on the element (e.g., get text or click)
-////             text = targetElement.getText();
-////             driver.switchTo().parentFrame();
-////           actions.moveToElement(chartDiv, 80, 10).click().perform();
-////		
-////           driver.switchTo().frame("iframe_0"); // Use the id of the iframe
-////           targetElement = driver.findElement(By.xpath("//*[@id='highcharts-0']/div/span"));
-////
-////           // Perform actions on the element (e.g., get text or click)
-////            text = targetElement.getText();
-//		
-//		
-//		
-//		
-//		
-//		
-//		
-////		String url = "https://pchome.megatime.com.tw/stock/sto0/ock3/sid"+getRandomStockCode(stockCodes)+".html";
-////		driver.get(url);
-////		// 找到表格中的 canvas 元素
-////		// 找到目标 div 元素
-////
-////		//
-////		WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(15));
-////		try {
-////			WebElement fancybox = wait
-////					.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='fancybox-container-1']")));
-////			JavascriptExecutor js = (JavascriptExecutor) driver;
-////			js.executeScript("arguments[0].parentNode.removeChild(arguments[0]);", fancybox);
-////		} catch (Exception e) {
-////			log.error(e.getMessage(), e);
-////		}
-////		WebElement searchText = wait
-////				.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='search_text']")));
-////		searchText.clear();
-////		// 使用 JavaScript 清空 value
-////		searchText.sendKeys(Keys.CONTROL + "a");
-////		searchText.sendKeys(Keys.BACK_SPACE);
-////		searchText.sendKeys(stockCodes.get(0));
-////		WebElement inputButton = wait
-////				.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='srch']/input")));
-////		inputButton.click();
-//		//
-////
-////		for (String stockCode : stockCodes) {
-////			Date oneStockCodeStartDate = new Date();
-////			boolean isExsits = stockExchangeDetailService.checkIsStockExchangeDetailExsits(stockCode, tradingDate);
-////			if(isExsits || stockCode.startsWith("00")) {
-////				continue;
-////			}
-////			wait = new WebDriverWait(driver, Duration.ofSeconds(15));
-////			searchText = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='search_text']")));
-////			searchText.clear();
-////			// 使用 JavaScript 清空 value
-////			searchText.sendKeys(Keys.CONTROL + "a");
-////			searchText.sendKeys(Keys.BACK_SPACE);
-////			searchText.sendKeys(stockCode);
-////			inputButton = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='srch']/input")));
-////			inputButton.click();
-////			WebElement candlestick = wait.until(ExpectedConditions
-////					.visibilityOfElementLocated(By.xpath("//*[@id='cont-area']/div/div[3]/div[3]/ul/li[1]/a")));
-////			candlestick.click();
-////			//
-////			WebElement operateDetail = wait.until(ExpectedConditions
-////					.visibilityOfElementLocated(By.xpath("//*[@id='cont-area']/div/div[3]/div[4]/ul/li[4]/a")));
-////			operateDetail.click();
-////
-//////			WebElement tbody = wait
-//////					.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='tb_chart']/tbody")));
-//////			List<WebElement> rows = tbody.findElements(By.tagName("tr"));
-////			// 從第二筆開始遍歷（排除掉第一筆資料）
-////			Date starParseTime = new Date();
-////			AtomicInteger uniqueSeqGenerator = new AtomicInteger(1);
-////			
-////			   // Get the entire HTML source of the page
-////            String pageSource = driver.getPageSource();
-////
-////            // Use Jsoup to parse the HTML content
-////            Document document = Jsoup.parse(pageSource);
-////
-////            // Now you can use Jsoup to efficiently parse and extract data
-////            Elements tablerows = document.select("#tb_chart tbody tr"); // Adjust the selector as needed
-//
-//
-////            for (Element row : tablerows) {
-////                Elements cells = row.select("td");
-////                if (cells.size() >= 6) {
-////                    String exchangeTime = cells.get(0).text();
-////                    String exchangePrice = cells.get(3).text();
-////                    String exchangeQuantity = cells.get(5).text();
-////                    // Process the data as needed
-////                }
-////            }
-//            
-////            List<StockExchangeDetail> singleStockExchangeDetails = tablerows.stream().map(row ->{
-////            	  Elements cells = row.select("td");
-////				if (cells.size() >= 6) {
-////					String exchangeTime = cells.get(0).text(); // 第 4 個 td
-////					String exchangePrice = cells.get(3).text(); // 第 4 個 td
-////					String exchangeQuantity = cells.get(5).text(); // 第 6 個 td
-////					if("分量(張)".equals(exchangeQuantity) || "成交價".equals(exchangePrice) || "時間".equals(exchangeTime) ) {
-////						return null;
-////					}
-////					StockExchangeDetail stockExchangeDetail = new StockExchangeDetail();
-////					stockExchangeDetail.setStockCode(stockCode);
-////					stockExchangeDetail.setTradingDate(tradingDate);
-////				    // 生成唯一碼
-////				    int seq = uniqueSeqGenerator.getAndAdd(1);
-////					stockExchangeDetail.setExchangeQuantity(Integer.valueOf(exchangeQuantity));
-////					stockExchangeDetail.setSeq(seq);
-////					stockExchangeDetail.setExchangePrice(exchangePrice);
-////					stockExchangeDetail.setExchangeTime(exchangeTime);
-////					return stockExchangeDetail;
-////				} else {
-////				 return null;
-////				}
-////			}).filter(stockExchangeDetail -> Optional.ofNullable(stockExchangeDetail).isPresent()).toList();
-////			List<StockExchangeDetail> singleStockExchangeDetails = rows.parallelStream().map(row ->{
-////				List<WebElement> cells = row.findElements(By.tagName("td"));
-////				if (cells.size() >= 6) {
-////					String exchangeTime = cells.get(0).getText(); // 第 4 個 td
-////					String exchangePrice = cells.get(3).getText(); // 第 4 個 td
-////					String exchangeQuantity = cells.get(5).getText(); // 第 6 個 td
-////					if("分量(張)".equals(exchangeQuantity) || "成交價".equals(exchangePrice) || "時間".equals(exchangeTime) ) {
-////						return null;
-////					}
-////					StockExchangeDetail stockExchangeDetail = new StockExchangeDetail();
-////					stockExchangeDetail.setStockCode(stockCode);
-////					stockExchangeDetail.setTradingDate(tradingDate);
-////				    // 生成唯一碼
-////				    int seq = uniqueSeqGenerator.getAndAdd(1);
-////					stockExchangeDetail.setExchangeQuantity(Integer.valueOf(exchangeQuantity));
-////					stockExchangeDetail.setSeq(String.valueOf(seq));
-////					stockExchangeDetail.setExchangePrice(exchangePrice);
-////					stockExchangeDetail.setExchangeTime(exchangeTime);
-////					return stockExchangeDetail;
-////				} else {
-////				 return null;
-////				}
-////			}).filter(stockExchangeDetail -> Optional.ofNullable(stockExchangeDetail).isPresent()).toList();
-////			Date endParseTime = new Date();
-////			log.info("stockCode :{} parse stockExchangeDetail cost {} ms", stockCode, starParseTime.getTime() - endParseTime.getTime());
-////			stockExchangeDetailService.saveAll(singleStockExchangeDetails);
-////			for (int i = 1; i < rows.size(); i++) {
-////				WebElement row = rows.get(i);
-////				// 在當前的 tr 中找到所有的 td 元素
-////				List<WebElement> cells = row.findElements(By.tagName("td"));
-////				if (cells.size() >= 6) {
-////					String exchangeTime = cells.get(0).getText(); // 第 4 個 td
-////					String exchangePrice = cells.get(3).getText(); // 第 4 個 td
-////					String exchangeQuantity = cells.get(5).getText(); // 第 6 個 td
-////					StockExchangeDetail stockExchangeDetail = new StockExchangeDetail();
-////					stockExchangeDetail.setStockCode(stockCode);
-////					stockExchangeDetail.setTradingDate(tradingDate);
-////					stockExchangeDetail.setExchangeQuantity(Integer.valueOf(exchangeQuantity));
-////					stockExchangeDetail.setExchangePrice(exchangePrice);
-////					stockExchangeDetail.setExchangeTime(exchangeTime);
-////					stockExchangeDetails.add(stockExchangeDetail);
-////				} else {
-////					System.out.println("該行的 td 元素數量不足 6 個");
-////				}
-////			}
-////			int randomInterval = ThreadLocalRandom.current().nextInt(1, 8) * 1000;
-////			Thread.sleep(3000 + randomInterval);
-////			Date oneStockCodeEndTime = new Date();
-////			log.info(
-////					"stockCode {} , total cost {} ms to parse", stockCode, oneStockCodeEndTime.getTime() -oneStockCodeStartDate.getTime());
-////		}
-//
-////		return stockExchangeDetails;
-////				Point iframeLocation = iframeElement.getLocation();
-////		        int iframeX = iframeLocation.getX();
-////		        int iframeY = iframeLocation.getY();
-////
-////		        // 定义需要点击的坐标位置（假设是 iframe 中的相对坐标）
-////		        int targetXInsideIframe = 720;  // 这是相对于 iframe 的 X 坐标
-////		        int targetYInsideIframe = 150;  // 这是相对于 iframe 的 Y 坐标
-////		        // 计算 iframe 最右侧的 X 坐标
-////		        int iframeWidth = iframeElement.getSize().getWidth();  // iframe 的宽度
-////		        int iframeRightX = iframeX + iframeWidth;
-////		        // 计算相对于整个页面的 X 和 Y 坐标
-////		        int targetX = iframeX + targetXInsideIframe;
-////		        int targetY = iframeY + targetYInsideIframe;
-////
-////		        // 使用 Actions 模拟鼠标移动并点击
-////		        Actions actions = new Actions(driver);
-////		        actions.moveByOffset(targetX, targetY).click().perform();
-////		        actions.moveByOffset(iframeRightX-100, targetY).click().perform();
-//
-//	}
-
-
-
-
+	
 
 	public static List<StockDayPrice> graspTwseDayPrice(String url, Date tradeDate) throws InterruptedException,
 			JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
@@ -567,7 +207,7 @@ public class ChromeDriverUtils {
 					return code.trim().length() < 5 && !code.matches(".*[a-zA-Z].*");
 				})
 				.collect(Collectors.toList());
-		LocalDate today = tradeDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+		LocalDate today = tradeDate.toInstant().atZone(ZoneId.of("Asia/Taipei")).toLocalDate();
 
 		// 設置本周第一天的日期
 		LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
@@ -575,7 +215,7 @@ public class ChromeDriverUtils {
 		// 設置本周最後一天的日期
 		LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
 		// 獲取系統默認時區
-		ZoneId zoneId = ZoneId.systemDefault();
+		ZoneId zoneId = ZoneId.of("Asia/Taipei");
 
 		// 獲取偏移量
 		ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
@@ -615,7 +255,7 @@ public class ChromeDriverUtils {
 				}).collect(Collectors.toList());
 		return responseList.stream().map(map -> {
 			// 指定日期字符串格式
-			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd").withZone(ZoneId.of("Asia/Taipei"));
 
 			String monthAndDate = map.get("Date").substring(map.get("Date").length() - 4);
 			int year = Integer.parseInt(map.get("Date").replace(monthAndDate, "")) + 1911; // 民国转换为西元
@@ -623,7 +263,7 @@ public class ChromeDriverUtils {
 
 			// 解析标准日期字符串为 LocalDate 对象
 			LocalDate localDate = LocalDate.parse(standardDateString, dateStringformatter);
-			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
+			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.of("Asia/Taipei")).toInstant());
 
 			MarginTradingAndShortSellingInfo marginTradingAndShortSellingInfo = new MarginTradingAndShortSellingInfo();
 			marginTradingAndShortSellingInfo.setTradingDay(date);
@@ -658,10 +298,10 @@ public class ChromeDriverUtils {
 		List<Map<String, String>> responseList = objectMapper
 				.readValue(jsonResponse, new TypeReference<List<Map<String, String>>>() {
 				}).stream()
-//				.filter(data -> {
-//					String code = data.get("股票名稱").toString();
-//					return (code.length() < 5 && !code.matches(".*[a-zA-Z].*"));
-//				})
+				.filter(data -> {
+					String code = data.get("股票名稱").toString();
+					return (code.length() < 5 && !code.matches(".*[a-zA-Z].*"));
+				})
 				.collect(Collectors.toList());
 		return responseList.stream().map(map -> {
 			MarginTradingAndShortSellingInfo marginTradingAndShortSellingInfo = new MarginTradingAndShortSellingInfo();
@@ -703,7 +343,7 @@ public class ChromeDriverUtils {
 
 		return responseList.stream().map(map -> {
 			// 指定日期字符串格式
-			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd").withZone(ZoneId.of("Asia/Taipei"));
 
 			String monthAndDate = map.get("Date").substring(map.get("Date").length() - 4);
 			int year = Integer.parseInt(map.get("Date").replace(monthAndDate, "")) + 1911; // 民国转换为西元
@@ -711,7 +351,7 @@ public class ChromeDriverUtils {
 
 			// 解析标准日期字符串为 LocalDate 对象
 			LocalDate localDate = LocalDate.parse(standardDateString, dateStringformatter);
-			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
+			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.of("Asia/Taipei")).toInstant());
 
 			TradeVolumeInfo tradeVolumeInfo = new TradeVolumeInfo();
 			tradeVolumeInfo.setStockCode(map.get("SecuritiesCompanyCode"));
@@ -750,7 +390,7 @@ public class ChromeDriverUtils {
 				.collect(Collectors.toList());
 		return responseList.stream().map(map -> {
 			// 指定日期字符串格式
-			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd").withZone(ZoneId.of("Asia/Taipei"));
 
 			String monthAndDate = map.get("Date").substring(map.get("Date").length() - 4);
 			int year = Integer.parseInt(map.get("Date").replace(monthAndDate, "")) + 1911; // 民国转换为西元
@@ -758,8 +398,8 @@ public class ChromeDriverUtils {
 
 			// 解析标准日期字符串为 LocalDate 对象
 			LocalDate localDate = LocalDate.parse(standardDateString, dateStringformatter);
-			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
-			LocalDate today = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.of("Asia/Taipei")).toInstant());
+			LocalDate today = date.toInstant().atZone(ZoneId.of("Asia/Taipei")).toLocalDate();
 
 			// 設置本周第一天的日期
 			LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
@@ -767,7 +407,7 @@ public class ChromeDriverUtils {
 			// 設置本周最後一天的日期
 			LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
 			// 獲取系統默認時區
-			ZoneId zoneId = ZoneId.systemDefault();
+			ZoneId zoneId = ZoneId.of("Asia/Taipei");
 
 			// 獲取偏移量
 			ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
@@ -829,7 +469,7 @@ public class ChromeDriverUtils {
 				.collect(Collectors.toList());
 		return responseList.stream().map(map -> {
 			// 指定日期字符串格式
-			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+			DateTimeFormatter dateStringformatter = DateTimeFormatter.ofPattern("yyyy/MM/dd").withZone(ZoneId.of("Asia/Taipei"));
 
 			String monthAndDate = map.get("Date").substring(map.get("Date").length() - 4);
 			int year = Integer.parseInt(map.get("Date").replace(monthAndDate, "")) + 1911; // 民国转换为西元
@@ -837,8 +477,8 @@ public class ChromeDriverUtils {
 
 			// 解析标准日期字符串为 LocalDate 对象
 			LocalDate localDate = LocalDate.parse(standardDateString, dateStringformatter);
-			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
-			LocalDate today = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+			Date date = Date.from(localDate.atStartOfDay().atZone(ZoneId.of("Asia/Taipei")).toInstant());
+			LocalDate today = date.toInstant().atZone(ZoneId.of("Asia/Taipei")).toLocalDate();
 
 			// 設置本周第一天的日期
 			LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
@@ -846,7 +486,7 @@ public class ChromeDriverUtils {
 			// 設置本周最後一天的日期
 			LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
 			// 獲取系統默認時區
-			ZoneId zoneId = ZoneId.systemDefault();
+			ZoneId zoneId = ZoneId.of("Asia/Taipei");
 
 			// 獲取偏移量
 			ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
@@ -895,7 +535,7 @@ public class ChromeDriverUtils {
 			Map<String, String> map = innerList.stream().findFirst().orElse(new HashMap<>());
 			String date = map.get("﻿資料日期");
 			String stockCode = map.get("證券代號");
-			LocalDate localDate = LocalDate.parse(date, DateTimeFormatter.ofPattern("yyyyMMdd"));
+			LocalDate localDate = LocalDate.parse(date, DateTimeFormatter.ofPattern("yyyyMMdd").withZone(ZoneId.of("Asia/Taipei")));
 			Integer weeksOfYear = localDate.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
 			String weeksOfYearString = localDate.getYear() + "W" + weeksOfYear;
 			String countDate = localDate.getMonthValue() + "/" + localDate.getDayOfMonth();
@@ -948,197 +588,7 @@ public class ChromeDriverUtils {
 
 //	private static final String baseUrl = "https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=%1s&stkno=6272&_=17225";
 
-	public static List<StockDayPrice> getTpexStockHistory(Date startDate, Date endDate, String baseUrl,
-			String stockCode) throws RestClientException, URISyntaxException, JsonMappingException,
-			JsonProcessingException, InterruptedException {
-		Calendar startCalendar = Calendar.getInstance();
-		startCalendar.setTime(startDate);
-		Calendar endCalendar = Calendar.getInstance();
-		endCalendar.setTime(endDate);
-		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
-		int totalStartDateMonth = startCalendar.get(Calendar.YEAR) * 12 + startCalendar.get(Calendar.MONTH);
-		int totalendDateMonth = endCalendar.get(Calendar.YEAR) * 12 + endCalendar.get(Calendar.MONTH);
-		int monthDiff = totalendDateMonth - totalStartDateMonth;
-		if (monthDiff == 0) {
-			monthDiff = 1;
-		}
-		for (int index = 0; index < monthDiff; index++) {
-			SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd");
-			String formattedDate = dateFormat.format(startCalendar.getTime());
-			Map<String, String> formParameters = new HashMap<>();
-			formParameters.put("code", stockCode);
-			formParameters.put("date", formattedDate);
-			formParameters.put("response", "json");
-			String jsonResponse = fetchApiData(baseUrl, formParameters);
 
-			ObjectMapper objectMapper = new ObjectMapper();
-			Map<String, Object> responseList = objectMapper.readValue(jsonResponse,
-					new TypeReference<Map<String, Object>>() {
-					});
-
-//			List<List<String>> stockPrices = (List<List<String>>) (responseList.get("tables")[0];
-			Map<String, Object> tables = (Map<String, Object>) ((List<Object>) responseList.get("tables")).get(0);
-			// [111/08/01, 6, 647, 106.00, 107.00, 106.00, 107.00, 0.00, 11]
-			if("0".equals(tables.get("totalCount").toString())) {
-				Thread.sleep(15000);
-				startCalendar.add(Calendar.MONTH, 1);
-				continue;
-			}
-			List<StockDayPrice> singleMonthStockDayPrices = ((List<List<String>>) tables.get("data")).stream()
-					.map(data -> {
-						StockDayPrice stockPrice = new StockDayPrice();
-						String tradingDateStr = data.get(0);
-						// 拆分民国日期字符串
-						String[] parts = tradingDateStr.split("/");
-						int innerTaiwanYear = Integer.parseInt(parts[0]); // 民国年份
-						int month = Integer.parseInt(parts[1]); // 月
-						int day = Integer.parseInt(parts[2].replaceAll("\\*", "")); // 日
-
-						// 将民国年份转换为公历年份
-						int year = innerTaiwanYear + 1911;
-
-						// 构造公历日期字符串
-						String gregorianDateStr = year + "/" + month + "/" + day;
-						SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
-						Date tradingDate;
-						try {
-							tradingDate = sdf.parse(gregorianDateStr);
-						} catch (ParseException e) {
-							log.warn(e.getMessage(), e);
-							tradingDate = new Date();
-						}
-
-						LocalDate today = tradingDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-
-						// 設置本周第一天的日期
-						LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
-
-						// 設置本周最後一天的日期
-						LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
-						// 獲取系統默認時區
-						ZoneId zoneId = ZoneId.systemDefault();
-
-						// 獲取偏移量
-						ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
-
-						// 將 LocalDate 轉換為 Date
-						Date startOfWeeDate = Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
-						Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
-
-						// 定义日期格式
-						stockPrice.setTradingDay(tradingDate);
-						stockPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
-						stockPrice.setStockCode(stockCode);
-						stockPrice.setStartOfWeekDate(startOfWeeDate);
-						stockPrice.setEndOfWeekDate(endOfWeekDate);
-						stockPrice.setOpeningPrice(data.get(3).replaceAll(",", ""));
-						stockPrice.setClosingPrice(data.get(6).replaceAll(",", ""));
-						stockPrice.setHighPrice(data.get(4).replaceAll(",", ""));
-						stockPrice.setLowPrice(data.get(5).replaceAll(",", ""));
-						stockPrice.setChange(data.get(7).replace("+", "").replaceAll(",", ""));
-					
-						return stockPrice;
-					}).toList();
-			allStockDayPrices.addAll(singleMonthStockDayPrices);
-			startCalendar.add(Calendar.MONTH, 1);
-			Thread.sleep(15000);
-		}
-		return allStockDayPrices;
-	}
-
-	public static List<StockDayPrice> getTwseStockHistory(Date startDate, Date endDate, String baseUrl,
-			String stockCode) throws RestClientException, URISyntaxException, JsonMappingException,
-			JsonProcessingException, InterruptedException {
-		Calendar startCalendar = Calendar.getInstance();
-		startCalendar.setTime(startDate);
-		Calendar endCalendar = Calendar.getInstance();
-		endCalendar.setTime(endDate);
-		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
-		int totalStartDateMonth = startCalendar.get(Calendar.YEAR) * 12 + startCalendar.get(Calendar.MONTH);
-		int totalendDateMonth = endCalendar.get(Calendar.YEAR) * 12 + endCalendar.get(Calendar.MONTH);
-		int monthDiff = totalendDateMonth - totalStartDateMonth;
-		if (monthDiff == 0) {
-			monthDiff = 1;
-		}
-		for (int index = 0; index < monthDiff; index++) {
-//			int taiwanYear = startCalendar.get(Calendar.YEAR) - 1911;
-			SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd");
-			String formattedDate = dateFormat.format(startCalendar.getTime());
-//			String searchDateString = taiwanYear + "/" + formattedDate;
-			String realUrl = String.format(baseUrl, formattedDate, stockCode);
-			String jsonResponse = fetchApiData(realUrl);
-
-			ObjectMapper objectMapper = new ObjectMapper();
-			Map<String, Object> responseList = objectMapper.readValue(jsonResponse,
-					new TypeReference<Map<String, Object>>() {
-					});
-			if(responseList.containsKey("total") && "0".equals(responseList.get("total").toString()) ) {
-				Thread.sleep(15000);
-				startCalendar.add(Calendar.MONTH, 1);
-				continue;
-			}
-			List<List<String>> stockPrices = (List<List<String>>) responseList.get("data");
-			// [111/08/01, 6, 647, 106.00, 107.00, 106.00, 107.00, 0.00, 11]
-			List<StockDayPrice> singleMonthStockDayPrices = stockPrices.stream().map(data -> {
-				StockDayPrice stockPrice = new StockDayPrice();
-				String tradingDateStr = data.get(0);
-				// 拆分民国日期字符串
-				String[] parts = tradingDateStr.split("/");
-				int innerTaiwanYear = Integer.parseInt(parts[0]); // 民国年份
-				int month = Integer.parseInt(parts[1]); // 月
-				int day = Integer.parseInt(parts[2].replaceAll("\\*", "")); // 日
-
-				// 将民国年份转换为公历年份
-				int year = innerTaiwanYear + 1911;
-
-				// 构造公历日期字符串
-				String gregorianDateStr = year + "/" + month + "/" + day;
-				SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
-				Date tradingDate;
-				try {
-					tradingDate = sdf.parse(gregorianDateStr);
-				} catch (ParseException e) {
-					log.warn(e.getMessage(), e);
-					tradingDate = new Date();
-				}
-
-				LocalDate today = tradingDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-
-				// 設置本周第一天的日期
-				LocalDate startOfWeekLocalDate = today.with(DayOfWeek.MONDAY);
-
-				// 設置本周最後一天的日期
-				LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
-				// 獲取系統默認時區
-				ZoneId zoneId = ZoneId.systemDefault();
-
-				// 獲取偏移量
-				ZoneOffset zoneOffset = zoneId.getRules().getOffset(startOfWeekLocalDate.atStartOfDay());
-
-				// 將 LocalDate 轉換為 Date
-				Date startOfWeeDate = Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
-				Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
-
-				// 定义日期格式
-				stockPrice.setTradingDay(tradingDate);
-				stockPrice.setWeekOfYear(today.getYear() + "W" + today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
-				stockPrice.setStockCode(stockCode);
-				stockPrice.setStartOfWeekDate(startOfWeeDate);
-				stockPrice.setEndOfWeekDate(endOfWeekDate);
-				stockPrice.setOpeningPrice(data.get(3).replaceAll(",", ""));
-				stockPrice.setClosingPrice(data.get(6).replaceAll(",", ""));
-				stockPrice.setHighPrice(data.get(4).replaceAll(",", ""));
-				stockPrice.setLowPrice(data.get(5).replaceAll(",", ""));
-				stockPrice.setChange(data.get(7).replace("+", "").replaceAll(",", ""));
-				
-				return stockPrice;
-			}).toList();
-			allStockDayPrices.addAll(singleMonthStockDayPrices);
-			startCalendar.add(Calendar.MONTH, 1);
-			Thread.sleep(15000);
-		}
-		return allStockDayPrices;
-	}
 
 	private static String fetchApiData(String url) {
 		int maxRetries = 3;

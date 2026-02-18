@@ -3,27 +3,34 @@ package com.bigstock.biz.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URISyntaxException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 
 import com.bigstock.biz.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
+import com.bigstock.sharedComponent.entity.SecuritiesFirmsDayOperate;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
 import com.bigstock.sharedComponent.entity.StockMonthPrice;
@@ -43,9 +50,11 @@ import com.bigstock.sharedComponent.service.TmpExDividendsExRightInfoService;
 import com.bigstock.sharedComponent.service.TradeVolumeInfoService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -54,28 +63,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class GraspStockPrice {
-//	@Value("${schedule.chromeDriverPath.windows.active}")
-//	private boolean windowsActive;
-
-//	@Value("${schedule.chromeDriverPath.windows.path}")
-//	private String windowsChromeDriverPath;
-
-//	@Value("${schedule.chromeDriverPath.linux.active}")
-//	private boolean linuxActive;
-
-//	@Value("${schedule.chromeDriverPath.linux.driver-path}")
-//	private String linuxChromeDriverPath;
-
-//	@Value("${schedule.chromeDriverPath.download-path}")
-//	private String downloadPath;
-
-//	@Value("${schedule.bpython-url}")
-//	private String bpythonUrl;
-
-//	@Value("${schedule.credentials-pathl}")
-//	private String credentialsPath;
-
-//	private final GraspHistoryStockPrice graspHistoryStockPrice;
 
 	private final SecuritiesFirmsDayOperateService securitiesFirmsDayOperateService;
 
@@ -95,26 +82,78 @@ public class GraspStockPrice {
 
 	private final StockMonthPriceService stockMonthPriceService;
 
-	// 爬蟲暫時不做，取消抓取蠟燭圖方法，帶未來真的規模擴大，再走實際正常串接作法
-//	@PostConstruct
-//	public void grepCandlestickChart() throws InterruptedException, JsonMappingException, JsonProcessingException, RestClientException, URISyntaxException {
-//		Date tradeDate = graspHistoryStockPrice.getLastTradeDate();
-//		List<String> stockCodes = ChromeDriverUtils
-//				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2").stream().filter(stockInfo -> StringUtils.isNotBlank(stockInfo.getStockType()))
-//				.filter(stockInfo -> List.of("1", "0").contains(stockInfo.getStockType()))
-//				.map(stockInfo -> stockInfo.getStockCode()).toList();
-//		ChromeDriverUtils.grepCanvas(windowsActive ? windowsChromeDriverPath : linuxChromeDriverPath, stockCodes, tradeDate, stockExchangeDetailService);
-//	}
-//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
-//	@PostConstruct
-	public void updateTmpExDivideExRightInfo() throws JsonMappingException, RestClientException,
-			JsonProcessingException, URISyntaxException, InterruptedException {
-		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
-				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
-		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
-		List<TmpExDividendsExRightInfo> tmpExDividendsExRightInfos = ChromeDriverUtils
-				.grepTmpExDividendsExRightInfo(tradeDate);
-		tmpExDividendsExRightInfoService.saveAll(tmpExDividendsExRightInfos);
+	public void grepSecuritiesFirmsDayOperate(JSONObject json)
+			throws InterruptedException, RestClientException, URISyntaxException, JsonProcessingException, JSONException, ParseException {
+		List<Object> datas = json.getJSONArray("batch").toList();
+		for(Object  jdata : datas) {
+			ObjectMapper mapper = new ObjectMapper();
+			String jsonString = mapper.writeValueAsString((HashMap) jdata);
+			JSONObject dataJson = new JSONObject(jsonString);
+			SimpleDateFormat sim = new SimpleDateFormat("yyyy-MM-dd");
+			Date tradingDate = sim.parse(dataJson.get("tradingDate").toString());;
+			// 讀取CSV文件
+			List<SecuritiesFirmsDayOperate> securitiesFirmsDayOperates = dataJson.getJSONArray("data").toList().stream()
+					.map(jm -> {
+						SecuritiesFirmsDayOperate securitiesFirmsDayOperate = new SecuritiesFirmsDayOperate();
+						try {
+							String innerJsonString = mapper.writeValueAsString((HashMap) jm);
+							JSONObject jsb = new JSONObject(innerJsonString);
+						String stockCode = dataJson.getString("stockCode").toString();
+						securitiesFirmsDayOperate.setPrice(jsb.getString("價格"));
+						securitiesFirmsDayOperate.setSeq(jsb.getInt("序號"));
+						securitiesFirmsDayOperate
+						.setStockCode(stockCode.contains("_") ? stockCode.split("_")[0] : stockCode);
+						securitiesFirmsDayOperate.setSecuritiesFirms( jsb.getString("券商"));
+						
+						securitiesFirmsDayOperate.setStockBuyAmount(
+								Long.valueOf( jsb.getString("買進股數").trim().replace(",", "")));
+						securitiesFirmsDayOperate.setStockSellAmount(Long.valueOf( jsb.getString("賣出股數").trim().replace(",", "")));
+							securitiesFirmsDayOperate.setTradingDate(sim.parse(dataJson.get("tradingDate").toString()));
+						} catch (JSONException | ParseException |JsonProcessingException e) {
+							log.error(e.getMessage(),e);
+							return null;
+						} 
+						return securitiesFirmsDayOperate;
+					}).filter(data -> !Optional.ofNullable(data).isEmpty()).sorted((x1, x2) -> x1.getSeq().compareTo(x2.getSeq())).toList();
+			if(CollectionUtils.isNotEmpty(securitiesFirmsDayOperates)) {
+				securitiesFirmsDayOperateService.batchReplace(dataJson.getString("stockCode").toString(), tradingDate,securitiesFirmsDayOperates);
+			}
+		}
+	}
+	
+	private List<JSONObject> convertTESECSVtoJSON(List<String[]> csvData) {
+		// 跳過前 3 行表頭數據
+		// 創建 JSON 數組
+		List<JSONObject> jsonArray = Lists.newArrayList();
+		// 跳過前 3 行表頭數據
+		for (int i = 3; i < csvData.size(); i++) {
+			String[] row = csvData.get(i);
+
+			// 檢查第一部分（列 1 到列 5 是否有數據）
+			if (row[0] != null && !row[0].trim().isEmpty()) {
+				JSONObject jsonObject = new JSONObject();
+				jsonObject.put("序號", Integer.parseInt(row[0].trim()));
+				jsonObject.put("券商", row[1].trim());
+				jsonObject.put("價格", row[2].trim());
+				jsonObject.put("買進股數", row[3].trim());
+				jsonObject.put("賣出股數", row[4].trim());
+
+				jsonArray.add(jsonObject); // 將第一部分的 JSON 對象添加到列表中
+			}
+
+			// 檢查第二部分（列 7 到列 11 是否有數據）
+			if (row.length > 6 && row[6] != null && !row[6].trim().isEmpty()) {
+				JSONObject jsonObject = new JSONObject();
+				jsonObject.put("序號", Integer.parseInt(row[6].trim())); // 從第 7 列開始
+				jsonObject.put("券商", row[7].trim());
+				jsonObject.put("價格", row[8].trim());
+				jsonObject.put("買進股數", row[9].trim());
+				jsonObject.put("賣出股數", row[10].trim());
+
+				jsonArray.add(jsonObject); // 將第二部分的 JSON 對象添加到列表中
+			}
+		}
+		return jsonArray;
 	}
 
 	// 每天下午5點更新

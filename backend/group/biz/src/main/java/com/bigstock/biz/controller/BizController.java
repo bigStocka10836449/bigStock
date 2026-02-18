@@ -1,19 +1,26 @@
 package com.bigstock.biz.controller;
 
+import java.net.URISyntaxException;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.json.JSONObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestClientException;
 
 import com.bigstock.biz.dto.MarginTradingAndShortSellingInfoVO;
 import com.bigstock.biz.service.BizService;
+import com.bigstock.biz.service.GraspStockPrice;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 //import io.micrometer.tracing.annotation.NewSpan;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +36,9 @@ public class BizController {
 	private final BizService bizService;
 	
 	private final SecuritiesFirmsDayOperateService securitiesFirmsDayOperateService;
+	
+	private final GraspStockPrice graspStockPrice;
+	
 	
 //	@NewSpan("stockShareholderStructure")
 	@Operation(summary = "個別股票持股分布", description = "")
@@ -55,6 +65,16 @@ public class BizController {
 //			@PathVariable("stockCode") String stockCode, @PathVariable("tradingDate") Date tradingDate) {
 //		return ResponseEntity.ok(securitiesFirmsDayOperateService.getByStockCodeAndTradingDate(stockCode, tradingDate));
 //	}
-	
-	
+
+	@Operation(summary = "個股買賣日報表資料匯入", description = "")
+	@PostMapping("stockShareholderStructure")
+	public void getSecuritiesFirmsDayOperate(@RequestBody Map<String, Object> request) throws RestClientException, InterruptedException, URISyntaxException {
+		ObjectMapper mapper = new ObjectMapper();
+		try {
+	        String jsonString = mapper.writeValueAsString(request);
+	        graspStockPrice.grepSecuritiesFirmsDayOperate(new JSONObject(jsonString));
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	    }
+	}
 }

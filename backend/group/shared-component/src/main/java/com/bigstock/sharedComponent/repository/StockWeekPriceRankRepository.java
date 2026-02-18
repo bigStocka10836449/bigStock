@@ -11,9 +11,9 @@ public interface StockWeekPriceRankRepository
 		extends JpaRepository<StockWeekPriceRank, StockWeekPriceRank.StockWeekPriceRankId> {
 
 	@Modifying
-	@Query("""
-			DELETE FROM StockWeekPriceRank r WHERE r.rankNo >= 361
-			""")
+	@Query(value ="""
+			DELETE FROM bstock.stock_week_price_rank r WHERE r.rank_No >= 361
+			""", nativeQuery = true)
 	void deleteByRankNoLessThanZero();
 	
 	
