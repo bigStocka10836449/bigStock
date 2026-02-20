@@ -17,11 +17,10 @@ public class MonthlyRevenueSyncController {
 
     @GetMapping("/syncDb")
     public StockRevenueService.SyncResult syncDb(
-            @RequestParam(required = false) String yearMonth,     // yyyy-MM
-            @RequestParam(required = false) String market,        // TWSE/TPEX
-            @RequestParam(defaultValue = "false") boolean forceRefresh
+            @RequestParam(required = false) String yearMonth     // yyyy-MM
+          
     ) {
-        return dbService.fetchToRedisAndUpsertDb(normalizeToYyyyMm(yearMonth), market, forceRefresh);
+        return dbService.fetchToRedisAndUpsertDb(normalizeToYyyyMm(yearMonth));
     }
 
     private static String normalizeToYyyyMm(String ym) {

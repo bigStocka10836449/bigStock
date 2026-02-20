@@ -53,6 +53,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse;
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockInfo;
@@ -195,7 +196,7 @@ public class ChromeDriverUtils {
 		}
 		
 		
-		private static List<com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse> toResponseDto(
+		private static List<ThreeInstitutionalTradingResponse> toResponseDto(
 		        List<ThreeInstiSimpleRow> rows
 		) {
 		    List<com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse> out = new ArrayList<>();
@@ -268,32 +269,7 @@ public class ChromeDriverUtils {
 		    return yyyyMMdd.substring(0, 4) + "/" + yyyyMMdd.substring(4, 6) + "/" + yyyyMMdd.substring(6, 8);
 		}
 
-		private static String cacheKey(String market, String yyyyMMdd, String type) {
-		    // type = raw | norm
-		    return "threeinsti:" + market + ":" + yyyyMMdd + ":" + type;
-		}
 
-		/**
-		 * 入口：同時抓 TWSE + TPEX，並把 raw + norm 都塞進 Redis cache（先不寫 DB）
-		 */
-		public static void cacheThreeInstiTwseAndTpex(
-		        RedissonClient redissonClient,
-		        String yyyyMMdd,
-		        Duration ttl
-		) {
-		    try {
-		        cacheThreeInstiTwse(redissonClient, yyyyMMdd, ttl);
-		    } catch (Exception e) {
-		        // 不中斷另一個市場
-		        log.warn("cacheThreeInstiTwse failed, yyyyMMdd={}, err={}", yyyyMMdd, e.getMessage(), e);
-		    }
-
-		    try {
-		        cacheThreeInstiTpex(redissonClient, yyyyMMdd, ttl);
-		    } catch (Exception e) {
-		        log.warn("cacheThreeInstiTpex failed, yyyyMMdd={}, err={}", yyyyMMdd, e.getMessage(), e);
-		    }
-		}
 
 		/**
 		 * TWSE：抓 T86，cache raw + norm
@@ -302,10 +278,8 @@ public class ChromeDriverUtils {
 		 * - 外資不分：外陸資(不含外資自營商) + 外資自營商  => foreignBuy/foreignSell
 		 * - 自營商不分：自行買賣 + 避險 => dealerBuy/dealerSell
 		 */
-		public static void cacheThreeInstiTwse(
-		        RedissonClient redissonClient,
-		        String yyyyMMdd,
-		        Duration ttl
+		public static List<ThreeInstitutionalTradingResponse> grabThreeInstiTwse(
+		        String yyyyMMdd
 		) throws Exception {
 
 		    String url = "https://www.twse.com.tw/rwd/zh/fund/T86?date=" + yyyyMMdd
@@ -313,9 +287,7 @@ public class ChromeDriverUtils {
 
 		    String raw = fetchApiData(url);
 
-		    // raw cache
-		    RBucket<String> rawBucket = redissonClient.getBucket(cacheKey("twse", yyyyMMdd, "raw"));
-		    rawBucket.set(raw, ttl);
+		 
 
 		    ObjectMapper om = new ObjectMapper();
 		    JsonNode root = om.readTree(raw);
@@ -323,14 +295,7 @@ public class ChromeDriverUtils {
 		    // 有時會回 {"stat":"很抱歉，沒有符合條件的資料!","total":0}
 		    JsonNode dataNode = root.get("data");
 		    JsonNode fieldsNode = root.get("fields");
-		    if (dataNode == null || !dataNode.isArray() || dataNode.size() == 0
-		            || fieldsNode == null || !fieldsNode.isArray()) {
 
-		        // norm 也 cache 一個空陣列，方便你檢視
-		    	RBucket<String> normBucket = redissonClient.getBucket(cacheKey("twse", yyyyMMdd, "norm"), StringCodec.INSTANCE);
-		        normBucket.set("[]", ttl);
-		        return;
-		    }
 
 		    // 建欄位 index map：欄名 -> index
 		    Map<String, Integer> fieldIndex = new HashMap<>();
@@ -395,9 +360,8 @@ public class ChromeDriverUtils {
 		        }
 		    }
 
-		    String norm = om.writeValueAsString(toResponseDto(rows));
-		    RBucket<String> normBucket = redissonClient.getBucket(cacheKey("twse", yyyyMMdd, "norm"), StringCodec.INSTANCE);
-		    normBucket.set(norm, ttl);
+		    return toResponseDto(rows);
+
 		}
 
 		/**
@@ -421,11 +385,10 @@ public class ChromeDriverUtils {
 		 * - 外資：優先用 group2（外資合計），若為 0 再 fallback group0+group1
 		 * - 投信：用 group3
 		 * - 自營商：優先用 group6（自營商合計），若為 0 再 fallback group4+group5
+		 * @return 
 		 */
-		public static void cacheThreeInstiTpex(
-		        RedissonClient redissonClient,
-		        String yyyyMMdd,
-		        Duration ttl
+		public static List<ThreeInstitutionalTradingResponse> grabThreeInstiTpex(
+		        String yyyyMMdd
 		) throws Exception {
 
 		    String url = "https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade";
@@ -439,27 +402,17 @@ public class ChromeDriverUtils {
 
 		    String raw = fetchApiData(url, form);
 
-		    // raw cache
-		    RBucket<String> rawBucket = redissonClient.getBucket(cacheKey("tpex", yyyyMMdd, "raw"), StringCodec.INSTANCE);
-		    rawBucket.set(raw, ttl);
+	
 
 		    ObjectMapper om = new ObjectMapper();
 		    JsonNode root = om.readTree(raw);
 
 		    JsonNode tables = root.get("tables");
-		    if (tables == null || !tables.isArray() || tables.size() == 0) {
-		    	RBucket<String> normBucket = redissonClient.getBucket(cacheKey("tpex", yyyyMMdd, "norm"), StringCodec.INSTANCE);
-		        normBucket.set("[]", ttl);
-		        return;
-		    }
+
 
 		    JsonNode table0 = tables.get(0);
 		    JsonNode dataNode = table0.get("data");
-		    if (dataNode == null || !dataNode.isArray() || dataNode.size() == 0) {
-		        RBucket<String> normBucket = redissonClient.getBucket(cacheKey("tpex", yyyyMMdd, "norm"), StringCodec.INSTANCE);
-		        normBucket.set("[]", ttl);
-		        return;
-		    }
+
 
 		    // data row: [code,name, g0b,g0s,g0n, g1b,g1s,g1n, g2b,g2s,g2n, g3b,g3s,g3n, g4b,g4s,g4n, g5b,g5s,g5n, g6b,g6s,g6n, totalNet]
 		    final int CODE = 0;
@@ -529,9 +482,8 @@ public class ChromeDriverUtils {
 		        rows.add(r);
 		    }
 
-		    String norm = om.writeValueAsString(toResponseDto(rows));
-		    RBucket<String> normBucket = redissonClient.getBucket(cacheKey("tpex", yyyyMMdd, "norm"), StringCodec.INSTANCE);
-		    normBucket.set(norm, ttl);
+		    return toResponseDto(rows);
+		  
 		}
 
 	private static Object firstNonNull(Object... arr) {

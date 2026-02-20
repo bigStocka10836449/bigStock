@@ -22,11 +22,9 @@ public class MonthlyRevenueQueryController {
      */
     @PostMapping("/monthly")
     public List<MonthlyRevenueVo> fetchMonthlyRevenueToRedis(
-            @RequestParam String yearMonth,
-            @RequestParam(required = false) String market,
-            @RequestParam(defaultValue = "false") boolean forceRefresh
+            @RequestParam String yearMonth
     ) {
-        return queryService.fetchMonthlyRevenueToRedis(yearMonth, market, forceRefresh);
+        return queryService.fetchMonthlyRevenueToRedis(yearMonth);
     }
 
     /**

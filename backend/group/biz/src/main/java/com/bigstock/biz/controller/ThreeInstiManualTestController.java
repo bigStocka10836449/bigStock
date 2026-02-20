@@ -27,37 +27,7 @@ public class ThreeInstiManualTestController {
     private final ThreeInstiService threeInstiService;
     private final RedissonClient redissonClient;
 
-    /**
-     * 觸發：抓 TWSE + TPEX → 寫 Redis（保留）
-     * 然後：從 Redis norm → 寫 DB
-     *
-     * GET /debug/threeinsti/run?date=20260123
-     */
-    @GetMapping("/run")
-    public Map<String, Object> run(@RequestParam(required = false) String date) {
-        String yyyyMMdd = (date == null || date.isBlank())
-                ? LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
-                : date.trim();
-
-        Duration ttl = Duration.ofHours(6);
-
-        StockThreeInstitutionalTradingService.SyncResult sync =
-                threeInstiService.fetchToRedisAndSyncDb(yyyyMMdd, ttl);
-
-        Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("ok", true);
-        resp.put("date", yyyyMMdd);
-        resp.put("ttlHours", 6);
-        resp.put("redisKeys", new String[] {
-                "threeinsti:twse:" + yyyyMMdd + ":raw",
-                "threeinsti:twse:" + yyyyMMdd + ":norm",
-                "threeinsti:tpex:" + yyyyMMdd + ":raw",
-                "threeinsti:tpex:" + yyyyMMdd + ":norm"
-        });
-        resp.put("dbSync", sync);
-        return resp;
-    }
-
+  
     /**
      * 讀取 Redis 裡的內容（raw / norm）
      *

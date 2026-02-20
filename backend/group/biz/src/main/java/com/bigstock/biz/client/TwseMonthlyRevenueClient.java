@@ -4,6 +4,8 @@ import com.bigstock.biz.parser.MonthlyRevenueExcelParser;
 import com.bigstock.biz.utils.HttpDownloadUtils;
 import com.bigstock.biz.utils.ZipExtractUtils;
 import com.bigstock.biz.vo.MonthlyRevenueVo;
+import com.google.common.collect.Lists;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -33,7 +35,7 @@ public class TwseMonthlyRevenueClient {
         // ZIP 裡找第一個 .xls，抽出 bytes
         byte[] xlsBytes = ZipExtractUtils.extractFirstFileBytes(zipBytes, ".xls");
         if (xlsBytes == null) {
-            throw new RuntimeException("TWSE zip does not contain .xls file for " + yearMonth);
+            return Lists.newArrayList();
         }
 
         // 交給 parser 解析

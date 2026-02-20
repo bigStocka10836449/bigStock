@@ -25,9 +25,10 @@ public class ThreeInstiSyncController {
      * - GET /api/threeinsti/sync?date=20260123
      * - GET /api/threeinsti/sync?date=2026-01-23
      * - GET /api/threeinsti/sync           (不帶 date 就用今天)
+     * @throws Exception 
      */
     @GetMapping("/sync")
-    public StockThreeInstitutionalTradingService.SyncResult sync(@RequestParam(required = false) String date) {
+    public StockThreeInstitutionalTradingService.SyncResult sync(@RequestParam(required = false) String date) throws Exception {
         String yyyyMMdd = normalizeToYyyyMMdd(date);
         Duration ttl = Duration.ofHours(6);
         return threeInstiService.fetchToRedisAndSyncDb(yyyyMMdd, ttl);

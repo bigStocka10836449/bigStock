@@ -76,6 +76,8 @@ schedule:
           update-shareholder-structure: "0 30 8 * * *"
           update-stock-info: "0 30 8 * * *"
           update-margin-trading: "0 30 8 * * *"
+          update-threeInsti: "0 30 18 * * *"
+          update-monthlyRevenue: "0 0 8 * * SUN"
   chromeDriverPath:
     windows: 
       active: false	

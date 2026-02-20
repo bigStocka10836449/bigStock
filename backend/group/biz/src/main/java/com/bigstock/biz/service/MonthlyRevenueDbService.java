@@ -23,12 +23,11 @@ public class MonthlyRevenueDbService {
      */
     @Transactional(rollbackFor = { Exception.class })
     public StockRevenueService.SyncResult fetchToRedisAndUpsertDb(
-            String yearMonth,        // yyyy-MM
-            String marketNullable,   // TWSE / TPEX / null(兩個)
-            boolean forceRefresh
+            String yearMonth
+
     ) {
         List<MonthlyRevenueVo> merged =
-                monthlyRevenueQueryService.fetchMonthlyRevenueToRedis(yearMonth, marketNullable, forceRefresh);
+                monthlyRevenueQueryService.fetchMonthlyRevenueToRedis(yearMonth);
 
         List<StockRevenueResponse> mapped =
                 merged.stream().map(MonthlyRevenueMapper::toStockRevenueResponse).toList();

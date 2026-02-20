@@ -41,9 +41,7 @@ public class StockThreeInstitutionalTradingService {
      * - DB 用複合 PK (trade_date, market, stock_code) 自動覆蓋更新
      */
     @Transactional
-    public SyncResult syncFromRedisToDb(String yyyyMMdd) {
-        List<ThreeInstitutionalTradingResponse> twse = redisRepository.getNormList("twse", yyyyMMdd);
-        List<ThreeInstitutionalTradingResponse> tpex = redisRepository.getNormList("tpex", yyyyMMdd);
+    public SyncResult syncFromRedisToDb(String yyyyMMdd,List<ThreeInstitutionalTradingResponse> twse , List<ThreeInstitutionalTradingResponse> tpex) {
 
         List<StockThreeInstitutionalTrading> entities = new ArrayList<>(twse.size() + tpex.size());
         entities.addAll(mapToEntities(twse));

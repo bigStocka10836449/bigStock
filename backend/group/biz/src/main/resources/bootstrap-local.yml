@@ -1,80 +1,80 @@
-server:
-  port: 18080
-  servlet:
-    context-path: /biz
-spring:
-  config:
-    import:
-    # 直接讀取Config
-    - optional:configserver:http://localhost:8519
-    # 從服務中心Consul 查詢 Config 服務
-#    - optional:consul:consul-headless.aps.svc.cluster.local:8500
-  cloud:
-    bus:
-      enabled: true
-      refresh:
-        enabled: true
-    config:
-      name: biz
-      profile: consul,redisadaptor,postgres-biz,notracing,deptsync,mailbox
-      label: main
-      fail-fast: true
-management:
-  health:
-    defaults:
-      enabled: false
-  security:
-    enabled: false
-  endpoints:
-    health:
-      show-details: always
-    web:
-      exposure:
-        include: "*"  
-logging:
-  config: classpath:logging-config-local.xml
-  ## 提供給開發者 trace spring transaction 使用。
-#  level.org.springframework.transaction: TRACE
-#  level.org.hibernate.type.descriptor.sql.BasicBinder: TRACE
-
-# 分散式ID生成設定
-snowflake:
-  datacenter-id: ${DATACENTER_ID:1}
-  worker-id: ${WORKER_ID:1}
-aps:
-  control:
-    # xml from local
-    xml-path: xml
-    # xml from config
-#    host: http://localhost:8519
-#    api-url: /getConfig
-#    name: biz
-#    label: main
-    # xml Preload
-    root-file: APSBIZPRELOAD.xml
-
-  regularpattern:
-    number: 0-9
-    en: a-zA-Z
-    spot: .
-    dash: "-"
-    underline: _
-    chineses: (\u4e00-\u9fa5)
-    sign: 
-      - .      
-      - _
-      #dash must be the last one
-      - "-"
-    email: ^(.+)@(.+)$
-    password: ^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$
-    space: \s
-auth:
-  secret:
-    authUrl: http://127.0.0.1:10083
-    client-id: eam
-    client-secret: 123456
-## 玉山 JBPM Client
-jbpm:
-  api:
-    url: https://bpmspxy1ddmz.testesunbank.com.tw
-    hrUrl: http://127.0.0.1:8080/hrDummy
+#server:
+#  port: 18080
+#  servlet:
+#    context-path: /biz
+#spring:
+#  config:
+#    import:
+#    # 直接讀取Config
+#    - optional:configserver:http://localhost:8519
+#    # 從服務中心Consul 查詢 Config 服務
+##    - optional:consul:consul-headless.aps.svc.cluster.local:8500
+#  cloud:
+#    bus:
+#      enabled: true
+#      refresh:
+#        enabled: true
+#    config:
+#      name: biz
+#      profile: consul,redisadaptor,postgres-biz,notracing,deptsync,mailbox
+#      label: main
+#      fail-fast: true
+#management:
+#  health:
+#    defaults:
+#      enabled: false
+#  security:
+#    enabled: false
+#  endpoints:
+#    health:
+#      show-details: always
+#    web:
+#      exposure:
+#        include: "*"  
+#logging:
+#  config: classpath:logging-config-local.xml
+#  ## 提供給開發者 trace spring transaction 使用。
+##  level.org.springframework.transaction: TRACE
+##  level.org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+#
+## 分散式ID生成設定
+#snowflake:
+#  datacenter-id: ${DATACENTER_ID:1}
+#  worker-id: ${WORKER_ID:1}
+#aps:
+#  control:
+#    # xml from local
+#    xml-path: xml
+#    # xml from config
+##    host: http://localhost:8519
+##    api-url: /getConfig
+##    name: biz
+##    label: main
+#    # xml Preload
+#    root-file: APSBIZPRELOAD.xml
+#
+#  regularpattern:
+#    number: 0-9
+#    en: a-zA-Z
+#    spot: .
+#    dash: "-"
+#    underline: _
+#    chineses: (\u4e00-\u9fa5)
+#    sign: 
+#      - .      
+#      - _
+#      #dash must be the last one
+#      - "-"
+#    email: ^(.+)@(.+)$
+#    password: ^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$
+#    space: \s
+#auth:
+#  secret:
+#    authUrl: http://127.0.0.1:10083
+#    client-id: eam
+#    client-secret: 123456
+### 玉山 JBPM Client
+#jbpm:
+#  api:
+#    url: https://bpmspxy1ddmz.testesunbank.com.tw
+#    hrUrl: http://127.0.0.1:8080/hrDummy

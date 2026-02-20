@@ -1,18 +1,29 @@
 package com.bigstock.biz.parser;
 
-import com.bigstock.biz.utils.ExcelCellUtils;
-import com.bigstock.biz.utils.RocYearMonthUtils;
-import com.bigstock.biz.vo.MonthlyRevenueVo;
-import org.apache.poi.hssf.usermodel.HSSFWorkbook;
-import org.apache.poi.ss.usermodel.*;
-import org.springframework.stereotype.Component;
-
 import java.io.InputStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.springframework.stereotype.Component;
+
+import com.bigstock.biz.utils.ExcelCellUtils;
+import com.bigstock.biz.utils.RocYearMonthUtils;
+import com.bigstock.biz.vo.MonthlyRevenueVo;
+import com.google.common.collect.Lists;
+
+import lombok.extern.slf4j.Slf4j;
+
 @Component
+@Slf4j
 public class MonthlyRevenueExcelParser {
 
     // 例如：1101  台泥 / 2330 台積電
@@ -42,8 +53,9 @@ public class MonthlyRevenueExcelParser {
 
             throw new RuntimeException("Cannot locate header for either GENERAL(TPEX) or TWSE(JAN./FEB.) format.");
         } catch (Exception e) {
-            throw new RuntimeException("parse xls failed: " + e.getMessage(), e);
+            log.warn("parse xls failed: " + e.getMessage(), e);
         }
+        return Lists.newArrayList();
     }
 
  // =========================

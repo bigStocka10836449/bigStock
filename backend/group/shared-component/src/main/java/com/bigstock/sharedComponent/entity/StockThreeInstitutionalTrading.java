@@ -37,7 +37,7 @@ public class StockThreeInstitutionalTrading {
     @Column(name = "dealer_sell", nullable = false)
     private long dealerSell;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
