@@ -1,4 +1,4 @@
-package com.bigstock.biz.service;
+package com.bigstock.biz.schedule;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -13,7 +13,6 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -28,6 +27,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 
+import com.bigstock.biz.service.RankStockChangeService;
 import com.bigstock.biz.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.SecuritiesFirmsDayOperate;
@@ -53,7 +53,6 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -81,6 +80,8 @@ public class GraspStockPrice {
 	private final StockWeekPriceService stockWeekPriceService;
 
 	private final StockMonthPriceService stockMonthPriceService;
+	
+	private final RankStockChangeService rankStockChangeService;
 
 	public void grepSecuritiesFirmsDayOperate(JSONObject json)
 			throws InterruptedException, RestClientException, URISyntaxException, JsonProcessingException, JSONException, ParseException {
@@ -268,8 +269,8 @@ public class GraspStockPrice {
 			}
 		});
 		stockTwseDayPrices.stream().forEach(stockTwseDayPrice -> {
-			if("5340".equals(stockTwseDayPrice.getStockCode())) {
-				log.info("5340");
+			if("2454".equals(stockTwseDayPrice.getStockCode())) {
+				log.info("2454");
 			}
 			if(!groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
 				return;
@@ -290,8 +291,8 @@ public class GraspStockPrice {
 		stockDayPriceService.upsertBatch(stockTwseDayPrices);
 		stockTwseDayPrices.stream().forEach(stockTwseDayPrice -> {
 			if(groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
-				if ("2330".equals(stockTwseDayPrice.getStockCode())) {
-					log.info("2330");
+				if ("2454".equals(stockTwseDayPrice.getStockCode())) {
+					log.info("2454");
 				}
 				StockDayPriceRank lastStockMonthPriceRank = stockDayPriceService.buildRanks(stockTwseDayPrice.getStockCode(), stockTwseDayPrice);
 				allStockDayPriceRanks.add(lastStockMonthPriceRank);
@@ -498,6 +499,12 @@ public class GraspStockPrice {
 		stockMonthPriceService.updateRankNo();
 		stockMonthPriceService.batchInsertMonthRankPrices(allStockMonthPriceRank);
 		stockMonthPriceService.deleteByRankNoLessThanZero();
+		
+		//計算漲跌幅排名
+		List<StockDayPrice> needRankTPEXs = stockTpexDayPrices.stream().filter(data -> !List.of("--","---","----").contains(data.getChange())).toList();
+		List<StockDayPrice> needRankTWSEs = stockTwseDayPrices.stream().filter(data -> !List.of("--","---","----").contains(data.getChange())).toList();
+		rankStockChangeService.writeStockListToRedis(needRankTPEXs, "TPEX");
+		rankStockChangeService.writeStockListToRedis(needRankTWSEs, "TWSE");
 	}
 
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}", zone= "Asia/Taipei")
@@ -543,6 +550,53 @@ public class GraspStockPrice {
 				|| StringUtils.isBlank(stockTwseDayPrice.getClosingPrice())) {
 			return;
 		}
+		
+		String tmpChage = stockTwseDayPrice.getChange().trim().replace("+", "").replaceAll(",", "");
+		boolean isNeedSpecialDeal = groupedtmpExDividendsExRightInfos.containsKey(stockTwseDayPrice.getStockCode())
+				? (groupedtmpExDividendsExRightInfos.get(stockTwseDayPrice.getStockCode()).stream().findFirst()
+						.isPresent()
+						&& groupedtmpExDividendsExRightInfos.get(stockTwseDayPrice.getStockCode()).stream().findFirst()
+								.get().getTradingDay().equals(stockTwseDayPrice.getTradingDay()))
+				: false;
+		if (tmpChage.equals("0.00")) {
+			tmpChage = "0";
+		}
+		if (tmpChage.contains("除息") || tmpChage.contains("除權") || tmpChage.contains("X")) {
+			Optional<StockDayPrice> stockDayPriceOp = stockDayPriceService.findByStockCodeAndTradingDayBeforLimitOne(
+					stockTwseDayPrice.getStockCode(), stockTwseDayPrice.getTradingDay());
+			if (stockDayPriceOp.isPresent()) {
+				tmpChage = String.valueOf(Double
+						.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""))
+						- Double.valueOf(stockDayPriceOp.get().getClosingPrice().replace("+", "").replaceAll(",", "")));
+			} else {
+				tmpChage = "0";
+			}
+		}
+		Double standarPrice = null;
+		Double upperLimitPrice = null;
+		Double lowerLimitPrice = null;
+		if (isNeedSpecialDeal) {
+				TmpExDividendsExRightInfo tmpExDividendsExRightInfo = groupedtmpExDividendsExRightInfos.get(stockTwseDayPrice.getStockCode()).stream().findFirst().get();
+				upperLimitPrice = Double.valueOf(tmpExDividendsExRightInfo.getLimitUp().replaceAll(",", ""));
+				lowerLimitPrice = Double.valueOf(tmpExDividendsExRightInfo.getLimitDown().replaceAll(",", ""));
+				standarPrice = new BigDecimal(
+						tmpExDividendsExRightInfo.getReferencePrice().replace(",", StringUtils.EMPTY)).doubleValue();
+		} else {
+			standarPrice = Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""))
+					- new BigDecimal(tmpChage).doubleValue();
+			upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true);
+			lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false);
+		}
+		Double closingPrice = Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""));
+		stockTwseDayPrice.setLimitDown(lowerLimitPrice.toString());
+		twoFourtyStockDayPrices.get(0).setLimitDown(lowerLimitPrice.toString());
+		stockTwseDayPrice.setLimitUp(upperLimitPrice.toString());
+		twoFourtyStockDayPrices.get(0).setLimitUp(upperLimitPrice.toString());
+		Double rate = ((closingPrice - standarPrice) / standarPrice) * 100;
+		rate = Math.round(rate * 100.0) / 100.0;
+		stockTwseDayPrice.setChangeRate(rate);
+		twoFourtyStockDayPrices.get(0).setChangeRate(rate);
+		//如果交易天數沒超過9天，則就不進行後續計算
 		if (twoFourtyStockDayPrices.size() < 9) {
 			return; // 如果不满足条件，返回 null
 		}
@@ -589,50 +643,7 @@ public class GraspStockPrice {
 		twoFourtyStockDayPrices.get(0).setLineKvalue(k.toString());
 		stockTwseDayPrice.setLineRSVvalue(rsv.toString());
 		twoFourtyStockDayPrices.get(0).setLineRSVvalue(rsv.toString());
-		String tmpChage = stockTwseDayPrice.getChange().trim().replace("+", "").replaceAll(",", "");
-		boolean isNeedSpecialDeal = groupedtmpExDividendsExRightInfos.containsKey(stockTwseDayPrice.getStockCode());
-		if (tmpChage.equals("0.00")) {
-			tmpChage = "0";
-		}
-		if (tmpChage.contains("除息") || tmpChage.contains("除權") || tmpChage.contains("X")) {
-			Optional<StockDayPrice> stockDayPriceOp = stockDayPriceService.findByStockCodeAndTradingDayBeforLimitOne(
-					stockTwseDayPrice.getStockCode(), stockTwseDayPrice.getTradingDay());
-			if (stockDayPriceOp.isPresent()) {
-				tmpChage = String.valueOf(Double
-						.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""))
-						- Double.valueOf(stockDayPriceOp.get().getClosingPrice().replace("+", "").replaceAll(",", "")));
-			} else {
-				tmpChage = "0";
-			}
-		}
-		Double standarPrice = null;
-		Double upperLimitPrice = null;
-		Double lowerLimitPrice = null;
-		if (isNeedSpecialDeal) {
-			if (groupedtmpExDividendsExRightInfos.get(stockTwseDayPrice.getStockCode()).stream().findFirst().isPresent()) {
-				TmpExDividendsExRightInfo tmpExDividendsExRightInfo = groupedtmpExDividendsExRightInfos.get(stockTwseDayPrice.getStockCode()).stream().findFirst().get();
-				upperLimitPrice = Double.valueOf(tmpExDividendsExRightInfo.getLimitUp().replaceAll(",", ""));
-				lowerLimitPrice = Double.valueOf(tmpExDividendsExRightInfo.getLimitDown().replaceAll(",", ""));
-				standarPrice = new BigDecimal(
-						tmpExDividendsExRightInfo.getReferencePrice().replace(",", StringUtils.EMPTY)).doubleValue();
-			} else {
-				return;
-			}
-		} else {
-			standarPrice = Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""))
-					- new BigDecimal(tmpChage).doubleValue();
-			upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true);
-			lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false);
-		}
-		Double closingPrice = Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""));
-		stockTwseDayPrice.setLimitDown(lowerLimitPrice.toString());
-		twoFourtyStockDayPrices.get(0).setLimitDown(lowerLimitPrice.toString());
-		stockTwseDayPrice.setLimitUp(upperLimitPrice.toString());
-		twoFourtyStockDayPrices.get(0).setLimitUp(upperLimitPrice.toString());
-		Double rate = ((closingPrice - standarPrice) / standarPrice) * 100;
-		rate = Math.round(rate * 100.0) / 100.0;
-		stockTwseDayPrice.setChangeRate(rate);
-		twoFourtyStockDayPrices.get(0).setChangeRate(rate);
+	
 		// 新增計算移動平均線 (MA) 的邏輯
 		int[] maPeriods = { 240, 120, 60, 20, 10, 5 }; // 定義需要計算的移動平均線週期
 		for (int maPeriod : maPeriods) {

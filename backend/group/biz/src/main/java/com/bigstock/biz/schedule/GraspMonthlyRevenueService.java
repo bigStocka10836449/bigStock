@@ -1,4 +1,4 @@
-package com.bigstock.biz.service;
+package com.bigstock.biz.schedule;
 
 import java.net.URISyntaxException;
 import java.time.LocalDate;
@@ -12,6 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 
+import com.bigstock.biz.service.MonthlyRevenueQueryService;
 import com.bigstock.biz.utils.ChromeDriverUtils;
 import com.bigstock.biz.utils.MonthlyRevenueMapper;
 import com.bigstock.biz.vo.MonthlyRevenueVo;

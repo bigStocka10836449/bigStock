@@ -1,4 +1,4 @@
-package com.bigstock.biz.service;
+package com.bigstock.biz.schedule;
 
 import java.net.URISyntaxException;
 import java.util.List;

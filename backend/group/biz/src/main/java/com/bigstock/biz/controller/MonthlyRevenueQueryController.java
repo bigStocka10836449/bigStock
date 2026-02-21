@@ -15,10 +15,7 @@ public class MonthlyRevenueQueryController {
     private final MonthlyRevenueQueryService queryService;
 
     /**
-     * 手動抓某月份月營收（先寫 Redis 讓你觀察轉換結果）
      * POST /api/revenue/monthly?yearMonth=2025-10&market=TWSE&forceRefresh=false
-     *
-     * market: TWSE / TPEX / (空白或不帶=兩邊都抓)
      */
     @PostMapping("/monthly")
     public List<MonthlyRevenueVo> fetchMonthlyRevenueToRedis(
