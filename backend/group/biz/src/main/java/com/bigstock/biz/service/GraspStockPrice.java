@@ -37,6 +37,7 @@ import com.bigstock.sharedComponent.service.TradeVolumeInfoService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -441,7 +442,7 @@ public class GraspStockPrice {
 
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}")
 	@Transactional
-//	@PostConstruct
+	@PostConstruct
 	public void updateMarginTradingAndShortSellingInfo() throws RestClientException, URISyntaxException,
 			JsonMappingException, JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料

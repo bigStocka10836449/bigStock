@@ -55,7 +55,7 @@ public class GraspShareholderStructureService {
 
 	private final StockInfoService stockInfoService;
 
-//	@PostConstruct
+	@PostConstruct
 	// 每天晚上8點更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}")
 	public void updateShareholderStructure()

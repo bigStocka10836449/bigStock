@@ -9,3 +9,8 @@ backend/group/biz/target/
 backend/group/gateway/target/
 backend/group/schedule/target/
 backend/group/shared-component/target/classes/
+*.gz
+backend/group/pom.xml.rej
+backend/group/biz/src/main/resources/init/ShareholderStructureInfo (2).zip
+*.pydevproject
+backend/group/schedule/docker/google-api-cloud-speech-to-text.json
