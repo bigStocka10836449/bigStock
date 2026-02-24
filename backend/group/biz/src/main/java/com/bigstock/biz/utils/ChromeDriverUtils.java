@@ -1002,7 +1002,7 @@ public class ChromeDriverUtils {
 
 
 
-	private static String fetchApiData(String url) {
+	public static String fetchApiData(String url) {
 		int maxRetries = 3;
 		int retryDelayMs = 1000;
 
