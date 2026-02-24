@@ -1,42 +1,25 @@
 package com.bigstock.biz.infra;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import com.bigstock.biz.component.SocketIOHandler;
-import com.corundumstudio.socketio.SocketIOServer;
+import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
+import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 import lombok.RequiredArgsConstructor;
 
 @Configuration
 @RequiredArgsConstructor
-public class SocketServerConfig {
+public class SocketServerConfig implements WebSocketMessageBrokerConfigurer {
 
-    private final SocketIOHandler socketIOHandler;
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry registry) {
+        registry.enableSimpleBroker("/topic");   // server → client
+        registry.setApplicationDestinationPrefixes("/app"); // client → server
+    }
 
-    @Value("${bigstock.socketio.host:0.0.0.0}")
-    private String host;
-
-    @Value("${bigstock.socketio.port:9092}")
-    private int port;
-
-    @Bean(destroyMethod = "stop")
-    public SocketIOServer socketIOServer() {
-
-        com.corundumstudio.socketio.Configuration config =
-                new com.corundumstudio.socketio.Configuration();
-        //netstat -ano | findstr :<PORT> Port被占用的話 netstat -plnt | grep :<PORT>
-        config.setHostname(host);
-        config.setPort(port);
-        config.setOrigin("*");
-        config.setPingInterval(25000);  // client ping every 25s
-        config.setPingTimeout(60000);   // timeout if no pong in 60s
-
-        SocketIOServer server = new SocketIOServer(config);
-        server.addListeners(socketIOHandler);
-
-        server.start();
-        return server;
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*").withSockJS();
     }
 }

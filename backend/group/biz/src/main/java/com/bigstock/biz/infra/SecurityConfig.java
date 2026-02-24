@@ -88,7 +88,7 @@ public class SecurityConfig {
 //                auth.requestMatchers(HttpMethod.GET, publicPaths).permitAll();
 //                auth.requestMatchers(HttpMethod.POST, publicPaths).permitAll();
 //                auth.requestMatchers(HttpMethod.PUT, publicPaths).permitAll();
-					auth.requestMatchers("/gateway/swagger/**", "/api/biz/swagger/**", "/biz/swagger/**",
+					auth.requestMatchers("/gateway/swagger/**", "/api/biz/swagger/**", "/biz/swagger/**","/ws/**",
 							"/v3/api-docs/**", "/swagger-ui/**", "/webjars/**", "/auth/**","/biz/stockShareholderStructure/**").permitAll();
 
 					/*
