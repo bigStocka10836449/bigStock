@@ -54,7 +54,7 @@ public class BizController {
 	}
 	
 	@Operation(summary = "個股漲跌幅排行", description = "market 分為 TEPX 與 TWSE")
-	@GetMapping
+	@GetMapping("ranking/raiseChange")
 	public List<RankingResponse> getRanking(@RequestParam String market, @RequestParam(defaultValue = "10") int limit,
 			@RequestParam(defaultValue = "desc") String order) {
 
