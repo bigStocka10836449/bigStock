@@ -6,27 +6,33 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
-import com.bigstock.biz.component.SocketIOHandler;
+import com.bigstock.biz.component.LocalSessionRegistry;
 
 import lombok.RequiredArgsConstructor;
 
 @Configuration
 @RequiredArgsConstructor
-public class RedisConfig {
+public class RedisKickConfig {
 
-    private final SocketIOHandler subscriber;
+    private final LocalSessionRegistry registry;
 
+    /**
+     * 監聽從Redis發來的推播信息，目前只監聽踢人的行為
+     * @param factory
+     * @return
+     */
     @Bean
-    public RedisMessageListenerContainer redisContainer(RedisConnectionFactory connectionFactory) {
+    public RedisMessageListenerContainer container(RedisConnectionFactory factory) {
+
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
-        container.setConnectionFactory(connectionFactory);
+        container.setConnectionFactory(factory);
 
         container.addMessageListener(
                 (message, pattern) -> {
-                    String msg = new String(message.getBody());
-                    subscriber.handleMessage(msg);
+                    String sessionId = new String(message.getBody());
+                    registry.close(sessionId);
                 },
-                new PatternTopic("market:broadcast")
+                new PatternTopic("WS_KICK")
         );
 
         return container;

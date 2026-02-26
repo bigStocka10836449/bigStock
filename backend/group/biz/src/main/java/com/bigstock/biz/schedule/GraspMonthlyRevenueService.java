@@ -36,7 +36,7 @@ public class GraspMonthlyRevenueService {
 	private final MonthlyRevenueQueryService monthlyRevenueQueryService;
 	private final StockRevenueService stockRevenueService;
 
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-monthlyRevenue}", zone = "Asia/Taipei")
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-monthlyRevenue}", zone = "Asia/Taipei")
 	@Transactional
 //	@PostConstruct
 	public void updateMonthlyRevenue() throws RestClientException, URISyntaxException,

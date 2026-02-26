@@ -56,7 +56,7 @@ public class GraspShareholderStructureService {
 
 //	@PostConstruct
 	// 每天晚上8點更新
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}", zone= "Asia/Taipei")
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}", zone= "Asia/Taipei")
 	public void updateShareholderStructure()
 			throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException {
 		// 先抓DB裡面全部的代號資料
@@ -149,7 +149,7 @@ public class GraspShareholderStructureService {
 	}
 
 //	@PostConstruct
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-stock-info}", zone= "Asia/Taipei")
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-stock-info}", zone= "Asia/Taipei")
 	public void updateStockInfo() throws InterruptedException, JsonMappingException, RestClientException,
 			JsonProcessingException, URISyntaxException {
 		List<StockInfo> stockInfos = ChromeDriverUtils

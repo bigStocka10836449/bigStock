@@ -26,7 +26,7 @@ public class GraspThreeInsti {
 
 	private final StockThreeInstitutionalTradingService stockThreeInstitutionalTradingService;
 
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-threeInsti}", zone = "Asia/Taipei")
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-threeInsti}", zone = "Asia/Taipei")
 	@Transactional
 //	@PostConstruct
 	public void updateThreeInsti() throws Exception {
