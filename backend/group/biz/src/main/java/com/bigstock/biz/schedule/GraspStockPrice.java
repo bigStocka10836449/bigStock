@@ -53,6 +53,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -160,7 +161,7 @@ public class GraspStockPrice {
 	// 每天下午5點更新
 //	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 	// 每周日早上8点触发更新
-//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}", zone= "Asia/Taipei")
+	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}", zone= "Asia/Taipei")
 //	@PostConstruct
 	public void updateStockDayPrice() throws Exception {
 		// 先抓DB裡面全部的代號資料
@@ -507,7 +508,7 @@ public class GraspStockPrice {
 		rankStockChangeService.writeStockListToRedis(needRankTWSEs, "TWSE");
 	}
 
-//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}", zone= "Asia/Taipei")
+	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}", zone= "Asia/Taipei")
 	@Transactional
 //	@PostConstruct
 	public void updateMarginTradingAndShortSellingInfo() throws RestClientException, URISyntaxException,
