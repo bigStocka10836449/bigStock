@@ -14,6 +14,7 @@ import com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.service.StockThreeInstitutionalTradingService;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

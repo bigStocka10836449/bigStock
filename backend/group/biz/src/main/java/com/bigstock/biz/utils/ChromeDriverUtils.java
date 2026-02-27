@@ -978,7 +978,7 @@ public class ChromeDriverUtils {
 		return responseList.stream().filter(data -> {
 			String code = data.get("證券代號").toString();
 			String market = data.get("市場別").toString();
-			return !market.contains("（終止上市(櫃)、興櫃)");
+			return (!market.contains("（終止上市(櫃)、興櫃)") && code.length() < 5 && !code.matches(".*[a-zA-Z].*"));
 //					code.length() < 5 && !code.matches(".*[a-zA-Z].*") &&
 //					!market.contains("（終止上市(櫃)、興櫃)");
 		}).map(data -> {

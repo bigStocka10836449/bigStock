@@ -219,16 +219,15 @@ public class GraspStockPrice {
 				stockDayPricesFor365Ds.stream()
 			        .collect(Collectors.groupingBy(StockDayPrice::getStockCode));
 		stockTpexDayPrices.stream().forEach(stockTpexDayPrice -> {
-			if(!groupedStockDayPrices.containsKey(stockTpexDayPrice.getStockCode())) {
-				return;
-			}
 			if("5340".equals(stockTpexDayPrice.getStockCode())) {
 				log.info("5340");
 			}
-			List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTpexDayPrice.getStockCode());
 			List<StockDayPrice> allThisStockCodeDayPrices = Lists.newArrayList();
 			allThisStockCodeDayPrices.add(stockTpexDayPrice);
-			allThisStockCodeDayPrices.addAll(stockDayPrices);
+			if(groupedStockDayPrices.containsKey(stockTpexDayPrice.getStockCode())) {
+				List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTpexDayPrice.getStockCode());
+				allThisStockCodeDayPrices.addAll(stockDayPrices);
+			}
 			calculateRSVValueAndLimitDownUp(stockTpexDayPrice,allThisStockCodeDayPrices,groupedtmpExDividendsExRightInfos);
 			stockTpexDayPrice.setMonthOfYear((stockTpexDayPrice.getTradingDay().getYear() + 1900) + "W"
 					+ (stockTpexDayPrice.getTradingDay().getMonth() + 1));
@@ -239,13 +238,12 @@ public class GraspStockPrice {
 			groupedStockDayPrices.put(stockTpexDayPrice.getStockCode(), allThisStockCodeDayPrices);
 		});
 		stockTpexEmergingStockPrices.stream().forEach(stockTpexDayPrice -> {
-			if(!groupedStockDayPrices.containsKey(stockTpexDayPrice.getStockCode())) {
-				return;
-			}
-			List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTpexDayPrice.getStockCode());
 			List<StockDayPrice> allThisStockCodeDayPrices = Lists.newArrayList();
 			allThisStockCodeDayPrices.add(stockTpexDayPrice);
-			allThisStockCodeDayPrices.addAll(stockDayPrices);
+			if(groupedStockDayPrices.containsKey(stockTpexDayPrice.getStockCode())) {
+				List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTpexDayPrice.getStockCode());
+				allThisStockCodeDayPrices.addAll(stockDayPrices);
+			}
 			calculateRSVValueAndLimitDownUp(stockTpexDayPrice,allThisStockCodeDayPrices,groupedtmpExDividendsExRightInfos);
 			stockTpexDayPrice.setMonthOfYear((stockTpexDayPrice.getTradingDay().getYear() + 1900) + "W"
 					+ (stockTpexDayPrice.getTradingDay().getMonth() + 1));
@@ -273,13 +271,12 @@ public class GraspStockPrice {
 			if("2454".equals(stockTwseDayPrice.getStockCode())) {
 				log.info("2454");
 			}
-			if(!groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
-				return;
-			}
-			List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTwseDayPrice.getStockCode());
 			List<StockDayPrice> allThisStockCodeDayPrices = Lists.newArrayList();
 			allThisStockCodeDayPrices.add(stockTwseDayPrice);
-			allThisStockCodeDayPrices.addAll(stockDayPrices);
+			if(groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
+				List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTwseDayPrice.getStockCode());
+				allThisStockCodeDayPrices.addAll(stockDayPrices);
+			}
 			calculateRSVValueAndLimitDownUp(stockTwseDayPrice,allThisStockCodeDayPrices,groupedtmpExDividendsExRightInfos);
 			stockTwseDayPrice.setMonthOfYear((stockTwseDayPrice.getTradingDay().getYear() + 1900) + "W"
 					+ (stockTwseDayPrice.getTradingDay().getMonth() + 1));
@@ -377,7 +374,9 @@ public class GraspStockPrice {
 		    stockWeekPrice.setYear(String.valueOf(firstDay.getTradingDay().getYear() + 1900));
 		    List<StockWeekPrice> stockWeekPrices = Lists.newArrayList();
 		    stockWeekPrices.add(stockWeekPrice);
-		    stockWeekPrices.addAll(groupedStockWeekPrice.get(stockCode));
+		    if(groupedStockWeekPrice.containsKey(stockCode)) {
+		    	stockWeekPrices.addAll(groupedStockWeekPrice.get(stockCode));
+		    }
 		    calculateRSVValueAndLimitDownUp(stockWeekPrice, stockWeekPrices);
 		    allStockWeekPrices.add(stockWeekPrice);
 		    groupedStockWeekPrice.put(stockCode, stockWeekPrices);
@@ -474,7 +473,9 @@ public class GraspStockPrice {
 			    stockMonthPrice.setMonthOfYear(year + "M" + month);
 			    List<StockMonthPrice> stockMonthPrices = Lists.newArrayList();
 			    stockMonthPrices.add(stockMonthPrice);
-			    stockMonthPrices.addAll(groupedStockMonthPrice.get(stockCode));
+			    if(groupedStockMonthPrice.containsKey(stockCode)) {
+			    	stockMonthPrices.addAll(groupedStockMonthPrice.get(stockCode));
+			    }
 			    calculateRSVValueAndLimitDownUp(stockMonthPrice,stockMonthPrices);
 			    allStockMonthPrices.add(stockMonthPrice);
 			    groupedStockMonthPrice.put(stockCode, stockMonthPrices);
@@ -502,8 +503,8 @@ public class GraspStockPrice {
 		stockMonthPriceService.deleteByRankNoLessThanZero();
 		
 		//計算漲跌幅排名
-		List<StockDayPrice> needRankTPEXs = stockTpexDayPrices.stream().filter(data -> !List.of("--","---","----").contains(data.getChange())).toList();
-		List<StockDayPrice> needRankTWSEs = stockTwseDayPrices.stream().filter(data -> !List.of("--","---","----").contains(data.getChange())).toList();
+		List<StockDayPrice> needRankTPEXs = stockTpexDayPrices.stream().filter(data -> (!List.of("--","---","----").contains(data.getChange()) && ObjectUtils.isNotEmpty(data.getChangeRate()))).toList();
+		List<StockDayPrice> needRankTWSEs = stockTwseDayPrices.stream().filter(data ->  (!List.of("--","---","----").contains(data.getChange()) && ObjectUtils.isNotEmpty(data.getChangeRate()))).toList();
 		rankStockChangeService.writeStockListToRedis(needRankTPEXs, "TPEX");
 		rankStockChangeService.writeStockListToRedis(needRankTWSEs, "TWSE");
 	}

@@ -9,6 +9,7 @@ import com.bigstock.biz.service.MarketBroadcastService;
 import com.bigstock.biz.utils.ChromeDriverUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
