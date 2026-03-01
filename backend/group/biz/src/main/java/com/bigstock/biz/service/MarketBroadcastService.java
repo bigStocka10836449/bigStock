@@ -11,7 +11,7 @@ public class MarketBroadcastService {
 
     private final SimpMessagingTemplate template;
 
-    public void broadcastMarketData(Object payload) {
-        template.convertAndSend("/topic/market", payload);
+    public void broadcastMarketData(String topic,Object payload) {
+        template.convertAndSend(topic, payload);
     }
 }
