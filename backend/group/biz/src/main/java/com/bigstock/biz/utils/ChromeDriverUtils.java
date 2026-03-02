@@ -1,19 +1,14 @@
 package com.bigstock.biz.utils;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -21,8 +16,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.IsoFields;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -44,7 +37,6 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONObject;
-import org.redisson.api.RBucket;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -62,15 +54,10 @@ import com.bigstock.sharedComponent.entity.TradeVolumeInfo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.redisson.api.RedissonClient;
-import org.redisson.api.RBucket;
-import org.redisson.client.codec.StringCodec;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -1005,10 +992,11 @@ public class ChromeDriverUtils {
 	public static String fetchApiData(String url) {
 		int maxRetries = 3;
 		int retryDelayMs = 1000;
-
+		
 		for (int attempt = 1; attempt <= maxRetries; attempt++) {
 			try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-				HttpGet request = new HttpGet(url);
+				URI uri = new URL(url).toURI();
+				HttpGet request = new HttpGet(uri);
 				HttpResponse response = httpClient.execute(request);
 				org.apache.http.HttpEntity entity = response.getEntity();
 
