@@ -28,7 +28,9 @@ public class GraspTWPMOnTheFly {
     private static final String REDIS_S_P_500_F_CHANNEL = "/topic/marketS_P_500_F";
     
     private static final String REDIS_DOW_JONES_F_CHANNEL = "/topic/marketDOW_JONES_F";
-
+    
+    private static final String REDIS_PHLX_SEMICONDUCTOR_SECTOR_CHANNEL = "/topic/marketPHLX_SEMICONDUCTOR_SECTOR";
+    
     private static final String TWSE_PM_NIGHT_ON_FLY_URL =
         "https://tw.stock.yahoo.com/_td-stock/api/resource/FinanceChartService.ApacLibraCharts;symbols=%5B%22WTX%26%22%5D;type=tick?bkt=c1-stock-pc-homepage&device=desktop&ecma=modern&feature=enableGAMAds%2CenableGAMEdgeToEdge%2CenableEvPlayer%2CuseCG%2CuseCGV2&intl=tw&partner=none&prid=5sf7v61kpdgps&region=TW&site=finance&tz=Asia%2FTaipei";
 
@@ -47,6 +49,11 @@ public class GraspTWPMOnTheFly {
     
     private static final String S_P_500_F_ON_FLY_URL = """
     		https://query1.finance.yahoo.com/v8/finance/chart/MES=F?interval=1m&includePrePost=true&events=div%7Csplit%7Cearn&region=US&source=cosaic
+    		""";
+    
+    
+    private static final String PHLX_SEMICONDUCTOR_SECTOR_ON_FLY_URL = """
+    		https://query1.finance.yahoo.com/v8/finance/chart/%5ESOX?interval=1m&includePrePost=true&events=div%7Csplit%7CearnS&region=US&source=cosaic
     		""";
     
     
@@ -134,6 +141,24 @@ public class GraspTWPMOnTheFly {
             String json = objectMapper.writeValueAsString(snapshot);
 
             broadcastService.broadcastMarketData(REDIS_S_P_500_F_CHANNEL,json);
+
+        } catch (Exception e) {
+            log.error("Error fetching market data", e);
+        }
+    }
+    
+    @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:10000}")
+    public void fetchPHLXSemiconductorSectorData() {
+
+        try {
+            String data = ChromeDriverUtils.fetchApiData(PHLX_SEMICONDUCTOR_SECTOR_ON_FLY_URL);
+
+            MarketSnapshot snapshot = new MarketSnapshot();
+            snapshot.setData(data);
+
+            String json = objectMapper.writeValueAsString(snapshot);
+
+            broadcastService.broadcastMarketData(REDIS_PHLX_SEMICONDUCTOR_SECTOR_CHANNEL,json);
 
         } catch (Exception e) {
             log.error("Error fetching market data", e);
