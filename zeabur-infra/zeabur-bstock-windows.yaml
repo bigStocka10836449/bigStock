@@ -1,0 +1,52 @@
+apiVersion: zeabur.com/v1
+kind: Template
+
+metadata:
+  name: bigstock-biz
+
+spec:
+  description: BigStock Backend Service
+
+  variables:
+    - key: BIGSTOCK_IMAGE
+      type: STRING
+      name: BigStock Docker Image
+      description: Full docker image reference
+
+  services:
+    # --- FIRST SERVICE ---
+    - name: bigstock-windows0
+      template: PREBUILT
+      spec:
+        privileged: true 
+        source:
+          image: isaac0410/bstock-all-in-one:windows0.0.1
+        volumes:
+          - id: shm
+            dir: /dev/shm
+        volumeMounts:
+          - name: shm
+            mountPath: /dev/shm
+        ports:
+          - id: rdp-0
+            port: 3389
+            type: TCP
+
+    # --- SECOND SERVICE (IDENTICAL) ---
+    - name: bigstock-windows1
+      template: PREBUILT
+      spec:
+        privileged: true 
+        source:
+          image: isaac0410/bstock-all-in-one:windows0.0.1
+        volumes:
+          - id: shm
+            dir: /dev/shm
+        volumeMounts:
+          - name: shm
+            mountPath: /dev/shm
+        ports:
+          - id: rdp-1
+            port: 3389
+            type: TCP
+
