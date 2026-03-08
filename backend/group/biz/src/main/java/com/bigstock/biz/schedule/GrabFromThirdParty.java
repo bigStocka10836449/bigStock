@@ -2,59 +2,37 @@ package com.bigstock.biz.schedule;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.URISyntaxException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
 
 import com.bigstock.biz.service.RankStockChangeService;
-import com.bigstock.biz.utils.ChromeDriverUtils;
-import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
-import com.bigstock.sharedComponent.entity.SecuritiesFirmsDayOperate;
+import com.bigstock.biz.utils.GrabThirdPartyStockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
 import com.bigstock.sharedComponent.entity.StockMonthPrice;
 import com.bigstock.sharedComponent.entity.StockMonthPriceRank;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
 import com.bigstock.sharedComponent.entity.StockWeekPriceRank;
-import com.bigstock.sharedComponent.entity.TmpExDividendsExRightInfo;
-import com.bigstock.sharedComponent.entity.TradeVolumeInfo;
-import com.bigstock.sharedComponent.service.MarginTradingAndShortSellingInfoService;
-import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
-import com.bigstock.sharedComponent.service.StockExchangeDetailService;
 import com.bigstock.sharedComponent.service.StockInfoService;
 import com.bigstock.sharedComponent.service.StockMonthPriceService;
 import com.bigstock.sharedComponent.service.StockWeekPriceService;
-import com.bigstock.sharedComponent.service.TmpExDividendsExRightInfoService;
-import com.bigstock.sharedComponent.service.TradeVolumeInfoService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Lists;
 
 import jakarta.annotation.PostConstruct;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -62,153 +40,41 @@ import lombok.extern.slf4j.Slf4j;
 @EnableScheduling
 @RequiredArgsConstructor
 @Slf4j
-public class GraspStockPrice {
-
-	private final SecuritiesFirmsDayOperateService securitiesFirmsDayOperateService;
+public class GrabFromThirdParty {
 
 	private final StockInfoService stockInfoService;
-
-	private final StockExchangeDetailService stockExchangeDetailService;
-
+	private final GrabThirdPartyStockDayPrice grabThirdPartyStockDayPrice;
 	private final StockDayPriceService stockDayPriceService;
-
-	private final MarginTradingAndShortSellingInfoService marginTradingAndShortSellingInfoServices;
-
-	private final TradeVolumeInfoService tradeVolumeInfoService;
-
-	private final TmpExDividendsExRightInfoService tmpExDividendsExRightInfoService;
+	
 
 	private final StockWeekPriceService stockWeekPriceService;
 
 	private final StockMonthPriceService stockMonthPriceService;
 	
 	private final RankStockChangeService rankStockChangeService;
-
-	public void grepSecuritiesFirmsDayOperate(JSONObject json)
-			throws InterruptedException, RestClientException, URISyntaxException, JsonProcessingException, JSONException, ParseException {
-		List<Object> datas = json.getJSONArray("batch").toList();
-		for(Object  jdata : datas) {
-			ObjectMapper mapper = new ObjectMapper();
-			String jsonString = mapper.writeValueAsString((HashMap) jdata);
-			JSONObject dataJson = new JSONObject(jsonString);
-			SimpleDateFormat sim = new SimpleDateFormat("yyyy-MM-dd");
-			Date tradingDate = sim.parse(dataJson.get("tradingDate").toString());;
-			// 讀取CSV文件
-			List<SecuritiesFirmsDayOperate> securitiesFirmsDayOperates = dataJson.getJSONArray("data").toList().stream()
-					.map(jm -> {
-						SecuritiesFirmsDayOperate securitiesFirmsDayOperate = new SecuritiesFirmsDayOperate();
-						try {
-							String innerJsonString = mapper.writeValueAsString((HashMap) jm);
-							JSONObject jsb = new JSONObject(innerJsonString);
-						String stockCode = dataJson.getString("stockCode").toString();
-						securitiesFirmsDayOperate.setPrice(jsb.getString("價格"));
-						securitiesFirmsDayOperate.setSeq(jsb.getInt("序號"));
-						securitiesFirmsDayOperate
-						.setStockCode(stockCode.contains("_") ? stockCode.split("_")[0] : stockCode);
-						securitiesFirmsDayOperate.setSecuritiesFirms( jsb.getString("券商"));
-						
-						securitiesFirmsDayOperate.setStockBuyAmount(
-								Long.valueOf( jsb.getString("買進股數").trim().replace(",", "")));
-						securitiesFirmsDayOperate.setStockSellAmount(Long.valueOf( jsb.getString("賣出股數").trim().replace(",", "")));
-							securitiesFirmsDayOperate.setTradingDate(sim.parse(dataJson.get("tradingDate").toString()));
-						} catch (JSONException | ParseException |JsonProcessingException e) {
-							log.error(e.getMessage(),e);
-							return null;
-						} 
-						return securitiesFirmsDayOperate;
-					}).filter(data -> !Optional.ofNullable(data).isEmpty()).sorted((x1, x2) -> x1.getSeq().compareTo(x2.getSeq())).toList();
-			if(CollectionUtils.isNotEmpty(securitiesFirmsDayOperates)) {
-				securitiesFirmsDayOperateService.batchReplace(dataJson.getString("stockCode").toString(), tradingDate,securitiesFirmsDayOperates);
-			}
-		}
-	}
 	
-	private List<JSONObject> convertTESECSVtoJSON(List<String[]> csvData) {
-		// 跳過前 3 行表頭數據
-		// 創建 JSON 數組
-		List<JSONObject> jsonArray = Lists.newArrayList();
-		// 跳過前 3 行表頭數據
-		for (int i = 3; i < csvData.size(); i++) {
-			String[] row = csvData.get(i);
-
-			// 檢查第一部分（列 1 到列 5 是否有數據）
-			if (row[0] != null && !row[0].trim().isEmpty()) {
-				JSONObject jsonObject = new JSONObject();
-				jsonObject.put("序號", Integer.parseInt(row[0].trim()));
-				jsonObject.put("券商", row[1].trim());
-				jsonObject.put("價格", row[2].trim());
-				jsonObject.put("買進股數", row[3].trim());
-				jsonObject.put("賣出股數", row[4].trim());
-
-				jsonArray.add(jsonObject); // 將第一部分的 JSON 對象添加到列表中
-			}
-
-			// 檢查第二部分（列 7 到列 11 是否有數據）
-			if (row.length > 6 && row[6] != null && !row[6].trim().isEmpty()) {
-				JSONObject jsonObject = new JSONObject();
-				jsonObject.put("序號", Integer.parseInt(row[6].trim())); // 從第 7 列開始
-				jsonObject.put("券商", row[7].trim());
-				jsonObject.put("價格", row[8].trim());
-				jsonObject.put("買進股數", row[9].trim());
-				jsonObject.put("賣出股數", row[10].trim());
-
-				jsonArray.add(jsonObject); // 將第二部分的 JSON 對象添加到列表中
-			}
-		}
-		return jsonArray;
-	}
-
-	// 每天下午5點更新
-//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
-	// 每周日早上8点触发更新
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}", zone= "Asia/Taipei")
-//	@PostConstruct
-	public void updateStockDayPrice() throws Exception {
-		// 先抓DB裡面全部的代號資料
-
-		List<StockDayPrice> stockTpexEmergingStockPrices = ChromeDriverUtils.graspTpexEmergingStockDayPrice();
-
-		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
-				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
-
-////		   List<StockDayPrice> singleStockDayPrices = entry.getValue();
-
-		List<TradeVolumeInfo> stockTpexTradeVolumeInfos = ChromeDriverUtils
-				.graspTpexTtradeVolume("https://www.tpex.org.tw/openapi/v1/tpex_volume_rank");
-		Map<String, TradeVolumeInfo> stockTpexTradeVolumeInfosMap = stockTpexTradeVolumeInfos.stream()
-				.collect(Collectors.toMap(TradeVolumeInfo::getStockCode, tradeVolumeInfo -> tradeVolumeInfo));
-		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
-		List<StockDayPrice> stockTwseDayPrices = ChromeDriverUtils
-				.graspTwseDayPrice("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", tradeDate);
-		List<TradeVolumeInfo> twseTradeVolumeInfos = stockTwseDayPrices.stream().map(stockDayPrice -> {
-			TradeVolumeInfo tradeVolumeInfo = new TradeVolumeInfo();
-			tradeVolumeInfo.setTradingDay(stockDayPrice.getTradingDay());
-			tradeVolumeInfo.setStockCode(stockDayPrice.getStockCode());
-			tradeVolumeInfo.setTradeVolume(stockDayPrice.getTradingVolume());
-			return tradeVolumeInfo;
+	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
+	public void updateStockDayPriceByThirdParty() throws Exception {
+		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
+			return !data.matches(".*[a-zA-Z].*");
 		}).toList();
-		List<TmpExDividendsExRightInfo> tmpExDividendsExRightInfos = ChromeDriverUtils
-				.grepTmpExDividendsExRightInfo(tradeDate);
-		Map<String, List<TmpExDividendsExRightInfo>> groupedtmpExDividendsExRightInfos =
-				tmpExDividendsExRightInfos.stream()
-			        .collect(Collectors.groupingBy(TmpExDividendsExRightInfo::getStockCode));
-		boolean isExDivideOrRightHappen = (stockTpexDayPrices.stream()
-				.anyMatch(stockTpexDayPrice -> (stockTpexDayPrice.getChange().contains("除息")
-						|| stockTpexDayPrice.getChange().contains("除權")))
-				|| stockTwseDayPrices.stream()
-						.anyMatch(stockTwseDayPrice -> stockTwseDayPrice.getChange().contains("X")));
-		if (isExDivideOrRightHappen) {
-			List<TmpExDividendsExRightInfo> todateTmpExDividendsExRightInfo = tmpExDividendsExRightInfoService
-					.findByTradingDay(tradeDate);
-			if (todateTmpExDividendsExRightInfo.isEmpty()) {
-				tmpExDividendsExRightInfoService.saveAll(tmpExDividendsExRightInfos);
+		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
+			return !data.matches(".*[a-zA-Z].*");
+		}).toList();
+		List<String> allStockCodes = Lists.newArrayList();
+		allStockCodes.addAll(tpexStockCodes);
+		allStockCodes.addAll(twseStockCodes);
+		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
+		allStockCodes.forEach(stockCode -> {
+			allStockDayPrices.addAll(grabThirdPartyStockDayPrice.grabFromYahoo(stockCode));
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				log.warn(stockCode + e.getMessage(), e);
 			}
-		}
-
-
-
-		stockDayPriceService.upsertBatch(stockTpexEmergingStockPrices);
-		stockDayPriceService.upsertBatch(stockTpexDayPrices);
+		});
+		stockDayPriceService.upsertBatch(allStockDayPrices);
+		Date tradeDate = allStockDayPrices.stream().findFirst().get().getTradingDay();
 		LocalDate tradeDateLdt = LocalDate.ofInstant(tradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
 		Integer years = tradeDateLdt.getYear();
 		LocalDate tradeDateMinus365 = tradeDateLdt.minusDays(500); 
@@ -218,56 +84,8 @@ public class GraspStockPrice {
 		Map<String, List<StockDayPrice>> groupedStockDayPrices =
 				stockDayPricesFor365Ds.stream()
 			        .collect(Collectors.groupingBy(StockDayPrice::getStockCode));
-		stockTpexDayPrices.stream().forEach(stockTpexDayPrice -> {
-			if("5340".equals(stockTpexDayPrice.getStockCode())) {
-				log.info("5340");
-			}
-			List<StockDayPrice> allThisStockCodeDayPrices = Lists.newArrayList();
-			allThisStockCodeDayPrices.add(stockTpexDayPrice);
-			if(groupedStockDayPrices.containsKey(stockTpexDayPrice.getStockCode())) {
-				List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTpexDayPrice.getStockCode());
-				allThisStockCodeDayPrices.addAll(stockDayPrices);
-			}
-			calculateRSVValueAndLimitDownUp(stockTpexDayPrice,allThisStockCodeDayPrices,groupedtmpExDividendsExRightInfos);
-			stockTpexDayPrice.setMonthOfYear((stockTpexDayPrice.getTradingDay().getYear() + 1900) + "W"
-					+ (stockTpexDayPrice.getTradingDay().getMonth() + 1));
-			if (stockTpexTradeVolumeInfosMap.containsKey(stockTpexDayPrice.getStockCode())) {
-				TradeVolumeInfo tradeVolumeInfo = stockTpexTradeVolumeInfosMap.get(stockTpexDayPrice.getStockCode());
-				stockTpexDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
-			}
-			groupedStockDayPrices.put(stockTpexDayPrice.getStockCode(), allThisStockCodeDayPrices);
-		});
-		stockTpexEmergingStockPrices.stream().forEach(stockTpexDayPrice -> {
-			List<StockDayPrice> allThisStockCodeDayPrices = Lists.newArrayList();
-			allThisStockCodeDayPrices.add(stockTpexDayPrice);
-			if(groupedStockDayPrices.containsKey(stockTpexDayPrice.getStockCode())) {
-				List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTpexDayPrice.getStockCode());
-				allThisStockCodeDayPrices.addAll(stockDayPrices);
-			}
-			calculateRSVValueAndLimitDownUp(stockTpexDayPrice,allThisStockCodeDayPrices,groupedtmpExDividendsExRightInfos);
-			stockTpexDayPrice.setMonthOfYear((stockTpexDayPrice.getTradingDay().getYear() + 1900) + "W"
-					+ (stockTpexDayPrice.getTradingDay().getMonth() + 1));
-			if("5340".equals(stockTpexDayPrice.getStockCode())) {
-				log.info("5340");
-			}
-			if (stockTpexTradeVolumeInfosMap.containsKey(stockTpexDayPrice.getStockCode())) {
-				TradeVolumeInfo tradeVolumeInfo = stockTpexTradeVolumeInfosMap.get(stockTpexDayPrice.getStockCode());
-				stockTpexDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
-			}
-			groupedStockDayPrices.put(stockTpexDayPrice.getStockCode(), allThisStockCodeDayPrices);
-		});
-		List<StockDayPriceRank> allStockDayPriceRanks = Lists.newArrayList();
-		List<StockWeekPriceRank> allStockWeekPriceRanks = Lists.newArrayList();
-		stockDayPriceService.upsertBatch(stockTpexEmergingStockPrices);
-		stockDayPriceService.upsertBatch(stockTpexDayPrices);
-		stockDayPriceService.upsertBatch(stockTwseDayPrices);
-		stockTpexDayPrices.stream().forEach(stockTwseDayPrice -> {
-			if(groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
-				StockDayPriceRank lastStockMonthPriceRank = stockDayPriceService.buildRanks(stockTwseDayPrice.getStockCode(), stockTwseDayPrice);
-				allStockDayPriceRanks.add(lastStockMonthPriceRank);
-			}
-		});
-		stockTwseDayPrices.stream().forEach(stockTwseDayPrice -> {
+		stockDayPriceService.upsertBatch(allStockDayPrices);
+		allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
 			if("2454".equals(stockTwseDayPrice.getStockCode())) {
 				log.info("2454");
 			}
@@ -277,17 +95,13 @@ public class GraspStockPrice {
 				List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTwseDayPrice.getStockCode());
 				allThisStockCodeDayPrices.addAll(stockDayPrices);
 			}
-			calculateRSVValueAndLimitDownUp(stockTwseDayPrice,allThisStockCodeDayPrices,groupedtmpExDividendsExRightInfos);
+			calculateRSVValueAndLimitDownUp(stockTwseDayPrice,allThisStockCodeDayPrices);
 			stockTwseDayPrice.setMonthOfYear((stockTwseDayPrice.getTradingDay().getYear() + 1900) + "W"
 					+ (stockTwseDayPrice.getTradingDay().getMonth() + 1));
-			if (stockTpexTradeVolumeInfosMap.containsKey(stockTwseDayPrice.getStockCode())) {
-				TradeVolumeInfo tradeVolumeInfo = stockTpexTradeVolumeInfosMap.get(stockTwseDayPrice.getStockCode());
-				stockTwseDayPrice.setTradingVolume(tradeVolumeInfo.getTradeVolume());
-			}
 			groupedStockDayPrices.put(stockTwseDayPrice.getStockCode(), allThisStockCodeDayPrices);
 		});
-		stockDayPriceService.upsertBatch(stockTwseDayPrices);
-		stockTwseDayPrices.stream().forEach(stockTwseDayPrice -> {
+		List<StockDayPriceRank> allStockDayPriceRanks = Lists.newArrayList();
+		allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
 			if(groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
 				if ("2454".equals(stockTwseDayPrice.getStockCode())) {
 					log.info("2454");
@@ -299,12 +113,7 @@ public class GraspStockPrice {
 		stockDayPriceService.bulkUpsertDayRankPrices(allStockDayPriceRanks, tradeDate);
 		stockDayPriceService.updateRankNo();
 		stockDayPriceService.deleteRankNoByStockCode();
-		tradeVolumeInfoService.saveAll(stockTpexTradeVolumeInfos);
-		tradeVolumeInfoService.saveAll(twseTradeVolumeInfos);
-//		.findByStartDateAndEndDate(new Date("2024/05/01"), new Date("2024/12/20")).stream()
-		
-		
-		String targetWeek = stockTpexDayPrices.get(0).getWeekOfYear();
+		String targetWeek = allStockDayPriceRanks.get(0).getWeekOfYear();
 		
 		List<StockWeekPrice> stockWeekPriceForYears = stockWeekPriceService.findByYearBeforEqualLimitTwoFourty(String.valueOf(years-6) , String.valueOf(years));
 		Map<String, List<StockWeekPrice>> groupedStockWeekPrice =
@@ -383,7 +192,7 @@ public class GraspStockPrice {
 		});
 		stockWeekPriceService.batchInsertWeekPrices(allStockWeekPrices);
 		
-		
+		List<StockWeekPriceRank> allStockWeekPriceRanks = Lists.newArrayList();
 		allStockWeekPrices.stream().forEach(allStockWeekPrice ->{
 			if(groupedStockWeekPrice.containsKey(allStockWeekPrice.getStockCode())) {
 				StockWeekPriceRank stockMonthPriceRanks = stockWeekPriceService.buildRanks(allStockWeekPrice.getStockCode(), allStockWeekPrice);
@@ -397,7 +206,7 @@ public class GraspStockPrice {
 
 
 		// 取得欲處理的月份
-		String targetMonth = stockTpexDayPrices.get(0).getMonthOfYear();
+		String targetMonth = allStockDayPrices.get(0).getMonthOfYear();
 		List<StockMonthPrice> twoFourtyStockMonthPrices = stockMonthPriceService
 				.findByMmonthOfYearAndDesc(targetMonth);
 		Map<String, List<StockMonthPrice>> groupedStockMonthPrice =
@@ -503,101 +312,19 @@ public class GraspStockPrice {
 		stockMonthPriceService.deleteByRankNoLessThanZero();
 		
 		//計算漲跌幅排名
-		List<StockDayPrice> needRankTPEXs = stockTpexDayPrices.stream().filter(data -> (!List.of("--","---","----").contains(data.getChange()) && ObjectUtils.isNotEmpty(data.getChangeRate()))).toList();
-		List<StockDayPrice> needRankTWSEs = stockTwseDayPrices.stream().filter(data ->  (!List.of("--","---","----").contains(data.getChange()) && ObjectUtils.isNotEmpty(data.getChangeRate()))).toList();
+		List<StockDayPrice> needRankTPEXs = allStockDayPrices.stream().filter(data -> (!List.of("--","---","----").contains(data.getChange()) && tpexStockCodes.contains(data.getStockCode()) && ObjectUtils.isNotEmpty(data.getChangeRate()))).toList();
+		List<StockDayPrice> needRankTWSEs = allStockDayPrices.stream().filter(data ->  (!List.of("--","---","----").contains(data.getChange()) && twseStockCodes.contains(data.getStockCode()) && ObjectUtils.isNotEmpty(data.getChangeRate()))).toList();
 		rankStockChangeService.writeStockListToRedis(needRankTPEXs, "TPEX");
 		rankStockChangeService.writeStockListToRedis(needRankTWSEs, "TWSE");
 	}
-
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}", zone= "Asia/Taipei")
-	@Transactional
-//	@PostConstruct
-	public void updateMarginTradingAndShortSellingInfo() throws RestClientException, URISyntaxException,
-			JsonMappingException, JsonProcessingException, InterruptedException {
-		// 先抓DB裡面全部的代號資料
-		List<MarginTradingAndShortSellingInfo> stockTpexarginTradingAndShortSellingInfo = ChromeDriverUtils
-				.graspTpexMarginTradingAndShortSellingInfo(
-						"https://www.tpex.org.tw/openapi/v1/tpex_mainboard_margin_balance");
-
-		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
-				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
-
-		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
-
-		List<MarginTradingAndShortSellingInfo> stockTwseDayPrices = ChromeDriverUtils
-				.graspTwseMarginTradingAndShortSellingInfo("https://openapi.twse.com.tw/v1/exchangeReport/MI_MARGN",
-						tradeDate);
-		marginTradingAndShortSellingInfoServices.saveAll(stockTpexarginTradingAndShortSellingInfo);
-		marginTradingAndShortSellingInfoServices.saveAll(stockTwseDayPrices);
-		log.info("finsh sync stockDayPrice");
-	}
-
-//
-	public static String removeFileExtension(String fileName) {
-		// 找到最後一個點的位置
-		int lastDotIndex = fileName.lastIndexOf('.');
-
-		// 如果找到了點，截取之前的部分；如果沒有點，則返回原始文件名
-		if (lastDotIndex != -1) {
-			return fileName.substring(0, lastDotIndex);
-		} else {
-			return fileName; // 沒有擴展名
-		}
-	}
-
-	public void calculateRSVValueAndLimitDownUp(StockDayPrice stockTwseDayPrice, List<StockDayPrice> twoFourtyStockDayPrices, Map<String, List<TmpExDividendsExRightInfo>> groupedtmpExDividendsExRightInfos ) {
+	
+	public void calculateRSVValueAndLimitDownUp(StockDayPrice stockTwseDayPrice, List<StockDayPrice> twoFourtyStockDayPrices) {
 		if (stockTwseDayPrice.getClosingPrice().equals("---") || stockTwseDayPrice.getClosingPrice().equals("----")
 				|| stockTwseDayPrice.getClosingPrice().equals("--") || stockTwseDayPrice.getClosingPrice().equals("-") || stockTwseDayPrice.getLowPrice().equals("--")
 				|| stockTwseDayPrice.getLowPrice().equals("---") || stockTwseDayPrice.getLowPrice().equals("----")
 				|| StringUtils.isBlank(stockTwseDayPrice.getClosingPrice())) {
 			return;
 		}
-		
-		String tmpChage = stockTwseDayPrice.getChange().trim().replace("+", "").replaceAll(",", "");
-		boolean isNeedSpecialDeal = groupedtmpExDividendsExRightInfos.containsKey(stockTwseDayPrice.getStockCode())
-				? (groupedtmpExDividendsExRightInfos.get(stockTwseDayPrice.getStockCode()).stream().findFirst()
-						.isPresent()
-						&& groupedtmpExDividendsExRightInfos.get(stockTwseDayPrice.getStockCode()).stream().findFirst()
-								.get().getTradingDay().equals(stockTwseDayPrice.getTradingDay()))
-				: false;
-		if (tmpChage.equals("0.00")) {
-			tmpChage = "0";
-		}
-		if (tmpChage.contains("除息") || tmpChage.contains("除權") || tmpChage.contains("X")) {
-			Optional<StockDayPrice> stockDayPriceOp = stockDayPriceService.findByStockCodeAndTradingDayBeforLimitOne(
-					stockTwseDayPrice.getStockCode(), stockTwseDayPrice.getTradingDay());
-			if (stockDayPriceOp.isPresent()) {
-				tmpChage = String.valueOf(Double
-						.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""))
-						- Double.valueOf(stockDayPriceOp.get().getClosingPrice().replace("+", "").replaceAll(",", "")));
-			} else {
-				tmpChage = "0";
-			}
-		}
-		Double standarPrice = null;
-		Double upperLimitPrice = null;
-		Double lowerLimitPrice = null;
-		if (isNeedSpecialDeal) {
-				TmpExDividendsExRightInfo tmpExDividendsExRightInfo = groupedtmpExDividendsExRightInfos.get(stockTwseDayPrice.getStockCode()).stream().findFirst().get();
-				upperLimitPrice = Double.valueOf(tmpExDividendsExRightInfo.getLimitUp().replaceAll(",", ""));
-				lowerLimitPrice = Double.valueOf(tmpExDividendsExRightInfo.getLimitDown().replaceAll(",", ""));
-				standarPrice = new BigDecimal(
-						tmpExDividendsExRightInfo.getReferencePrice().replace(",", StringUtils.EMPTY)).doubleValue();
-		} else {
-			standarPrice = Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""))
-					- new BigDecimal(tmpChage).doubleValue();
-			upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true);
-			lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false);
-		}
-		Double closingPrice = Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""));
-		stockTwseDayPrice.setLimitDown(lowerLimitPrice.toString());
-		twoFourtyStockDayPrices.get(0).setLimitDown(lowerLimitPrice.toString());
-		stockTwseDayPrice.setLimitUp(upperLimitPrice.toString());
-		twoFourtyStockDayPrices.get(0).setLimitUp(upperLimitPrice.toString());
-		Double rate = ((closingPrice - standarPrice) / standarPrice) * 100;
-		rate = Math.round(rate * 100.0) / 100.0;
-		stockTwseDayPrice.setChangeRate(rate);
-		twoFourtyStockDayPrices.get(0).setChangeRate(rate);
 		//如果交易天數沒超過9天，則就不進行後續計算
 		if (twoFourtyStockDayPrices.size() < 9) {
 			return; // 如果不满足条件，返回 null
@@ -678,7 +405,22 @@ public class GraspStockPrice {
 			}
 		}
 	}
+	private double roundToThreeDecimalPlaces(double value) {
+		return new BigDecimal(value).setScale(3, RoundingMode.HALF_UP).doubleValue();
+	}
+	
+	private double calculateMovingAverage(List<StockDayPrice> stockDayPrices, int period) {
+		if (stockDayPrices.size() < period) {
+			return 0.0; // 如果資料不足，返回 0
+		}
+		double average = stockDayPrices.stream().limit(period)
+				.mapToDouble(stockDayPrice -> Double.valueOf(stockDayPrice.getClosingPrice().replaceAll(",", "")))
+				.average().orElse(0.0);
 
+		// 使用 BigDecimal 保留小數點第 4 位（四捨五入）
+		return new BigDecimal(average).setScale(4, RoundingMode.HALF_UP).doubleValue();
+	}
+	
 	public void calculateRSVValueAndLimitDownUp(StockMonthPrice stockMonthPrice, List<StockMonthPrice> twoFourtyStockMonthPrices) {
 
 		if (twoFourtyStockMonthPrices.size() < 9) {
@@ -831,23 +573,6 @@ public class GraspStockPrice {
 			}
 		}
 	}
-
-	private double calculateMovingAverage(List<StockDayPrice> stockDayPrices, int period) {
-		if (stockDayPrices.size() < period) {
-			return 0.0; // 如果資料不足，返回 0
-		}
-		double average = stockDayPrices.stream().limit(period)
-				.mapToDouble(stockDayPrice -> Double.valueOf(stockDayPrice.getClosingPrice().replaceAll(",", "")))
-				.average().orElse(0.0);
-
-		// 使用 BigDecimal 保留小數點第 4 位（四捨五入）
-		return new BigDecimal(average).setScale(4, RoundingMode.HALF_UP).doubleValue();
-	}
-
-	private double roundToThreeDecimalPlaces(double value) {
-		return new BigDecimal(value).setScale(3, RoundingMode.HALF_UP).doubleValue();
-	}
-
 	// 計算股票週期移動平均價
 	private BigDecimal calculateStockWeekPriceMovingAverage(List<StockWeekPrice> stockDayPrices, int period) {
 		if (stockDayPrices.size() < period) {
@@ -859,7 +584,6 @@ public class GraspStockPrice {
 		// 計算平均值並保留小數點第 4 位（四捨五入）
 		return total.divide(new BigDecimal(period), 4, RoundingMode.HALF_UP);
 	}
-
 	// 計算股票週期移動平均價
 	private BigDecimal calculateStockMonthPriceMovingAverage(List<StockMonthPrice> stockMonthPrice, int period) {
 		if (stockMonthPrice.size() < period) {
