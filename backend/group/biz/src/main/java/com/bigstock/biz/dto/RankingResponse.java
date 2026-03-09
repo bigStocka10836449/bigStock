@@ -17,4 +17,6 @@ public class RankingResponse {
     private String stockName;
     private BigDecimal openingPrice;
     private BigDecimal closingPrice;
+    private BigDecimal limitUp;
+    private BigDecimal limitDown;
 }

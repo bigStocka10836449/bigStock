@@ -62,7 +62,9 @@ public class RankStockChangeService {
 	        map.putAsync("changeRate", stock.getChangeRate());
 	        map.putAsync("change", stock.getChange());
 	        map.putAsync("tradingVolume", stock.getTradingVolume());
-
+	        map.putAsync("change", stock.getChange());
+	        map.putAsync("limitUp", stock.getLimitUp());
+	        map.putAsync("limitDown", stock.getLimitDown());
 	        ranking.addAsync(stock.getChangeRate(), stockCode);
 	    }
 
@@ -127,6 +129,9 @@ public class RankStockChangeService {
 	            response.setClosingPrice(castToBigDecimal(stockMap.get("close")));
 	            response.setChange(castToBigDecimal(stockMap.get("change")));
 	            response.setTradingVolume(castToLong(stockMap.get("tradingVolume")));
+	            response.setOpeningPrice(castToBigDecimal(stockMap.get("open")));
+	            response.setLimitUp(castToBigDecimal(stockMap.get("limitUp")));
+	            response.setLimitDown(castToBigDecimal(stockMap.get("limitDown")));
 	        }
 
 	        result.add(response);
