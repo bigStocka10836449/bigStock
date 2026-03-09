@@ -20,6 +20,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.biz.service.RankStockChangeService;
+import com.bigstock.biz.utils.ChromeDriverUtils;
 import com.bigstock.biz.utils.GrabThirdPartyStockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
@@ -33,6 +34,7 @@ import com.bigstock.sharedComponent.service.StockInfoService;
 import com.bigstock.sharedComponent.service.StockMonthPriceService;
 import com.bigstock.sharedComponent.service.StockWeekPriceService;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -53,6 +55,7 @@ public class GrabFromThirdParty {
 	
 	private final RankStockChangeService rankStockChangeService;
 	
+//	@PostConstruct
 	@Scheduled(cron = "0 50 15 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
@@ -87,9 +90,14 @@ public class GrabFromThirdParty {
 		Instant instant = tradeDateMinus365.atStartOfDay( ZoneId.of("Asia/Taipei")).toInstant();
 		Date tradeDateBefore365Days = Date.from(instant);
 		List<StockDayPrice> stockDayPricesFor365Ds = stockDayPriceService.findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, tradeDate);
-		Map<String, List<StockDayPrice>> groupedStockDayPrices =
-				stockDayPricesFor365Ds.stream()
-			        .collect(Collectors.groupingBy(StockDayPrice::getStockCode));
+		Map<String, List<StockDayPrice>> groupedStockDayPrices = stockDayPricesFor365Ds.stream().filter(data -> {
+			java.util.Date tradingDay = data.getTradingDay();
+			LocalDate dataTradeDateLdt = ((java.sql.Date)tradingDay).toLocalDate();
+			return dataTradeDateLdt.compareTo(tradeDateLdt) < 0;
+		}
+
+		).collect(Collectors.groupingBy(StockDayPrice::getStockCode));
+				
 		stockDayPriceService.upsertBatch(allStockDayPrices);
 		allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
 			if("2454".equals(stockTwseDayPrice.getStockCode())) {
@@ -106,6 +114,7 @@ public class GrabFromThirdParty {
 					+ (stockTwseDayPrice.getTradingDay().getMonth() + 1));
 			groupedStockDayPrices.put(stockTwseDayPrice.getStockCode(), allThisStockCodeDayPrices);
 		});
+		stockDayPriceService.upsertBatch(allStockDayPrices);
 		List<StockDayPriceRank> allStockDayPriceRanks = Lists.newArrayList();
 		allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
 			if(groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
@@ -331,6 +340,19 @@ public class GrabFromThirdParty {
 				|| StringUtils.isBlank(stockTwseDayPrice.getClosingPrice())) {
 			return;
 		}
+		
+		
+		Double upperLimitPrice = null;
+		Double lowerLimitPrice = null;
+		Double standarPrice = null;
+		standarPrice = Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""))
+				- new BigDecimal(stockTwseDayPrice.getChange()).doubleValue();
+		upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true);
+		lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false);
+		stockTwseDayPrice.setLimitDown(lowerLimitPrice.toString());
+		twoFourtyStockDayPrices.get(0).setLimitDown(lowerLimitPrice.toString());
+		stockTwseDayPrice.setLimitUp(upperLimitPrice.toString());
+		twoFourtyStockDayPrices.get(0).setLimitUp(upperLimitPrice.toString());
 		//如果交易天數沒超過9天，則就不進行後續計算
 		if (twoFourtyStockDayPrices.size() < 9) {
 			return; // 如果不满足条件，返回 null

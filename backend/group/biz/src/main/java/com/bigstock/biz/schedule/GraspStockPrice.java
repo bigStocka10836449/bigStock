@@ -221,9 +221,14 @@ public class GraspStockPrice {
 		Instant instant = tradeDateMinus365.atStartOfDay( ZoneId.of("Asia/Taipei")).toInstant();
 		Date tradeDateBefore365Days = Date.from(instant);
 		List<StockDayPrice> stockDayPricesFor365Ds = stockDayPriceService.findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, tradeDate);
+		
 		Map<String, List<StockDayPrice>> groupedStockDayPrices =
 				stockDayPricesFor365Ds.stream()
-			        .collect(Collectors.groupingBy(StockDayPrice::getStockCode));
+				.filter(data -> {
+					java.util.Date tradingDay = data.getTradingDay();
+					LocalDate dataTradeDateLdt = ((java.sql.Date)tradingDay).toLocalDate();
+					return dataTradeDateLdt.compareTo(tradeDateLdt) < 0;
+				}).collect(Collectors.groupingBy(StockDayPrice::getStockCode));
 		stockTpexDayPrices.stream().forEach(stockTpexDayPrice -> {
 			if("5340".equals(stockTpexDayPrice.getStockCode())) {
 				log.info("5340");

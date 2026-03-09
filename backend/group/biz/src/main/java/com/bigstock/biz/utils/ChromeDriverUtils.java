@@ -1138,14 +1138,10 @@ public class ChromeDriverUtils {
 	        return 0.5;
 	    } else if (price >= 500 && price < 1000) {
 	        return 1.0;
-	    } else if (price >= 1000 && price < 2000) {
+	    } else if (price >= 1000 && price < 10000) {
 	        return 5.0;
-	    } else if (price >= 2000 && price < 5000) {
-	        return 10.0;
-	    } else if (price >= 5000 && price < 10000) {
-	        return 50.0;
 	    } else if (price >= 10000) {
-	        return 100.0;
+	        return 10.0;
 	    } else {
 	        throw new IllegalArgumentException("無效的價格：" + price);
 	    }
