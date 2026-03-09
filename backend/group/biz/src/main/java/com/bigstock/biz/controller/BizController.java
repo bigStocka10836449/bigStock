@@ -3,6 +3,7 @@ package com.bigstock.biz.controller;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import org.json.JSONObject;
@@ -56,7 +57,7 @@ public class BizController {
 	@Operation(summary = "個股漲跌幅排行", description = "market 分為 TEPX 與 TWSE")
 	@GetMapping("ranking/raiseChange")
 	public List<RankingResponse> getRanking(@RequestParam String market, @RequestParam(defaultValue = "10") int limit,
-			@RequestParam(defaultValue = "desc") String order) {
+			@RequestParam(defaultValue = "desc") String order) throws InterruptedException, ExecutionException {
 
 		return rankStockChangeService.getRanking(market, limit, order);
 	}

@@ -23,6 +23,7 @@ import com.bigstock.biz.service.RankStockChangeService;
 import com.bigstock.biz.utils.GrabThirdPartyStockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
+import com.bigstock.sharedComponent.entity.StockInfo;
 import com.bigstock.sharedComponent.entity.StockMonthPrice;
 import com.bigstock.sharedComponent.entity.StockMonthPriceRank;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
@@ -32,7 +33,6 @@ import com.bigstock.sharedComponent.service.StockInfoService;
 import com.bigstock.sharedComponent.service.StockMonthPriceService;
 import com.bigstock.sharedComponent.service.StockWeekPriceService;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -53,7 +53,7 @@ public class GrabFromThirdParty {
 	
 	private final RankStockChangeService rankStockChangeService;
 	
-	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
+	@Scheduled(cron = "0 50 15 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
@@ -62,6 +62,12 @@ public class GrabFromThirdParty {
 			return !data.matches(".*[a-zA-Z].*");
 		}).toList();
 		List<String> allStockCodes = Lists.newArrayList();
+		List<StockInfo> allStockInfos =  stockInfoService.getAllStockCode().stream().filter(data -> {
+			return !data.getStockCode().matches(".*[a-zA-Z].*");
+		}).toList();
+		Map<String, List<StockInfo>> allStockInfoMap =
+				allStockInfos.stream()
+			        .collect(Collectors.groupingBy(StockInfo::getStockCode));
 		allStockCodes.addAll(tpexStockCodes);
 		allStockCodes.addAll(twseStockCodes);
 		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
@@ -314,8 +320,8 @@ public class GrabFromThirdParty {
 		//計算漲跌幅排名
 		List<StockDayPrice> needRankTPEXs = allStockDayPrices.stream().filter(data -> (!List.of("--","---","----").contains(data.getChange()) && tpexStockCodes.contains(data.getStockCode()) && ObjectUtils.isNotEmpty(data.getChangeRate()))).toList();
 		List<StockDayPrice> needRankTWSEs = allStockDayPrices.stream().filter(data ->  (!List.of("--","---","----").contains(data.getChange()) && twseStockCodes.contains(data.getStockCode()) && ObjectUtils.isNotEmpty(data.getChangeRate()))).toList();
-		rankStockChangeService.writeStockListToRedis(needRankTPEXs, "TPEX");
-		rankStockChangeService.writeStockListToRedis(needRankTWSEs, "TWSE");
+		rankStockChangeService.writeStockListToRedis(needRankTPEXs, allStockInfoMap, "TPEX");
+		rankStockChangeService.writeStockListToRedis(needRankTWSEs, allStockInfoMap,"TWSE");
 	}
 	
 	public void calculateRSVValueAndLimitDownUp(StockDayPrice stockTwseDayPrice, List<StockDayPrice> twoFourtyStockDayPrices) {

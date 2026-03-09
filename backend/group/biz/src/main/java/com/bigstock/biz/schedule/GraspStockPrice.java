@@ -33,6 +33,7 @@ import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.SecuritiesFirmsDayOperate;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
+import com.bigstock.sharedComponent.entity.StockInfo;
 import com.bigstock.sharedComponent.entity.StockMonthPrice;
 import com.bigstock.sharedComponent.entity.StockMonthPriceRank;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
@@ -167,7 +168,12 @@ public class GraspStockPrice {
 		// 先抓DB裡面全部的代號資料
 
 		List<StockDayPrice> stockTpexEmergingStockPrices = ChromeDriverUtils.graspTpexEmergingStockDayPrice();
-
+		List<StockInfo> allStockInfos =  stockInfoService.getAllStockCode().stream().filter(data -> {
+			return !data.getStockCode().matches(".*[a-zA-Z].*");
+		}).toList();
+		Map<String, List<StockInfo>> allStockInfoMap =
+				allStockInfos.stream()
+			        .collect(Collectors.groupingBy(StockInfo::getStockCode));
 		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
 				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
 
@@ -505,8 +511,8 @@ public class GraspStockPrice {
 		//計算漲跌幅排名
 		List<StockDayPrice> needRankTPEXs = stockTpexDayPrices.stream().filter(data -> (!List.of("--","---","----").contains(data.getChange()) && ObjectUtils.isNotEmpty(data.getChangeRate()))).toList();
 		List<StockDayPrice> needRankTWSEs = stockTwseDayPrices.stream().filter(data ->  (!List.of("--","---","----").contains(data.getChange()) && ObjectUtils.isNotEmpty(data.getChangeRate()))).toList();
-		rankStockChangeService.writeStockListToRedis(needRankTPEXs, "TPEX");
-		rankStockChangeService.writeStockListToRedis(needRankTWSEs, "TWSE");
+		rankStockChangeService.writeStockListToRedis(needRankTPEXs, allStockInfoMap, "TPEX");
+		rankStockChangeService.writeStockListToRedis(needRankTWSEs, allStockInfoMap, "TWSE");
 	}
 
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}", zone= "Asia/Taipei")

@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 public class StockInfoService {
 	private final StockInfoRepository stockInfoRepository;
 
-	public List<String> getAllStockCode() {
+	public List<StockInfo> getAllStockCode() {
 		return stockInfoRepository.getAllStockCode();
 	}
 	
