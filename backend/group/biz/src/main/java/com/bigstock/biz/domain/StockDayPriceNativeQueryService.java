@@ -191,7 +191,7 @@ public class StockDayPriceNativeQueryService {
 
 		            FROM bstock.stock_day_price_rank
 		            WHERE trading_day <= :tradingDay
-		              AND rank_no <= :twoFourtyDaysSlopeLimit
+		              AND rank_no <= 240
 		              AND closing_price ~ '^-?[0-9]+(\\.[0-9]+)?$'
 		        ) base_data
 		        GROUP BY stock_code
