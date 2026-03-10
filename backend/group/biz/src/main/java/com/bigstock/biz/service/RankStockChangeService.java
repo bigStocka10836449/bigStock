@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.redisson.api.RBatch;
 import org.redisson.api.RFuture;
 import org.redisson.api.RMapAsync;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import com.bigstock.biz.dto.RankingResponse;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
+import com.bigstock.sharedComponent.entity.StockDayPriceRank;
 import com.bigstock.sharedComponent.entity.StockInfo;
 
 import lombok.RequiredArgsConstructor;
@@ -48,6 +50,46 @@ public class RankStockChangeService {
 
 	    for (StockDayPrice stock : list) {
 
+	        String stockCode = stock.getStockCode();
+	        String stockKey = "stock:" + market + ":" + stockCode;
+
+	        RMapAsync<String, Object> map =
+	                batch.getMap(stockKey);
+
+	        map.putAsync("stockName", allStockInfoMaps.containsKey(stockCode) ? allStockInfoMaps.get(stockCode).get(0).getStockName() : stockCode);
+	        map.putAsync("open", stock.getOpeningPrice());
+	        map.putAsync("close", stock.getClosingPrice());
+	        map.putAsync("high", stock.getHighPrice());
+	        map.putAsync("low", stock.getLowPrice());
+	        map.putAsync("changeRate", stock.getChangeRate());
+	        map.putAsync("change", stock.getChange());
+	        map.putAsync("tradingVolume", stock.getTradingVolume());
+	        map.putAsync("change", stock.getChange());
+	        map.putAsync("limitUp", stock.getLimitUp());
+	        map.putAsync("limitDown", stock.getLimitDown());
+	        ranking.addAsync(stock.getChangeRate(), stockCode);
+	    }
+
+	    batch.execute();
+	}
+	
+	public void writeStockListRankToRedis(List<StockDayPriceRank> list, Map<String, List<StockInfo>> allStockInfoMaps , String market) {
+
+	    RBatch batch = redissonClient.createBatch();
+
+	    RScoredSortedSetAsync<String> ranking =
+	            batch.getScoredSortedSet(
+	                    RANK_KEY_PREFIX + market + ":changeRate");
+
+	    ranking.deleteAsync(); // clear previous ranking
+
+	    for (StockDayPriceRank stock : list) {
+	    	if (stock.getClosingPrice().equals("---") || stock.getClosingPrice().equals("----")
+					|| stock.getClosingPrice().equals("--") || stock.getClosingPrice().equals("-") || stock.getLowPrice().equals("--")
+					|| stock.getLowPrice().equals("---") || stock.getLowPrice().equals("----")
+					|| StringUtils.isBlank(stock.getClosingPrice())) {
+				continue;
+			}
 	        String stockCode = stock.getStockCode();
 	        String stockKey = "stock:" + market + ":" + stockCode;
 

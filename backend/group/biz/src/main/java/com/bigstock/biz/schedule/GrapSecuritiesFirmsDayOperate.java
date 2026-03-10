@@ -15,14 +15,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
-@EnableScheduling
+//@EnableScheduling
 @RequiredArgsConstructor
 @Slf4j
 public class GrapSecuritiesFirmsDayOperate {
 
     private final RestTemplate restTemplate = new RestTemplate();
 	
-	@Scheduled(cron = "0 30 17 * * ?", zone = "Asia/Taipei")
+//	@Scheduled(cron = "0 30 17 * * ?", zone = "Asia/Taipei")
 	public void callWindowsToExcecute() {
 		 HttpHeaders headers = new HttpHeaders();
 		    headers.set("User-Agent", "Mozilla/5.0");

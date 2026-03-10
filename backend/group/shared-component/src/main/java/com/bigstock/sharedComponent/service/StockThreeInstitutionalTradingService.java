@@ -9,6 +9,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +37,22 @@ public class StockThreeInstitutionalTradingService {
         private int savedCount;
     }
 
+    public List<StockThreeInstitutionalTrading> getDateRangMarketStockData( LocalDate startDate,
+            LocalDate endDate){
+    	return repository.getDateRangMarketStockData(startDate, endDate);
+    }
+    
+    @Transactional
+    public List<StockThreeInstitutionalTrading> getLastThreeSingleStockData(String stockCode){
+    	return repository.getLastThreeSingleStockData(stockCode);
+    }
+    
+    @Transactional
+    public void deleteByRankNoLessThanZero( LocalDate expiredDate){
+    	repository.deleteByExpiredDate(expiredDate);
+    }
+    
+    
     /**
      * 從 Redis 的 norm key 讀出（twse/tpex），然後寫入 DB（JPA saveAll）。
      * - Redis 內容不動（保留）

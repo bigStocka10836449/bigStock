@@ -5,6 +5,7 @@ import com.bigstock.sharedComponent.entity.StockThreeInstitutionalTradingId;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -14,6 +15,33 @@ import java.util.List;
 public interface StockThreeInstitutionalTradingRepository
         extends JpaRepository<StockThreeInstitutionalTrading, StockThreeInstitutionalTradingId> {
 
+
+	
+	@Modifying
+	@Query(value = """
+			DELETE FROM bstock.stock_three_institutional_trading r WHERE r.trade_date <= :expiredDate
+			""", nativeQuery = true )
+	void deleteByExpiredDate( @Param("expiredDate") LocalDate expiredDate);
+	
+	@Query(value = """
+			SELECT r.*
+			FROM bstock.stock_three_institutional_trading r
+			WHERE r.trade_date between :startDate AND :endDate 
+			""", nativeQuery = true )
+	List<StockThreeInstitutionalTrading> getDateRangMarketStockData(    @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+	
+	
+	@Query(value = """
+			SELECT r.*
+			FROM bstock.stock_three_institutional_trading r
+			WHERE r.stock_code = :stockCode
+			ORDER BY r.trade_date DESC
+			LIMIT 3
+			""", nativeQuery = true )
+	List<StockThreeInstitutionalTrading> getLastThreeSingleStockData( @Param("stockCode") String stockCode);
+	
+	
     // 查某檔股票區間（App 最常用）
     @Query("""
             SELECT e

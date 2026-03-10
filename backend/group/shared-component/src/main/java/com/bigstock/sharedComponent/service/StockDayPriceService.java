@@ -9,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -181,6 +182,10 @@ public class StockDayPriceService {
 
 	public List<StockDayPrice> findStockCodeAndLimit(String stockCode, Integer limit) {
 		return stockDayPriceRepository.findStockCodeAndLimit(stockCode, limit);
+	}
+	
+	public List<StockDayPriceRank> findByIdTradingDay(LocalDate tradingDay){
+		return stockDayPriceRankRepository.findByIdTradingDay(tradingDay);
 	}
 
 	private StockDayPriceService getSelf() {
