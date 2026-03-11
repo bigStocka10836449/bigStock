@@ -1,51 +1,58 @@
 server:
-  port: 28081
+  port: 18080
   shutdown: graceful
-spring:
+#  ssl:
+#    enabled: false
+#    key-store: classpath:container-sit.testesunbank.com.tw.jks
+#    key-store-password: ENC(KXcrgSoHASfYwGk2mmH8sRwkr4+DHY/kez+vPE0Pz2pRoYGWMjqw+r1eVs/41i6m)
+#    key-store-type: JKS
+spring: 
+#  sleuth:
+#    sampler:
+#      probability: 1.0 # 设置采样率为100%
   application:
     name: bigstock-schedule
   main:
     allow-bean-definition-overriding: true
-  cloud:
-    consul:
-      host: 127.0.0.1
-      port: 8500 
   datasource:
-    url: jdbc:postgresql://127.0.0.1:15432/bstock
+    url: jdbc:postgresql://43.153.144.80:31482/bstock
     username: bstockuser
     password: postgresql
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
+      leak-detection-threshold: 10000
   jpa:
     hibernate:
       ddl-auto: none
     properties:
       hibernate:
-        show-sql: true    
+        show-sql: true  
+        jdbc:
+          batch_size: 100
+        order_inserts: true
+        order_updates: true     
   redis:
-    host: 127.0.0.1
-    port: 6379
+    host: 43.153.144.80
     lettuce:
       pool:
         max-active: 200
         max-idle: 500
         min-idle: 10
         max-wait: 100000
-  rabbitmq:
-    host: 127.0.0.1
-    port: 5672
-    username: admin
-    password: rabbitmq
-    virtual-host: /
-    pool:
-      channelCacheSize: 5          
+    port: 30815      
 logging:
   config: classpath:logback.xml
-
+  
+springdoc:
+  api-docs:
+    path: /schedule/swagger/v3/api-docs  
+  swagger-ui:
+    path: /schedule/swagger/swagger-ui.html
+    enable: true
+    supportHeaderParams: true
+    
 schedule:
-  bpython-url: http://127.0.0.1:8000/captcha/
-  credentials-pathl: D:\GOOGLE_APPLICATION_CREDENTIALS\api-project-488164973892-240337ff54fe.json
   task:
     scheduling:
       cron:
@@ -55,6 +62,8 @@ schedule:
           update-shareholder-structure: "0 */30 * * * *"
           update-stock-info: "0 */30 * * * *"
           update-margin-trading:  "0 */30 * * * *"
+          update-threeInsti: "0 30 18 * * *"
+          update-monthlyRevenue: "0 0 8 * * SUN"
   chromeDriverPath:
     windows: 
       active: true	
@@ -71,25 +80,6 @@ schedule:
     search-start-date: 2025-10-05
     search-end-date: 2025-12-07
      # date格式 yyyyMMdd 
-    twse-baseurl: https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=%1s&stockNo=%2s&response=json&_=1730439477455
-management:
-  endpoints:
-    web:
-      exposure:
-        include: "*" # 包含所有的Actuator端点，可以根据需要进行调整
-  endpoint:
-    health:
-      show-details: always
-  health:
-    consul:
-      enabled: true  
-  tracing:
-    enabled: true
-    sampling:
-      probability: 1.0  # 设置采样率为 100%
-    export:
-      otlp:
-        enabled: true
-        endpoint: http://localhost:14250  # Jaeger 的 OTLP 接收端点    
-tracing:
-  url: http://localhost:4317     
+    twse-baseurl: https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=%1s&stockNo=%2s&response=json&_=1730439477455    
+    
+   

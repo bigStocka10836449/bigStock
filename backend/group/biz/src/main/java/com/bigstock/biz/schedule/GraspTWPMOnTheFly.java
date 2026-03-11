@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 
 import com.bigstock.biz.dto.MarketSnapshot;
 import com.bigstock.biz.service.MarketBroadcastService;
-import com.bigstock.biz.utils.ChromeDriverUtils;
+import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;

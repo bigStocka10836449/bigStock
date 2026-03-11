@@ -1,6 +1,6 @@
 package com.bigstock.biz.service;
 
-import com.bigstock.biz.vo.ThreeInstitutionalTradingVo;
+import com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingVo;
 import com.bigstock.sharedComponent.entity.StockThreeInstitutionalTrading;
 import com.bigstock.sharedComponent.repository.StockThreeInstitutionalTradingRepository;
 import lombok.RequiredArgsConstructor;

@@ -7,8 +7,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse;
-import com.bigstock.biz.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.service.StockThreeInstitutionalTradingService;
+import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
 
 import lombok.RequiredArgsConstructor;
 

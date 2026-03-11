@@ -1,0 +1,14 @@
+package com.bigstock.sharedComponent.dto;
+
+import lombok.Data;
+
+@Data
+public class CompanyInfo {
+    private String stockId;
+    private String market; // TWSE / TPEX
+    private String stockName;
+
+    private String mainBusiness;
+    private String industryCategory;
+    private String listingDate; // yyyy-MM-dd
+}

@@ -85,7 +85,11 @@
 			<version>1.0.1</version> <!-- MP3 解码库 -->
 		</dependency>
 
-
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<scope>provided</scope>
+		</dependency>
 		<!--
 		https://mvnrepository.com/artifact/com.github.kokorin.jaffree/jaffree -->
 		<dependency>

@@ -1,9 +1,9 @@
 package com.bigstock.biz.service;
 
-import com.bigstock.biz.client.CompanyInfoClient;
 import com.bigstock.biz.dto.StockBasicInfoResponse;
-import com.bigstock.biz.model.CompanyInfo;
-import com.bigstock.biz.vo.QuarterlyFinancialVo;
+import com.bigstock.sharedComponent.client.CompanyInfoClient;
+import com.bigstock.sharedComponent.dto.CompanyInfo;
+import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;
 import com.bigstock.sharedComponent.dto.SingleStockDayPriceVo;
 import com.bigstock.sharedComponent.dto.SingleStockPriceVo;
 import com.bigstock.sharedComponent.dto.SingleStockWeekPriceVo;

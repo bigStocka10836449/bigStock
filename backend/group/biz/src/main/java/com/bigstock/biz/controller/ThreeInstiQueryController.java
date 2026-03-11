@@ -1,7 +1,8 @@
 package com.bigstock.biz.controller;
 
 import com.bigstock.biz.service.ThreeInstiQueryService;
-import com.bigstock.biz.vo.ThreeInstitutionalTradingVo;
+import com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingVo;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;

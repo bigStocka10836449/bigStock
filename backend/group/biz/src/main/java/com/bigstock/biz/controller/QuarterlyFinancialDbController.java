@@ -1,7 +1,8 @@
 package com.bigstock.biz.controller;
 
 import com.bigstock.biz.service.QuarterlyFinancialDbService;
-import com.bigstock.biz.vo.QuarterlyFinancialVo;
+import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

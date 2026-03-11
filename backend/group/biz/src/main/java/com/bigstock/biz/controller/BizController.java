@@ -18,11 +18,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClientException;
 
 import com.bigstock.biz.dto.MarginTradingAndShortSellingInfoVO;
-import com.bigstock.biz.dto.RankingResponse;
-import com.bigstock.biz.schedule.GraspStockPrice;
 import com.bigstock.biz.service.BizService;
-import com.bigstock.biz.service.RankStockChangeService;
+import com.bigstock.sharedComponent.dto.RankingResponse;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
+import com.bigstock.sharedComponent.service.RankStockChangeService;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -40,8 +39,6 @@ public class BizController {
 	private final BizService bizService;
 	
 	private final SecuritiesFirmsDayOperateService securitiesFirmsDayOperateService;
-	
-	private final GraspStockPrice graspStockPrice;
 	
 	private final RankStockChangeService  rankStockChangeService;
 	
@@ -86,7 +83,7 @@ public class BizController {
 		ObjectMapper mapper = new ObjectMapper();
 		try {
 	        String jsonString = mapper.writeValueAsString(request);
-	        graspStockPrice.grepSecuritiesFirmsDayOperate(new JSONObject(jsonString));
+	        securitiesFirmsDayOperateService.grepSecuritiesFirmsDayOperate(new JSONObject(jsonString));
 	    } catch (Exception e) {
 	        e.printStackTrace();
 	    }

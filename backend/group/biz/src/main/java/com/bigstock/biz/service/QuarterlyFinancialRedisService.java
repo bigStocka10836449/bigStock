@@ -1,7 +1,7 @@
 package com.bigstock.biz.service;
 
-import com.bigstock.biz.vo.QuarterlyFinancialVo;
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialResponse;
+import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;
 import com.bigstock.sharedComponent.service.StockQuarterFinancialService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;

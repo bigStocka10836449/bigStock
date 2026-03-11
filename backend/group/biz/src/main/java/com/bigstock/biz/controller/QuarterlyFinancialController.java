@@ -1,9 +1,10 @@
 package com.bigstock.biz.controller;
 
-import com.bigstock.biz.client.TpexQuarterlyFinancialClient;
-import com.bigstock.biz.client.TwseQuarterlyFinancialClient;
 import com.bigstock.biz.service.QuarterlyFinancialRedisService;
-import com.bigstock.biz.vo.QuarterlyFinancialVo;
+import com.bigstock.sharedComponent.client.TpexQuarterlyFinancialClient;
+import com.bigstock.sharedComponent.client.TwseQuarterlyFinancialClient;
+import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

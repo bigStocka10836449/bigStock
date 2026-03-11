@@ -1,7 +1,7 @@
 package com.bigstock.biz.service;
 
-import com.bigstock.biz.client.CompanyInfoClient;
-import com.bigstock.biz.model.CompanyInfo;
+import com.bigstock.sharedComponent.client.CompanyInfoClient;
+import com.bigstock.sharedComponent.dto.CompanyInfo;
 import com.bigstock.sharedComponent.repository.StockBasicInfoRepository;
 import com.bigstock.sharedComponent.service.StockBasicInfoService;
 import lombok.RequiredArgsConstructor;
