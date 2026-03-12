@@ -32,7 +32,7 @@ jobs:
 
       - name: Prepare Docker Artifact
         run: |
-          cp backend/group/schedule/target/bigstock-schedule.jar backend/schedule/biz/docker/
+          cp backend/group/schedule/target/bigstock-schedule.jar backend/group/schedule/docker/
 
       - name: Build Docker Image
         run: |
