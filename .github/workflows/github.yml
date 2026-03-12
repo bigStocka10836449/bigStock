@@ -1,25 +1,3 @@
-# This is a basic workflow to help you get started with Actions
-
-name: CI
-
-# Controls when the workflow will run
-on:
-  # Triggers the workflow when a tag is pushed
-  # Commonly used for release or deployment pipelines
-  push:
-    tags:
-      - 'v*'   # e.g. v1.0.0, v2.1.3 biz版本
-      - 'vts*'   # e.g. vts1.0.0  schdule版本
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
-jobs:
-  build-vts:
-  # schdule  tag更板模式
-  if: startsWith(github.ref_name, 'vts')
-  # This is a basic workflow to help you get started with Actions
-
 name: CI
 
 # Controls when the workflow will run
