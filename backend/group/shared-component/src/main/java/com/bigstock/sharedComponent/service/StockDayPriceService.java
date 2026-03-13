@@ -31,21 +31,21 @@ import org.springframework.stereotype.Service;
 import com.bigstock.sharedComponent.annotation.BigStockCacheableWithLock;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
+import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.repository.StockDayPriceRankRepository;
 import com.bigstock.sharedComponent.repository.StockDayPriceRepository;
 
-import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class StockDayPriceService {
+	
 	private final StockDayPriceRepository stockDayPriceRepository;
 	
 	private final StockDayPriceRankRepository stockDayPriceRankRepository;
 	
-	private final EntityManager entityManager;
 	
 	private final DataSource dataSource;
 	

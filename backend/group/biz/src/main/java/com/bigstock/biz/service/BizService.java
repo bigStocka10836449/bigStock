@@ -131,12 +131,12 @@ public class BizService {
 	    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 	    List<StockDayPrice> stockDayPrices = Lists.newArrayList();
 
-        // ✅ 真正會查 stock_info 的地方：findAllById(ids)
+        // 真正會查 stock_info 的地方：findAllById(ids)
 	    List<String> singleStockId = Lists.newArrayList();
 	    singleStockId.add(stockCode);
         List<StockInfo> singleInfos = Lists.newArrayList();
         		
-        		//stockInfoService.findByIds(matchStocks);
+        //stockInfoService.findByIds(matchStocks);
 	    if (ObjectUtils.isEmpty(startDate) || ObjectUtils.isEmpty(endDate)) {
 	        stockDayPrices = stockDayPriceService.findStockCodeAndLimit(stockCode, 360);
 	        

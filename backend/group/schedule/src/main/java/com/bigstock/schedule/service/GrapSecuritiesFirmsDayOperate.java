@@ -4,6 +4,8 @@ import java.net.URI;
 import java.util.Date;
 import java.util.List;
 
+import javax.annotation.PostConstruct;
+
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -28,7 +30,7 @@ public class GrapSecuritiesFirmsDayOperate {
 	private final StockDayPriceService stockDayPriceService;
 
 	private final SecuritiesFirmsDayOperateService securitiesFirmsDayOperateService;
-
+	@PostConstruct
 	@Scheduled(cron = "0 30 17 * * ?", zone = "Asia/Taipei")
 	public void callWindowsToExcecute() {
 		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();
