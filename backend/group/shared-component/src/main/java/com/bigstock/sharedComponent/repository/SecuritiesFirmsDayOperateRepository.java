@@ -27,7 +27,7 @@ public interface SecuritiesFirmsDayOperateRepository
 			            SELECT 1
 			            FROM bstock.securities_firms_day_operate sfdo
 			            WHERE sfdo.stock_code = :stockCode
-			            AND sfdo.trading_day = :tradingDate
+			            AND sfdo.trading_date = :tradingDate
 			       )
 			       THEN 1
 			       ELSE 0
