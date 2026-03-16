@@ -997,6 +997,14 @@ public class ChromeDriverUtils {
 			try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
 				URI uri = new URL(url).toURI();
 				HttpGet request = new HttpGet(uri);
+				request.setHeader("User-Agent", 
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+						+ "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+
+						request.setHeader("Accept", "*/*");
+						request.setHeader("Connection", "keep-alive");
+						request.setHeader("Accept-Encoding", "gzip, deflate");
+						request.setHeader("Accept-Language", "zh-TW,zh;q=0.9,en;q=0.8");
 				HttpResponse response = httpClient.execute(request);
 				org.apache.http.HttpEntity entity = response.getEntity();
 
