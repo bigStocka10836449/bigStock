@@ -61,7 +61,7 @@ public class GrabFromThirdParty {
 	private final CacheOperatorService cacheOperatorService;
 	
 	@PostConstruct
-	@Scheduled(cron = "0 15 18 * * ?", zone = "Asia/Taipei")
+	@Scheduled(cron = "0 50 19 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
@@ -340,10 +340,8 @@ public class GrabFromThirdParty {
 			String stockCode = entry.getKey();
 			List<StockDayPrice> stockDayPrices = entry.getValue();
 			if(allStockInfoMap.containsKey(stockCode)) {
-				StockInfo stockInfo = allStockInfoMap
-						.get(stockCode).stream().findFirst().get();
 				List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getListSeries("ultraLongLivedCache",
-						"stock:" + (stockInfo.getStockType().equals("1") ? "TWSE:" : "TPEX:") + stockCode,
+						"stock:" + stockCode,
 						StockDayPrice.class);
 				if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
 					
