@@ -84,9 +84,8 @@ public class GraspStockPrice {
 
 	// 每天下午5點更新
 //	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
-	// 每周日早上8点触发更新
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}", zone = "Asia/Taipei")
-	@PostConstruct
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}", zone= "Asia/Taipei")
+//	@PostConstruct
 	public void updateStockDayPrice() throws Exception {
 		// 先抓DB裡面全部的代號資料
 
@@ -455,7 +454,7 @@ public class GraspStockPrice {
 
 	}
 
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}", zone = "Asia/Taipei")
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}", zone= "Asia/Taipei")
 	@Transactional
 //	@PostConstruct
 	public void updateMarginTradingAndShortSellingInfo() throws RestClientException, URISyntaxException,

@@ -30,8 +30,6 @@ public class GrapSecuritiesFirmsDayOperate {
 	private final StockDayPriceService stockDayPriceService;
 
 	private final SecuritiesFirmsDayOperateService securitiesFirmsDayOperateService;
-	
-//	@PostConstruct
 	@Scheduled(cron = "0 45 17 * * ?", zone = "Asia/Taipei")
 	public void callWindowsToExcecute() {
 		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();

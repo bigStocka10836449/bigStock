@@ -7,6 +7,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
 
+import javax.annotation.PostConstruct;
+
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import com.bigstock.sharedComponent.dto.MonthlyRevenueVo;
 import com.bigstock.sharedComponent.dto.StockRevenueResponse;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.service.MonthlyRevenueQueryService;
+import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockRevenueService;
 import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
 import com.bigstock.sharedComponent.utils.MonthlyRevenueMapper;
@@ -32,20 +35,18 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class GraspMonthlyRevenueService {
 
+	private final StockDayPriceService stockDayPriceService;
 	private final MonthlyRevenueQueryService monthlyRevenueQueryService;
 	private final StockRevenueService stockRevenueService;
 
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-monthlyRevenue}", zone = "Asia/Taipei")
 	@Transactional
-//	@PostConstruct
+	@PostConstruct
 	public void updateMonthlyRevenue() throws RestClientException, URISyntaxException,
 			JsonMappingException, JsonProcessingException, InterruptedException {
 
-		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
-				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
-
-		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
-		LocalDate lod = tradeDate.toInstant()
+		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();
+		LocalDate lod = currentTradeDate.toInstant()
 	      .atZone(ZoneId.of("Asia/Taipei"))
 	      .toLocalDate();
 		lod = lod.minusMonths(1);
