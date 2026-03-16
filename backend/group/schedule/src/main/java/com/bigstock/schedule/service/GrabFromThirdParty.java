@@ -60,7 +60,7 @@ public class GrabFromThirdParty {
 	
 	private final CacheOperatorService cacheOperatorService;
 	
-	@PostConstruct
+//	@PostConstruct
 	@Scheduled(cron = "0 50 19 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
