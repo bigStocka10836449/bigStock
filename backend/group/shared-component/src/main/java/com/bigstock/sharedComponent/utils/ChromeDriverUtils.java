@@ -1,5 +1,6 @@
 package com.bigstock.sharedComponent.utils;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
@@ -23,18 +24,23 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONObject;
 import org.springframework.http.HttpEntity;
@@ -63,6 +69,14 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class ChromeDriverUtils {
+	
+	private static final CloseableHttpClient HTTP_CLIENT =
+	        HttpClients.custom()
+	                .setMaxConnTotal(50)
+	                .setMaxConnPerRoute(10)
+	                .evictExpiredConnections()
+	                .evictIdleConnections(30, TimeUnit.SECONDS)
+	                .build();
 
 	private static final Map<Integer, String> SHAREHOLDER_STRUCTURE_COLUMN_NAME = new HashMap<>();
 
@@ -990,46 +1004,87 @@ public class ChromeDriverUtils {
 
 
 	public static String fetchApiData(String url) {
-		int maxRetries = 3;
-		int retryDelayMs = 1000;
-		
-		for (int attempt = 1; attempt <= maxRetries; attempt++) {
-			try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-				URI uri = new URL(url).toURI();
-				HttpGet request = new HttpGet(uri);
-				request.setHeader("User-Agent", 
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-						+ "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 
-						request.setHeader("Accept", "*/*");
-						request.setHeader("Connection", "keep-alive");
-						request.setHeader("Accept-Encoding", "gzip, deflate");
-						request.setHeader("Accept-Language", "zh-TW,zh;q=0.9,en;q=0.8");
-				HttpResponse response = httpClient.execute(request);
-				org.apache.http.HttpEntity entity = response.getEntity();
+	    int maxRetries = 3;
+	    int retryDelayMs = 2000;   // slower retry (important)
 
-				if (entity != null) {
-					String body = EntityUtils.toString(entity, StandardCharsets.UTF_8);
+	    RequestConfig requestConfig = RequestConfig.custom()
+	            .setConnectTimeout(30_000)
+	            .setSocketTimeout(60_000)
+	            .setConnectionRequestTimeout(30_000)
+	            .build();
 
-					if (body != null) {
-						return body;
-					} else {
-						log.warn("Attempt {}/{}: JSON malformed or incomplete", attempt, maxRetries);
-					}
-				}
+	    for (int attempt = 1; attempt <= maxRetries; attempt++) {
 
-			} catch (Exception e) {
-				log.warn("Attempt {}/{}: Exception while fetching data: {}", attempt, maxRetries, e.getMessage());
-			}
+	    	HttpGet httpGet = new HttpGet(url);
+	    	httpGet.setConfig(requestConfig);
 
-			try {
-				Thread.sleep(retryDelayMs);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				throw new RuntimeException("Thread was interrupted during retry wait", e);
-			}
-		}
-		throw new RuntimeException("Failed to fetch valid JSON after " + maxRetries + " attempts.");
+	        // ⭐ browser-like headers (very important for TWSE/TPEX)
+	    	httpGet.setHeader("User-Agent",
+	                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+	                        + "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+	    	httpGet.setHeader("Accept", "*/*");
+	    	httpGet.setHeader("Connection", "keep-alive");
+	    	httpGet.setHeader("Accept-Encoding", "identity"); // ⭐ disable gzip risk
+
+	        try {
+
+	            try (CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet)) {
+
+	                int statusCode = response.getStatusLine().getStatusCode();
+
+	                org.apache.http.HttpEntity entity = response.getEntity();
+	                if (entity == null) {
+	                    log.warn("Attempt {}/{}: Empty entity", attempt, maxRetries);
+	                    continue;
+	                }
+
+	                // ⭐ STREAMING READ (instead of EntityUtils)
+	                ByteArrayOutputStream out = new ByteArrayOutputStream();
+	                try (InputStream in = entity.getContent()) {
+
+	                    byte[] buffer = new byte[8192];
+	                    int len;
+	                    while ((len = in.read(buffer)) != -1) {
+	                        out.write(buffer, 0, len);
+	                    }
+	                }
+
+	                String responseBody = out.toString(StandardCharsets.UTF_8);
+
+	                // ⭐ validate download length (very important)
+	                long expectedLength = entity.getContentLength();
+	                if (expectedLength > 0 && out.size() < expectedLength) {
+	                    log.warn("Attempt {}/{}: Truncated download (expected {}, got {})",
+	                            attempt, maxRetries, expectedLength, out.size());
+	                    continue;
+	                }
+
+	                if (statusCode == 200 && responseBody != null && !responseBody.isEmpty()) {
+	                    return responseBody;
+	                }
+
+	                log.warn("Attempt {}/{}: Bad response (status: {})",
+	                        attempt, maxRetries, statusCode);
+
+	            }
+
+	        } catch (Exception e) {
+
+	            log.warn("Attempt {}/{}: Exception during POST request: {}",
+	                    attempt, maxRetries, e.toString());
+
+	        }
+
+	        try {
+	            Thread.sleep(retryDelayMs * attempt);   // ⭐ exponential backoff
+	        } catch (InterruptedException ie) {
+	            Thread.currentThread().interrupt();
+	            throw new RuntimeException("Thread interrupted", ie);
+	        }
+	    }
+
+	    throw new RuntimeException("POST request failed after " + maxRetries + " attempts");
 	}
 	
 	public static String fetchApiData(String url, Map<String, String> formParameters) {
