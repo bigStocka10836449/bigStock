@@ -80,7 +80,7 @@ public class GrabFromThirdParty {
 		allStockCodes.forEach(stockCode -> {
 			allStockDayPrices.addAll(grabThirdPartyStockDayPrice.grabFromYahoo(stockCode));
 			try {
-				Thread.sleep(1000);
+				Thread.sleep(2000);
 			} catch (InterruptedException e) {
 				log.warn(stockCode + e.getMessage(), e);
 			}
