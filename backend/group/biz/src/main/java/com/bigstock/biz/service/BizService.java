@@ -135,18 +135,8 @@ public class BizService {
 	    List<String> singleStockId = Lists.newArrayList();
 	    singleStockId.add(stockCode);
         List<StockInfo> singleInfos = Lists.newArrayList();
-        		
+        stockDayPrices = stockDayPriceService.findLastest600StockDayPriceByStockCodeCache(stockCode);
         //stockInfoService.findByIds(matchStocks);
-	    if (ObjectUtils.isEmpty(startDate) || ObjectUtils.isEmpty(endDate)) {
-	        stockDayPrices = stockDayPriceService.findStockCodeAndLimit(stockCode, 360);
-	        
-	    } else {
-	        stockDayPrices = stockDayPriceService.findByStockCodeAndStartDateAndEndDateCache(
-	                stockCode,
-	                sdf.format(startDate),
-	                sdf.format(endDate)
-	        );
-	    }
 	    singleInfos = stockInfoService.findByIds(singleStockId);
 	    final String singleStockName = singleInfos.get(0).getStockName().toString();
 	    log.error("Thomas StockName = " +  singleStockName);
