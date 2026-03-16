@@ -59,7 +59,7 @@ public class GrabFromThirdParty {
 	private final CacheOperatorService cacheOperatorService;
 	
 //	@PostConstruct
-	@Scheduled(cron = "0 50 15 * * ?", zone = "Asia/Taipei")
+	@Scheduled(cron = "0 30 17 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
@@ -337,22 +337,27 @@ public class GrabFromThirdParty {
 		groupedStockDayPrices.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue())).forEach(entry -> {
 			String stockCode = entry.getKey();
 			List<StockDayPrice> stockDayPrices = entry.getValue();
-			StockInfo stockInfo = allStockInfoMap.get(stockCode).stream().findFirst().get();
-			List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getListSeries("ultraLongLivedCache",
-					"stock:" + (stockInfo.getStockType().equals("1") ? "TWSE:" : "TPEX:") + stockCode,
-					StockDayPrice.class);
-			if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
-
-				cacheOperatorService.upsertZSetSeries("ultraLongLivedCache",
-						"stock:" + stockCode,
-						stockDayPrices.stream().findFirst().get(),
-						stockDayPrices.stream().findFirst().get().getTradingDay().getTime(),
-						CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+			if(allStockInfoMap.containsKey(stockCode)) {
+				StockInfo stockInfo = allStockInfoMap
+						.get(stockCode).stream().findFirst().get();
+				List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getListSeries("ultraLongLivedCache",
+						"stock:" + (stockInfo.getStockType().equals("1") ? "TWSE:" : "TPEX:") + stockCode,
+						StockDayPrice.class);
+				if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
+					
+					cacheOperatorService.upsertZSetSeries("ultraLongLivedCache",
+							"stock:" + stockCode,
+							stockDayPrices.stream().findFirst().get(),
+							stockDayPrices.stream().findFirst().get().getTradingDay().getTime(),
+							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+				} else {
+					cacheOperatorService.batchUpsertZSetSeries("ultraLongLivedCache",
+							"stock:" + stockCode,
+							stockDayPrices, stockDayPrice -> stockDayPrice.getTradingDay().getTime(),
+							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+				}
 			} else {
-				cacheOperatorService.batchUpsertZSetSeries("ultraLongLivedCache",
-						"stock:" + stockCode,
-						stockDayPrices, stockDayPrice -> stockDayPrice.getTradingDay().getTime(),
-						CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+				log.warn("stock_info missing : {}",stockCode);
 			}
 		});
 	}

@@ -435,7 +435,7 @@ public class GraspStockPrice {
 			List<StockDayPrice> stockDayPrices = entry.getValue();
 			StockInfo stockInfo = allStockInfoMap.get(stockCode).stream().findFirst().get();
 			List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getListSeries("ultraLongLivedCache",
-					"stock:" + (stockInfo.getStockType().equals("1") ? "TWSE:" : "TPEX:") + stockCode,
+					"stock:" + stockCode,
 					StockDayPrice.class);
 			if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
 
@@ -446,7 +446,7 @@ public class GraspStockPrice {
 						CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
 			} else {
 				cacheOperatorService.batchUpsertZSetSeries("ultraLongLivedCache",
-						"stock:" + (stockInfo.getStockType().equals("1") ? "TWSE:" : "TPEX:") + stockCode,
+						"stock:" + stockCode,
 						stockDayPrices, stockDayPrice -> stockDayPrice.getTradingDay().getTime(),
 						CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
 			}
