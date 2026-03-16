@@ -344,13 +344,13 @@ public class GrabFromThirdParty {
 			if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
 
 				cacheOperatorService.upsertZSetSeries("ultraLongLivedCache",
-						"stock:" + (stockInfo.getStockType().equals("1") ? "TWSE:" : "TPEX:") + stockCode,
+						"stock:" + stockCode,
 						stockDayPrices.stream().findFirst().get(),
 						stockDayPrices.stream().findFirst().get().getTradingDay().getTime(),
 						CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
 			} else {
 				cacheOperatorService.batchUpsertZSetSeries("ultraLongLivedCache",
-						"stock:" + (stockInfo.getStockType().equals("1") ? "TWSE:" : "TPEX:") + stockCode,
+						"stock:" + stockCode,
 						stockDayPrices, stockDayPrice -> stockDayPrice.getTradingDay().getTime(),
 						CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
 			}

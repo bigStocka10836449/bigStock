@@ -46,6 +46,7 @@ public class StockDayPriceService {
 	
 	private final StockDayPriceRankRepository stockDayPriceRankRepository;
 	
+	private final CacheOperatorService cacheOperatorService;
 	
 	private final DataSource dataSource;
 	
@@ -82,9 +83,9 @@ public class StockDayPriceService {
 		return stockDayPriceRepository.findByStockCodeAndTradingDay(stockCode, tradingDate);
 	}
 
-	@Cacheable(value = "middleLivedCache", key = "#p0 + '-' + #p1 + '-' + #p2")
 	public List<StockDayPrice> findByStockCodeAndStartDateAndEndDateCache(String stockCode, String startDate,
 			String endDate) throws ParseException {
+		cacheOperatorService.getListSeries(startDate, endDate, null);
 		return getSelf().findByStockCodeAndStartDateAndEndDate(stockCode, startDate, endDate);
 	}
 
