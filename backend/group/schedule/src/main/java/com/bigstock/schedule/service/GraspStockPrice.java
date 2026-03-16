@@ -3,32 +3,27 @@ package com.bigstock.schedule.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URISyntaxException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections4.CollectionUtils;
+import javax.annotation.PostConstruct;
+
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
-import com.bigstock.sharedComponent.entity.SecuritiesFirmsDayOperate;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
 import com.bigstock.sharedComponent.entity.StockInfo;
@@ -51,7 +46,6 @@ import com.bigstock.sharedComponent.service.TradeVolumeInfoService;
 import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 
 import jakarta.transaction.Transactional;
@@ -448,7 +442,7 @@ public class GraspStockPrice {
 
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}", zone= "Asia/Taipei")
 	@Transactional
-//	@PostConstruct
+	@PostConstruct
 	public void updateMarginTradingAndShortSellingInfo() throws RestClientException, URISyntaxException,
 			JsonMappingException, JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
