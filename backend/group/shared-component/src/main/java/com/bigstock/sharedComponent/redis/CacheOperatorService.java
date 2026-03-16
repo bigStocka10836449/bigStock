@@ -118,7 +118,29 @@ public class CacheOperatorService {
                 .map(clazz::cast)
                 .toList();
     }
+    
+    
+    public <T> List<T> getZSetSeries(
+            String cacheName,
+            String key,
+            Class<T> clazz
+    ) {
 
+        String redisKey = buildKey(cacheName, key);
+
+        Set<Object> raw =
+                redisTemplate.opsForZSet().range(redisKey, 0, -1);
+
+        if (raw == null || raw.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        touch(redisKey, cacheName);
+
+        return raw.stream()
+                .map(clazz::cast)
+                .toList();
+    }
     // =========================
     // ZSET SERIES CACHE
     // =========================

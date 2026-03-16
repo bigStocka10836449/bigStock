@@ -12,7 +12,7 @@ import com.bigstock.sharedComponent.entity.StockDayPriceRank;
 public interface StockDayPriceRankRepository extends JpaRepository<StockDayPriceRank, StockDayPriceRank.StockDayPriceRankId> {
 
 	@Query(value = """
-			select s.* from bstock.stock_day_price_rank s where s.stock_Code = :stockCode order by s.rank_No desc
+			select s.* from bstock.stock_day_price_rank s where s.stock_Code = :stockCode order by s.rank_No asc
 			""", nativeQuery = true)
 	List<StockDayPriceRank> findByIdStockCode(String stockCode);
 	

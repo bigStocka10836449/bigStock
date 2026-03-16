@@ -85,12 +85,12 @@ public class StockDayPriceService {
 
 	public List<StockDayPrice> findByStockCodeAndStartDateAndEndDateCache(String stockCode, String startDate,
 			String endDate) throws ParseException {
-		cacheOperatorService.getListSeries("ultraLongLivedCache", "stock:" + stockCode, StockDayPrice.class);
+		cacheOperatorService.getZSetSeries("ultraLongLivedCache", "stock:" + stockCode, StockDayPrice.class);
 		return getSelf().findByStockCodeAndStartDateAndEndDate(stockCode, startDate, endDate);
 	}
 	
 	public List<StockDayPrice> findLastest600StockDayPriceByStockCodeCache(String stockCode) throws ParseException {
-		cacheOperatorService.getListSeries("ultraLongLivedCache", "stock:" + stockCode, StockDayPrice.class);
+		cacheOperatorService.getZSetSeries("ultraLongLivedCache", "stock:" + stockCode, StockDayPrice.class);
 		return getSelf().findLastest600StockDayPriceByStockCode(stockCode);
 	}
 	

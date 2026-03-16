@@ -434,7 +434,7 @@ public class GraspStockPrice {
 			String stockCode = entry.getKey();
 			List<StockDayPrice> stockDayPrices = entry.getValue();
 			StockInfo stockInfo = allStockInfoMap.get(stockCode).stream().findFirst().get();
-			List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getListSeries("ultraLongLivedCache",
+			List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getZSetSeries("ultraLongLivedCache",
 					"stock:" + stockCode,
 					StockDayPrice.class);
 			if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
