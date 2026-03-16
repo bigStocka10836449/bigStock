@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -26,6 +27,7 @@ import com.bigstock.sharedComponent.entity.StockMonthPrice;
 import com.bigstock.sharedComponent.entity.StockMonthPriceRank;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
 import com.bigstock.sharedComponent.entity.StockWeekPriceRank;
+import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.service.RankStockChangeService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockInfoService;
@@ -53,6 +55,8 @@ public class GrabFromThirdParty {
 	private final StockMonthPriceService stockMonthPriceService;
 	
 	private final RankStockChangeService rankStockChangeService;
+	
+	private final CacheOperatorService cacheOperatorService;
 	
 //	@PostConstruct
 	@Scheduled(cron = "0 50 15 * * ?", zone = "Asia/Taipei")
@@ -330,6 +334,27 @@ public class GrabFromThirdParty {
 		List<StockDayPrice> needRankTWSEs = allStockDayPrices.stream().filter(data ->  (!List.of("--","---","----").contains(data.getChange()) && twseStockCodes.contains(data.getStockCode()) && ObjectUtils.isNotEmpty(data.getChangeRate()))).toList();
 		rankStockChangeService.writeStockListToRedis(needRankTPEXs, allStockInfoMap, "TPEX");
 		rankStockChangeService.writeStockListToRedis(needRankTWSEs, allStockInfoMap,"TWSE");
+		groupedStockDayPrices.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue())).forEach(entry -> {
+			String stockCode = entry.getKey();
+			List<StockDayPrice> stockDayPrices = entry.getValue();
+			StockInfo stockInfo = allStockInfoMap.get(stockCode).stream().findFirst().get();
+			List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getListSeries("ultraLongLivedCache",
+					"stock:" + (stockInfo.getStockType().equals("1") ? "TWSE:" : "TPEX:") + stockCode,
+					StockDayPrice.class);
+			if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
+
+				cacheOperatorService.upsertZSetSeries("ultraLongLivedCache",
+						"stock:" + (stockInfo.getStockType().equals("1") ? "TWSE:" : "TPEX:") + stockCode,
+						stockDayPrices.stream().findFirst().get(),
+						stockDayPrices.stream().findFirst().get().getTradingDay().getTime(),
+						CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+			} else {
+				cacheOperatorService.batchUpsertZSetSeries("ultraLongLivedCache",
+						"stock:" + (stockInfo.getStockType().equals("1") ? "TWSE:" : "TPEX:") + stockCode,
+						stockDayPrices, stockDayPrice -> stockDayPrice.getTradingDay().getTime(),
+						CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+			}
+		});
 	}
 	
 	public void calculateRSVValueAndLimitDownUp(StockDayPrice stockTwseDayPrice, List<StockDayPrice> twoFourtyStockDayPrices) {
