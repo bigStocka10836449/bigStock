@@ -29,7 +29,7 @@ public class GrapSecuritiesFirmsDayOperate {
 
 	private final SecuritiesFirmsDayOperateService securitiesFirmsDayOperateService;
 
-	@Scheduled(cron = "0 05 18 * * ?", zone = "Asia/Taipei")
+	@Scheduled(cron = "0 45 17 * * ?", zone = "Asia/Taipei")
 	public void callWindowsToExcecute() {
 		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();
 		boolean isfinished = securitiesFirmsDayOperateService.chechIsFinishedWithTradingDate("2330", currentTradeDate);
