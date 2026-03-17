@@ -998,25 +998,6 @@ public class ChromeDriverUtils {
 			try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
 				URI uri = new URL(url).toURI();
 				HttpGet request = new HttpGet(uri);
-	            request.setConfig(RequestConfig.custom()
-	                    .setConnectTimeout(10_000)
-	                    .setSocketTimeout(30_000)
-	                    .setConnectionRequestTimeout(5_000)
-	                    .build());
-
-	            // ⭐ mimic browser
-	            request.setHeader("User-Agent",
-	                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-	                            + "(KHTML, like Gecko) Chrome/122.0 Safari/537.36");
-
-	            request.setHeader("Accept",
-	                    "application/json, text/plain, */*");
-
-	            request.setHeader("Accept-Encoding",
-	                    "gzip, deflate");
-
-	            request.setHeader("Connection",
-	                    "keep-alive");
 				HttpResponse response = httpClient.execute(request);
 				org.apache.http.HttpEntity entity = response.getEntity();
 

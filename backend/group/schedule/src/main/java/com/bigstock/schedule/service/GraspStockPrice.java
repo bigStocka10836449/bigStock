@@ -85,7 +85,7 @@ public class GraspStockPrice {
 	// 每天下午5點更新
 //	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}")
 //	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.grasp-stock-price}", zone= "Asia/Taipei")
-//	@PostConstruct
+	@PostConstruct
 	public void updateStockDayPrice() throws Exception {
 		// 先抓DB裡面全部的代號資料
 
