@@ -555,6 +555,11 @@ public class GrabFromThirdParty {
 		}
 	}
 
+	public void grabMarginTradingAndShortSellingInfo()
+	{
+		
+	}
+	
 	public void calculateRSVValueAndLimitDownUp(StockWeekPrice stockWeekPrice, List<StockWeekPrice> twoFourtyStockWeekPrices) {
 		if (twoFourtyStockWeekPrices.size() < 9) {
 			return; // 如果不满足条件，返回 null
