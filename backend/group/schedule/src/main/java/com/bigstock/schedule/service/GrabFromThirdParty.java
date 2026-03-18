@@ -12,8 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.annotation.PostConstruct;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.lang3.ObjectUtils;
@@ -22,6 +20,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
 import com.bigstock.sharedComponent.entity.StockInfo;
@@ -50,7 +49,6 @@ public class GrabFromThirdParty {
 	private final StockInfoService stockInfoService;
 	private final GrabThirdPartyStockDayPrice grabThirdPartyStockDayPrice;
 	private final StockDayPriceService stockDayPriceService;
-	
 
 	private final StockWeekPriceService stockWeekPriceService;
 
@@ -557,7 +555,21 @@ public class GrabFromThirdParty {
 
 	public void grabMarginTradingAndShortSellingInfo()
 	{
-		
+		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
+			return !data.matches(".*[a-zA-Z].*");
+		}).toList();
+		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
+			return !data.matches(".*[a-zA-Z].*");
+		}).toList();
+		List<String> allStockCodes = Lists.newArrayList();
+		List<MarginTradingAndShortSellingInfo> allMarginTradingAndShortSellingInfos = Lists.newArrayList();
+		allStockCodes.addAll(tpexStockCodes);
+		allStockCodes.addAll(twseStockCodes);
+		allStockCodes.stream().forEach(stockCode ->{
+			List<MarginTradingAndShortSellingInfo> singleStockCodeTop10MarginTradingAndShortSellingInfos = grabThirdPartyStockDayPrice
+					.grabMarginTradingAndShortSellingInfoFromYahoo(stockCode);
+			allMarginTradingAndShortSellingInfos.addAll(singleStockCodeTop10MarginTradingAndShortSellingInfos);
+		});
 	}
 	
 	public void calculateRSVValueAndLimitDownUp(StockWeekPrice stockWeekPrice, List<StockWeekPrice> twoFourtyStockWeekPrices) {

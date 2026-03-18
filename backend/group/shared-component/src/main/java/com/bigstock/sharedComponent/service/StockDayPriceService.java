@@ -296,7 +296,7 @@ public class StockDayPriceService {
 
 	        executor.shutdown();
 
-	        // 3️⃣ 刪除該交易日舊資料（只刪單日）
+	        // 3️ 刪除該交易日舊資料（只刪單日）
 	        try (PreparedStatement ps = connection.prepareStatement("""
 	           DELETE FROM bstock.stock_day_price_rank t
 				USING tmp_stock_day_price_rank tmp
