@@ -105,27 +105,27 @@ public class GrabThirdPartyStockDayPrice {
 		}
 	}
 
-	public List<MarginTradingAndShortSellingInfo> grabMarginTradingAndShortSellingInfoFromYahoo(String stockCode) {
-		try {
-			HttpHeaders headers = new HttpHeaders();
-			headers.set("User-Agent", "Mozilla/5.0");
-			headers.set("Accept", "application/json, text/plain, */*");
-			headers.set("Referer", "https://tw.stock.yahoo.com/");
-			headers.set("Origin", "https://tw.stock.yahoo.com");
-			headers.set("Accept-Language", "zh-TW,zh;q=0.9,en;q=0.8");
-			String symbol = stockCode + ".TWO";
-			String url = "https://tw.stock.yahoo.com/_td-stock/api/resource/StockServices.creditsWithQuoteStats;limit=90;symbol="
-					+ symbol
-					+ "?bkt=%5B%22t3-stock-bts-p13n%22%2C%22t3-pc-twstock-hp-r1%22%2C%22twstock-pc-lumosv2-migration-t1%22%5D&device=desktop&ecma=modern&feature=enableGAMAds%2CenableGAMEdgeToEdge%2CenableEvPlayer%2CuseCG%2CuseCGV2%2CuseLumosV2Stock%2CuseLumosArticleP13n&intl=tw&lang=zh-Hant-TW&partner=none&prid=4nlht0pkr89p9&region=TW&site=finance&tz=Asia%2FTaipei&ver=1.4.826&returnMeta=true";
-			HttpEntity<Void> entityh = new HttpEntity<>(headers);
-			ResponseEntity<String> response = restTemplate.exchange(URI.create(url), HttpMethod.GET, entityh,
-					String.class);
-			JsonNode root = mapper.readTree(response.getBody());
-
-			JsonNode dataNode = root.get(0);
-		} catch (Exception e) {
-			Log.warn(stockCode + " - error , so fast skip:" + e.getMessage());
-			return Collections.emptyList();
-		}
-	}
+//	public List<MarginTradingAndShortSellingInfo> grabMarginTradingAndShortSellingInfoFromYahoo(String stockCode) {
+//		try {
+//			HttpHeaders headers = new HttpHeaders();
+//			headers.set("User-Agent", "Mozilla/5.0");
+//			headers.set("Accept", "application/json, text/plain, */*");
+//			headers.set("Referer", "https://tw.stock.yahoo.com/");
+//			headers.set("Origin", "https://tw.stock.yahoo.com");
+//			headers.set("Accept-Language", "zh-TW,zh;q=0.9,en;q=0.8");
+//			String symbol = stockCode + ".TWO";
+//			String url = "https://tw.stock.yahoo.com/_td-stock/api/resource/StockServices.creditsWithQuoteStats;limit=90;symbol="
+//					+ symbol
+//					+ "?bkt=%5B%22t3-stock-bts-p13n%22%2C%22t3-pc-twstock-hp-r1%22%2C%22twstock-pc-lumosv2-migration-t1%22%5D&device=desktop&ecma=modern&feature=enableGAMAds%2CenableGAMEdgeToEdge%2CenableEvPlayer%2CuseCG%2CuseCGV2%2CuseLumosV2Stock%2CuseLumosArticleP13n&intl=tw&lang=zh-Hant-TW&partner=none&prid=4nlht0pkr89p9&region=TW&site=finance&tz=Asia%2FTaipei&ver=1.4.826&returnMeta=true";
+//			HttpEntity<Void> entityh = new HttpEntity<>(headers);
+//			ResponseEntity<String> response = restTemplate.exchange(URI.create(url), HttpMethod.GET, entityh,
+//					String.class);
+//			JsonNode root = mapper.readTree(response.getBody());
+//
+//			JsonNode dataNode = root.get(0);
+//		} catch (Exception e) {
+//			Log.warn(stockCode + " - error , so fast skip:" + e.getMessage());
+//			return Collections.emptyList();
+//		}
+//	}
 }

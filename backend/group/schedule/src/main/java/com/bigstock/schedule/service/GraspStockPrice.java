@@ -456,7 +456,7 @@ public class GraspStockPrice {
 
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}", zone= "Asia/Taipei")
 	@Transactional
-	@PostConstruct
+//	@PostConstruct
 	public void updateMarginTradingAndShortSellingInfo() throws RestClientException, URISyntaxException,
 			JsonMappingException, JsonProcessingException, InterruptedException {
 		// 先抓DB裡面全部的代號資料
@@ -464,10 +464,7 @@ public class GraspStockPrice {
 				.graspTpexMarginTradingAndShortSellingInfo(
 						"https://www.tpex.org.tw/openapi/v1/tpex_mainboard_margin_balance");
 
-		List<StockDayPrice> stockTpexDayPrices = ChromeDriverUtils
-				.graspTpexDayPrice("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes");
-
-		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
+		Date tradeDate = stockTpexarginTradingAndShortSellingInfo.stream().findFirst().get().getTradingDay();
 
 		List<MarginTradingAndShortSellingInfo> stockTwseDayPrices = ChromeDriverUtils
 				.graspTwseMarginTradingAndShortSellingInfo("https://openapi.twse.com.tw/v1/exchangeReport/MI_MARGN",
