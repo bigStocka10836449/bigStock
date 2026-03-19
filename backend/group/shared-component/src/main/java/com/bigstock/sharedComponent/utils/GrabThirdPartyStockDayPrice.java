@@ -188,6 +188,9 @@ public class GrabThirdPartyStockDayPrice {
 	            );
 
 	            result.add(info);
+	            if(result.size() == 10) {
+	            	break;
+	            }
 	        }
 
 	        return result;

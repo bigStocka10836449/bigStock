@@ -2,7 +2,6 @@ package com.bigstock.schedule.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.URISyntaxException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -22,7 +21,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
 
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
@@ -46,8 +44,6 @@ import com.bigstock.sharedComponent.service.StockWeekPriceService;
 import com.bigstock.sharedComponent.service.TmpExDividendsExRightInfoService;
 import com.bigstock.sharedComponent.service.TradeVolumeInfoService;
 import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.common.collect.Lists;
 
 import jakarta.transaction.Transactional;
@@ -457,8 +453,7 @@ public class GraspStockPrice {
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}", zone= "Asia/Taipei")
 	@Transactional
 //	@PostConstruct
-	public void updateMarginTradingAndShortSellingInfo() throws RestClientException, URISyntaxException,
-			JsonMappingException, JsonProcessingException, InterruptedException {
+	public void updateMarginTradingAndShortSellingInfo() throws Exception {
 		// 先抓DB裡面全部的代號資料
 		List<MarginTradingAndShortSellingInfo> stockTpexarginTradingAndShortSellingInfo = ChromeDriverUtils
 				.graspTpexMarginTradingAndShortSellingInfo(
@@ -469,8 +464,8 @@ public class GraspStockPrice {
 		List<MarginTradingAndShortSellingInfo> stockTwseDayPrices = ChromeDriverUtils
 				.graspTwseMarginTradingAndShortSellingInfo("https://openapi.twse.com.tw/v1/exchangeReport/MI_MARGN",
 						tradeDate);
-		marginTradingAndShortSellingInfoServices.saveAll(stockTpexarginTradingAndShortSellingInfo);
-		marginTradingAndShortSellingInfoServices.saveAll(stockTwseDayPrices);
+		marginTradingAndShortSellingInfoServices.bulkUpsertMarginTradingAndShortSellingInfo(stockTpexarginTradingAndShortSellingInfo);
+		marginTradingAndShortSellingInfoServices.bulkUpsertMarginTradingAndShortSellingInfo(stockTwseDayPrices);
 		log.info("finsh sync stockDayPrice");
 	}
 

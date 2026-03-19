@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import javax.annotation.PostConstruct;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.lang3.ObjectUtils;
@@ -29,6 +31,7 @@ import com.bigstock.sharedComponent.entity.StockMonthPriceRank;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
 import com.bigstock.sharedComponent.entity.StockWeekPriceRank;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
+import com.bigstock.sharedComponent.service.MarginTradingAndShortSellingInfoService;
 import com.bigstock.sharedComponent.service.RankStockChangeService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockInfoService;
@@ -57,6 +60,8 @@ public class GrabFromThirdParty {
 	private final RankStockChangeService rankStockChangeService;
 	
 	private final CacheOperatorService cacheOperatorService;
+	
+	private final MarginTradingAndShortSellingInfoService marginTradingAndShortSellingInfoService;
 	
 //	@PostConstruct
 	@Scheduled(cron = "0 40 15 * * ?", zone = "Asia/Taipei")
@@ -553,7 +558,8 @@ public class GrabFromThirdParty {
 		}
 	}
 
-	public void grabMarginTradingAndShortSellingInfo()
+	@PostConstruct
+	public void grabMarginTradingAndShortSellingInfo() throws Exception
 	{
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
@@ -569,7 +575,14 @@ public class GrabFromThirdParty {
 			List<MarginTradingAndShortSellingInfo> singleStockCodeTop10MarginTradingAndShortSellingInfos = grabThirdPartyStockDayPrice
 					.grabMarginTradingAndShortSellingInfoFromYahoo(stockCode);
 			allMarginTradingAndShortSellingInfos.addAll(singleStockCodeTop10MarginTradingAndShortSellingInfos);
+			try {
+				Thread.sleep(1500);
+			} catch (InterruptedException e) {
+				log.warn(e.getMessage(), e);
+				throw new RuntimeException(e);
+			}
 		});
+		marginTradingAndShortSellingInfoService.bulkUpsertMarginTradingAndShortSellingInfo(allMarginTradingAndShortSellingInfos);
 	}
 	
 	public void calculateRSVValueAndLimitDownUp(StockWeekPrice stockWeekPrice, List<StockWeekPrice> twoFourtyStockWeekPrices) {
