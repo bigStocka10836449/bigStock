@@ -558,7 +558,7 @@ public class GrabFromThirdParty {
 		}
 	}
 
-//	@PostConstruct
+	@PostConstruct
 	@Scheduled(cron = "0 40 21 * * ?", zone = "Asia/Taipei")
 	public void grabMarginTradingAndShortSellingInfo() throws Exception
 	{
