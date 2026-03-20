@@ -6,7 +6,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
-
 public class RankingResponse {
 
     private int rank;              // 1-based ranking

@@ -1,22 +1,39 @@
 package com.bigstock.sharedComponent.redis;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.ToDoubleFunction;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
-import org.apache.poi.ss.formula.functions.T;
+import org.apache.commons.io.output.ByteArrayOutputStream;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.stereotype.Service;
 
+import lombok.extern.java.Log;
+import lombok.extern.slf4j.Slf4j;
+
 @Service
+@Slf4j
 public class CacheOperatorService {
 
-    private final RedisTemplate<String, Object> redisTemplate;
+	@Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+    
+	@Autowired
+    @Qualifier("rawRedisTemplate")
+    private  RedisTemplate<String, byte[]> rawRedisTemplate;
 
     public static final int DEFAULT_SERIES_MAX_SIZE = 600;
 
@@ -33,9 +50,6 @@ public class CacheOperatorService {
             "longLivedCache", Duration.ofDays(14)
     );
 
-    public CacheOperatorService(RedisTemplate<String, Object> redisTemplate) {
-        this.redisTemplate = redisTemplate;
-    }
 
     private String buildKey(String cacheName, String key) {
         return "cache:" + cacheName + ":" + key;
@@ -260,5 +274,96 @@ public class CacheOperatorService {
 		}
 
 		touch(redisKey, cacheName);
+	}
+	
+	public void putCompressedValue(
+	        String cacheName,
+	        String key,
+	        String json
+	) {
+
+	    if (json == null) {
+	        return;
+	    }
+
+	    String redisKey = buildKey(cacheName, key);
+
+	    try {
+
+	        byte[] compressed = gzipCompress(json);
+
+	        rawRedisTemplate.opsForValue().set(
+	                redisKey,
+	                compressed
+	        );
+
+	    } catch (Exception e) {
+
+	        log.warn("putCompressedValue fail key=" + redisKey
+	                + " , reason=" + e.getMessage(), e);
+	    }
+	}
+
+	public byte[] gzipCompress(String data) {
+
+	    try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
+	         GZIPOutputStream gzip = new GZIPOutputStream(bos)) {
+
+	        gzip.write(data.getBytes(StandardCharsets.UTF_8));
+	        gzip.finish();
+
+	        return bos.toByteArray();
+
+	    } catch (Exception e) {
+	        throw new RuntimeException("gzip compress fail", e);
+	    }
+	}
+	
+	public String getCompressedValue(
+	        String cacheName,
+	        String key
+	) {
+
+	    String redisKey = buildKey(cacheName, key);
+
+	    try {
+
+	        byte[] compressed =
+	                rawRedisTemplate.opsForValue().get(redisKey);
+
+	        if (compressed == null || compressed.length == 0) {
+	            return null;
+	        }
+
+	        return gzipDecompress(compressed);
+
+	    } catch (Exception e) {
+
+	    	log.warn("getCompressedValue fail key=" + redisKey
+	                + " , reason=" + e.getMessage(), e);
+
+	        return null;
+	    }
+	}
+	
+	public String gzipDecompress(byte[] compressed) {
+
+	    try (ByteArrayInputStream bis = new ByteArrayInputStream(compressed);
+	         GZIPInputStream gzip = new GZIPInputStream(bis);
+	         InputStreamReader isr = new InputStreamReader(gzip, StandardCharsets.UTF_8);
+	         BufferedReader br = new BufferedReader(isr)) {
+
+	        StringBuilder sb = new StringBuilder();
+
+	        String line;
+	        while ((line = br.readLine()) != null) {
+	            sb.append(line);
+	        }
+
+	        return sb.toString();
+
+	    } catch (Exception e) {
+	        throw new RuntimeException("gzip decompress fail", e);
+	    }
 	}
 }

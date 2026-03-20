@@ -20,10 +20,13 @@ import org.springframework.web.client.RestClientException;
 import com.bigstock.biz.dto.MarginTradingAndShortSellingInfoVO;
 import com.bigstock.biz.service.BizService;
 import com.bigstock.sharedComponent.dto.RankingResponse;
+import com.bigstock.sharedComponent.dto.USHistoryResponse;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
+import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.service.RankStockChangeService;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Maps;
 
 //import io.micrometer.tracing.annotation.NewSpan;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,6 +45,8 @@ public class BizController {
 	
 	private final RankStockChangeService  rankStockChangeService;
 	
+	private final CacheOperatorService cacheOperatorService;
+	
 	
 //	@NewSpan("stockShareholderStructure")
 	@Operation(summary = "個別股票持股分布", description = "")
@@ -57,6 +62,20 @@ public class BizController {
 			@RequestParam(defaultValue = "desc") String order) throws InterruptedException, ExecutionException {
 
 		return rankStockChangeService.getRanking(market, limit, order);
+	}
+	
+	@Operation(summary = "SOX、MES=F、MYM=F、MNQ=F過去歷史", description = "market 分為 TEPX 與 TWSE")
+	@GetMapping("market/USHistory")
+	public USHistoryResponse getUSHistory() throws InterruptedException, ExecutionException {
+		List<String> indicators =  List.of("^SOX","MES=F","MYM=F","MNQ=F");
+		Map<String, String> usHistory = Maps.newHashMap();
+		indicators.stream().forEach(indicator ->{
+			String json = cacheOperatorService.getCompressedValue("market:raw:history", indicator);
+			usHistory.put(indicator, json);
+		});
+		USHistoryResponse response = new USHistoryResponse();
+		response.setUsHistory(usHistory);
+		return response;
 	}
 	
 	

@@ -18,12 +18,12 @@ import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
 import com.bigstock.sharedComponent.entity.StockInfo;
 import com.bigstock.sharedComponent.entity.StockThreeInstitutionalTrading;
+import com.bigstock.sharedComponent.service.GrabThirdPartyStockDayPrice;
 import com.bigstock.sharedComponent.service.RankStockChangeService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockInfoService;
 import com.bigstock.sharedComponent.service.StockThreeInstitutionalTradingService;
 import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
-import com.bigstock.sharedComponent.utils.GrabThirdPartyStockDayPrice;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;

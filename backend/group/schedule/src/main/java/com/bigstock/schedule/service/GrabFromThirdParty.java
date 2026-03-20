@@ -31,6 +31,7 @@ import com.bigstock.sharedComponent.entity.StockMonthPriceRank;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
 import com.bigstock.sharedComponent.entity.StockWeekPriceRank;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
+import com.bigstock.sharedComponent.service.GrabThirdPartyStockDayPrice;
 import com.bigstock.sharedComponent.service.MarginTradingAndShortSellingInfoService;
 import com.bigstock.sharedComponent.service.RankStockChangeService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
@@ -38,7 +39,6 @@ import com.bigstock.sharedComponent.service.StockInfoService;
 import com.bigstock.sharedComponent.service.StockMonthPriceService;
 import com.bigstock.sharedComponent.service.StockWeekPriceService;
 import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
-import com.bigstock.sharedComponent.utils.GrabThirdPartyStockDayPrice;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
