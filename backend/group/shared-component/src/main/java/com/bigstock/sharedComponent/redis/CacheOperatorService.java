@@ -1,11 +1,11 @@
 package com.bigstock.sharedComponent.redis;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
-import java.io.InputStreamReader;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,13 +21,16 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.stereotype.Service;
 
-import lombok.extern.java.Log;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.extern.slf4j.Slf4j;
 
 @Service
 @Slf4j
 public class CacheOperatorService {
 
+	private static final int PIPELINE_CHUNK = 200;
+	
 	@Autowired
     private RedisTemplate<String, Object> redisTemplate;
     
@@ -235,46 +238,71 @@ public class CacheOperatorService {
         touch(redisKey, cacheName);
     } 
     
-	public <T> void batchUpsertZSetSeries(String cacheName, String key, List<T> values,
-			ToDoubleFunction<T> scoreExtractor, int maxSize) {
+    public <T> void batchUpsertCompressedZSetSeries(
+            String cacheName,
+            String key,
+            List<T> values,
+            ToDoubleFunction<T> scoreExtractor,
+            int maxSize
+    ) {
 
-		if (values == null || values.isEmpty()) {
-			return;
-		}
+        if (values == null || values.isEmpty()) return;
 
-		String redisKey = buildKey(cacheName, key);
+        String redisKey = buildKey(cacheName, key);
+        ObjectMapper objectMapper = new ObjectMapper();
+        // optional but recommended
+        values.sort(Comparator.comparingDouble(scoreExtractor::applyAsDouble));
 
-		redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+        for (int i = 0; i < values.size(); i += PIPELINE_CHUNK) {
 
-			RedisSerializer<String> keySerializer = (RedisSerializer<String>) redisTemplate.getKeySerializer();
+            List<T> chunk =
+                    values.subList(
+                            i,
+                            Math.min(i + PIPELINE_CHUNK, values.size())
+                    );
 
-			@SuppressWarnings("unchecked")
-			RedisSerializer<Object> valueSerializer = (RedisSerializer<Object>) redisTemplate.getValueSerializer();
+            rawRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
 
-			byte[] rawKey = keySerializer.serialize(redisKey);
+                RedisSerializer<String> keySer =
+                        rawRedisTemplate.getStringSerializer();
 
-			for (T v : values) {
-				double score = scoreExtractor.applyAsDouble(v);
+                byte[] rawKey = keySer.serialize(redisKey);
 
-				// remove old record with same score
-				connection.zRemRangeByScore(rawKey, score, score);
+                for (T v : chunk) {
 
-				// add new record
-				byte[] rawValue = valueSerializer.serialize(v);
-				connection.zAdd(rawKey, score, rawValue);
-			}
+                    double score = scoreExtractor.applyAsDouble(v);
 
-			return null;
-		});
+                    try {
 
-		Long size = redisTemplate.opsForZSet().size(redisKey);
+                        byte[] json = objectMapper.writeValueAsBytes(v);
+                        byte[] compressed = gzipCompress(json);
 
-		if (size != null && size > maxSize) {
-			redisTemplate.opsForZSet().removeRange(redisKey, 0, size - maxSize - 1);
-		}
+                        // overwrite same timestamp candle
+                        connection.zRemRangeByScore(rawKey, score, score);
 
-		touch(redisKey, cacheName);
-	}
+                        connection.zAdd(rawKey, score, compressed);
+
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+
+                return null;
+
+            });
+        }
+
+        // trim series length
+        Long size = rawRedisTemplate.opsForZSet().size(redisKey);
+
+        if (size != null && size > maxSize) {
+
+            rawRedisTemplate.opsForZSet()
+                    .removeRange(redisKey, 0, size - maxSize - 1);
+        }
+
+        touch(redisKey, cacheName);
+    }
 	
 	public void putCompressedValue(
 	        String cacheName,
@@ -285,12 +313,13 @@ public class CacheOperatorService {
 	    if (json == null) {
 	        return;
 	    }
-
+	    
 	    String redisKey = buildKey(cacheName, key);
 
 	    try {
-
-	        byte[] compressed = gzipCompress(json);
+	    	ObjectMapper objectMapper = new ObjectMapper();
+			byte[] jsonByte = objectMapper.writeValueAsBytes(json);
+			byte[] compressed = gzipCompress(jsonByte);
 
 	        rawRedisTemplate.opsForValue().set(
 	                redisKey,
@@ -304,19 +333,18 @@ public class CacheOperatorService {
 	    }
 	}
 
-	public byte[] gzipCompress(String data) {
+	public byte[] gzipCompress(byte[] data) {
+		try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
+				GZIPOutputStream gzip = new GZIPOutputStream(bos)) {
 
-	    try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
-	         GZIPOutputStream gzip = new GZIPOutputStream(bos)) {
+			gzip.write(data);
+			gzip.finish();
 
-	        gzip.write(data.getBytes(StandardCharsets.UTF_8));
-	        gzip.finish();
+			return bos.toByteArray();
 
-	        return bos.toByteArray();
-
-	    } catch (Exception e) {
-	        throw new RuntimeException("gzip compress fail", e);
-	    }
+		} catch (IOException e) {
+			throw new RuntimeException("Compress failed", e);
+		}
 	}
 	
 	public String getCompressedValue(
@@ -348,19 +376,24 @@ public class CacheOperatorService {
 	
 	public String gzipDecompress(byte[] compressed) {
 
-	    try (ByteArrayInputStream bis = new ByteArrayInputStream(compressed);
-	         GZIPInputStream gzip = new GZIPInputStream(bis);
-	         InputStreamReader isr = new InputStreamReader(gzip, StandardCharsets.UTF_8);
-	         BufferedReader br = new BufferedReader(isr)) {
+	    if (compressed == null || compressed.length == 0) {
+	        return null;
+	    }
 
-	        StringBuilder sb = new StringBuilder();
+	    try (
+	            ByteArrayInputStream bis = new ByteArrayInputStream(compressed);
+	            GZIPInputStream gzip = new GZIPInputStream(bis);
+	            ByteArrayOutputStream out = new ByteArrayOutputStream(compressed.length * 2)
+	    ) {
 
-	        String line;
-	        while ((line = br.readLine()) != null) {
-	            sb.append(line);
+	        byte[] buffer = new byte[4096];
+	        int n;
+
+	        while ((n = gzip.read(buffer)) != -1) {
+	            out.write(buffer, 0, n);
 	        }
 
-	        return sb.toString();
+	        return out.toString(StandardCharsets.UTF_8);
 
 	    } catch (Exception e) {
 	        throw new RuntimeException("gzip decompress fail", e);
