@@ -201,7 +201,6 @@ public class GrabThirdPartyStockDayPrice {
 	}
 	
 	
-	
 	private String text(JsonNode node, String fieldName) {
 	    JsonNode field = node.get(fieldName);
 	    if (field == null || field.isNull()) {
