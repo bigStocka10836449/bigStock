@@ -66,33 +66,6 @@ public class CacheOperatorService {
     }
 
     // =========================
-    // SIMPLE CACHE
-    // =========================
-
-    public void putSimple(String cacheName, String key, Object value) {
-
-        String redisKey = buildKey(cacheName, key);
-
-        redisTemplate.opsForValue().set(redisKey, value);
-
-        touch(redisKey, cacheName);
-    }
-
-    public <T> T getSimple(String cacheName, String key, Class<T> clazz) {
-
-        String redisKey = buildKey(cacheName, key);
-
-        Object v = redisTemplate.opsForValue().get(redisKey);
-
-        if (v != null) {
-            touch(redisKey, cacheName);
-            return clazz.cast(v);
-        }
-
-        return null;
-    }
-
-    // =========================
     // LIST SERIES CACHE
     // =========================
 
@@ -237,6 +210,53 @@ public class CacheOperatorService {
 
         touch(redisKey, cacheName);
     } 
+    
+    public <T> void upsertCompressedZSetSeries(
+            String cacheName,
+            String key,
+            T value,
+            double score,
+            int maxSize
+    ) {
+
+        String redisKey = buildKey(cacheName, key);
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        try {
+
+            byte[] json = objectMapper.writeValueAsBytes(value);
+            byte[] compressed = gzipCompress(json);
+
+            rawRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+
+                RedisSerializer<String> keySer =
+                        rawRedisTemplate.getStringSerializer();
+
+                byte[] rawKey = keySer.serialize(redisKey);
+
+                // remove duplicate timestamp candle
+                connection.zRemRangeByScore(rawKey, score, score);
+
+                // insert new candle
+                connection.zAdd(rawKey, score, compressed);
+
+                return null;
+            });
+
+        } catch (Exception e) {
+            throw new RuntimeException("Redis compressed upsert failed", e);
+        }
+
+        // maintain max size
+        Long size = rawRedisTemplate.opsForZSet().size(redisKey);
+
+        if (size != null && size > maxSize) {
+            rawRedisTemplate.opsForZSet()
+                    .removeRange(redisKey, 0, size - maxSize - 1);
+        }
+
+        touch(redisKey, cacheName);
+    }
     
     public <T> void batchUpsertCompressedZSetSeries(
             String cacheName,

@@ -85,19 +85,25 @@ public class StockDayPriceService {
 
 	public List<StockDayPrice> findByStockCodeAndStartDateAndEndDateCache(String stockCode, String startDate,
 			String endDate) throws ParseException {
-		cacheOperatorService.getZSetSeries("ultraLongLivedCache", "stock:" + stockCode, StockDayPrice.class);
+		List<StockDayPrice> stockDayPrices = cacheOperatorService.getZSetSeries("ultraLongLivedCache", "stock:" + stockCode, StockDayPrice.class);
+		if(!stockDayPrices.isEmpty()) {
+			return stockDayPrices;
+		}
 		return getSelf().findByStockCodeAndStartDateAndEndDate(stockCode, startDate, endDate);
 	}
 	
 	public List<StockDayPrice> findLastest600StockDayPriceByStockCodeCache(String stockCode) throws ParseException {
-		cacheOperatorService.getZSetSeries("ultraLongLivedCache", "stock:" + stockCode, StockDayPrice.class);
+		List<StockDayPrice> stockDayPrices = cacheOperatorService.getZSetSeries("ultraLongLivedCache", "stock:" + stockCode, StockDayPrice.class);
+		if(!stockDayPrices.isEmpty()) {
+			return stockDayPrices;
+		}
 		return getSelf().findLastest600StockDayPriceByStockCode(stockCode);
 	}
 	
 	@BigStockCacheableWithLock(value = "ultraLongLivedCache", key = "#p0")
 	public List<StockDayPrice> findLastest600StockDayPriceByStockCode(String stockCode){
 		List<StockDayPrice> stockDayPrices = stockDayPriceRepository.findLastest600StockDayPriceByStockCode(stockCode);
-		cacheOperatorService.batchUpsertZSetSeries("ultraLongLivedCache",
+		cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
 				"stock:" + stockCode,
 				stockDayPrices, stockDayPrice -> stockDayPrice.getTradingDay().getTime(),
 				CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);

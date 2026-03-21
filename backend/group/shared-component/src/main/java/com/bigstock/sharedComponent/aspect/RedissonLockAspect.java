@@ -43,7 +43,7 @@ public class RedissonLockAspect {
 
 		log.info("method {} not hit cache, execute database access", methodSignature.getMethod().getName());
 
-		String lockKey = "lock:" + methodSignature.getMethod().getName() + ":" + cacheKey;
+		String lockKey = "lock:" + methodSignature.getMethod().getName()+ ":cacheName:"+ cacheName + ":" + cacheKey;
 
 		RLock lock = redissonClient.getLock(lockKey);
 
@@ -55,16 +55,7 @@ public class RedissonLockAspect {
 
 			if (lockAcquired) {
 
-				// ⭐ DOUBLE CHECK CACHE
-				Object cached = cacheOperatorService.getSimple(cacheName, cacheKey, Object.class);
-
-				if (cached != null) {
-					return cached;
-				}
-
 				Object result = joinPoint.proceed();
-
-				cacheOperatorService.putSimple(cacheName, cacheKey, result);
 
 				return result;
 
