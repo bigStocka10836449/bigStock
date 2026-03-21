@@ -41,7 +41,7 @@ public class GraspMonthlyRevenueService {
 
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-monthlyRevenue}", zone = "Asia/Taipei")
 	@Transactional
-//	@PostConstruct
+	@PostConstruct
 	public void updateMonthlyRevenue() throws RestClientException, URISyntaxException,
 			JsonMappingException, JsonProcessingException, InterruptedException {
 
