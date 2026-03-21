@@ -5,8 +5,10 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.aop.framework.AopContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.annotation.BigStockCacheableWithLock;
@@ -23,6 +25,9 @@ public class ShareholderStructureService {
 	private final ShareholderStructureRepository shareholderStructureRepository;
 
 	private final StockDayPriceRepository stockDayPriceRepository;
+	
+	private final ApplicationContext ctx;
+	
 
 	public List<ShareholderStructure> getAll() {
 		return shareholderStructureRepository.findAll();
@@ -101,6 +106,6 @@ public class ShareholderStructureService {
 	}
 
 	private ShareholderStructureService getSelf() {
-		return (ShareholderStructureService) AopContext.currentProxy();
+		return ctx.getBean(ShareholderStructureService.class);
 	}
 }

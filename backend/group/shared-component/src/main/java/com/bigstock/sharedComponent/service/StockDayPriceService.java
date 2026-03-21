@@ -22,8 +22,9 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationContext;
 import org.springframework.data.repository.query.Param;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,9 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class StockDayPriceService {
+	
+	@Autowired
+	private ApplicationContext ctx;
 	
 	private final StockDayPriceRepository stockDayPriceRepository;
 	
@@ -211,7 +215,7 @@ public class StockDayPriceService {
 	}
 
 	private StockDayPriceService getSelf() {
-		return (StockDayPriceService) AopContext.currentProxy();
+		return ctx.getBean(StockDayPriceService.class);
 	}
 	
 	@Transactional
