@@ -2,8 +2,8 @@ package com.bigstock.sharedComponent.redis;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -30,327 +30,246 @@ import lombok.extern.slf4j.Slf4j;
 public class CacheOperatorService {
 
 	private static final int PIPELINE_CHUNK = 200;
-	
+	private static final int GZIP_BUFFER_SIZE = 8192;
+
 	@Autowired
-    private RedisTemplate<String, Object> redisTemplate;
-    
+	private RedisTemplate<String, Object> redisTemplate;
+
 	@Autowired
-    @Qualifier("rawRedisTemplate")
-    private  RedisTemplate<String, byte[]> rawRedisTemplate;
-
-    public static final int DEFAULT_SERIES_MAX_SIZE = 600;
-
-    private final Map<String, Duration> slidingTtlMap = Map.of(
-            "shortLivedCache", Duration.ofMinutes(120),
-            "middleLivedCache", Duration.ofDays(1),
-            "longLivedCache", Duration.ofDays(7),
-            "ultraLongLivedCache", Duration.ofDays(999999)
-    );
-
-    private final Map<String, Duration> hardTtlMap = Map.of(
-            "shortLivedCache", Duration.ofHours(6),
-            "middleLivedCache", Duration.ofDays(3),
-            "longLivedCache", Duration.ofDays(14)
-    );
-
-
-    private String buildKey(String cacheName, String key) {
-        return "cache:" + cacheName + ":" + key;
-    }
-
-    private void touch(String redisKey, String cacheName) {
-        Duration sliding = slidingTtlMap.get(cacheName);
-        if (sliding != null) {
-            redisTemplate.expire(redisKey, sliding);
-        }
-    }
-
-    // =========================
-    // LIST SERIES CACHE
-    // =========================
-
-    public void appendListSeries(
-            String cacheName,
-            String key,
-            Object value,
-            int maxSize
-    ) {
+	@Qualifier("rawRedisTemplate")
+	private RedisTemplate<String, byte[]> rawRedisTemplate;
 
-        String redisKey = buildKey(cacheName, key);
+	public static final int DEFAULT_SERIES_MAX_SIZE = 600;
 
-        redisTemplate.opsForList().rightPush(redisKey, value);
+	private final Map<String, Duration> slidingTtlMap = Map.of("shortLivedCache", Duration.ofMinutes(120),
+			"middleLivedCache", Duration.ofDays(1), "longLivedCache", Duration.ofDays(7), "ultraLongLivedCache",
+			Duration.ofDays(999999));
 
-        redisTemplate.opsForList().trim(
-                redisKey,
-                -maxSize,
-                -1
-        );
-
-        touch(redisKey, cacheName);
-    }
-
-    public <T> List<T> getListSeries(
-            String cacheName,
-            String key,
-            Class<T> clazz
-    ) {
-
-        String redisKey = buildKey(cacheName, key);
-
-        List<Object> raw =
-                redisTemplate.opsForList().range(redisKey, 0, -1);
-
-        if (raw == null) return Collections.emptyList();
-
-        touch(redisKey, cacheName);
+	private final Map<String, Duration> hardTtlMap = Map.of("shortLivedCache", Duration.ofHours(6), "middleLivedCache",
+			Duration.ofDays(3), "longLivedCache", Duration.ofDays(14));
 
-        return raw.stream()
-                .map(clazz::cast)
-                .toList();
-    }
-    
-    
-    public <T> List<T> getZSetSeries(
-            String cacheName,
-            String key,
-            Class<T> clazz
-    ) {
-
-        String redisKey = buildKey(cacheName, key);
-
-        Set<Object> raw =
-                redisTemplate.opsForZSet().range(redisKey, 0, -1);
-
-        if (raw == null || raw.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        touch(redisKey, cacheName);
-
-        return raw.stream()
-                .map(clazz::cast)
-                .toList();
-    }
-    // =========================
-    // ZSET SERIES CACHE
-    // =========================
+	private String buildKey(String cacheName, String key) {
+		return "cache:" + cacheName + ":" + key;
+	}
 
-    public void appendZSetSeries(
-            String cacheName,
-            String key,
-            Object value,
-            double score,
-            int maxSize
-    ) {
+	private void touch(String redisKey, String cacheName) {
+		Duration sliding = slidingTtlMap.get(cacheName);
+		if (sliding != null) {
+			redisTemplate.expire(redisKey, sliding);
+		}
+	}
 
-        String redisKey = buildKey(cacheName, key);
+	// =========================
+	// LIST SERIES CACHE
+	// =========================
 
-        redisTemplate.opsForZSet()
-                .add(redisKey, value, score);
+	public void appendListSeries(String cacheName, String key, Object value, int maxSize) {
 
-        Long size =
-                redisTemplate.opsForZSet().size(redisKey);
+		String redisKey = buildKey(cacheName, key);
 
-        if (size != null && size > maxSize) {
+		redisTemplate.opsForList().rightPush(redisKey, value);
 
-            redisTemplate.opsForZSet()
-                    .removeRange(redisKey, 0, size - maxSize - 1);
-        }
+		redisTemplate.opsForList().trim(redisKey, -maxSize, -1);
 
-        touch(redisKey, cacheName);
-    }
+		touch(redisKey, cacheName);
+	}
 
-    public <T> List<T> getLatestZSetSeries(
-            String cacheName,
-            String key,
-            Class<T> clazz,
-            int limit
-    ) {
+	public <T> List<T> getListSeries(String cacheName, String key, Class<T> clazz) {
 
-        String redisKey = buildKey(cacheName, key);
+		String redisKey = buildKey(cacheName, key);
 
-        Set<Object> raw =
-                redisTemplate.opsForZSet()
-                        .reverseRange(redisKey, 0, limit - 1);
-
-        if (raw == null) return Collections.emptyList();
+		List<Object> raw = redisTemplate.opsForList().range(redisKey, 0, -1);
 
-        touch(redisKey, cacheName);
+		if (raw == null)
+			return Collections.emptyList();
 
-        return raw.stream()
-                .map(clazz::cast)
-                .toList();
-    }
+		touch(redisKey, cacheName);
 
-    public void upsertZSetSeries(
-            String cacheName,
-            String key,
-            Object value,
-            double score,
-            int maxSize
-    ) {
+		return raw.stream().map(clazz::cast).toList();
+	}
 
-        String redisKey = buildKey(cacheName, key);
+	public <T> List<T> getZSetSeries(String cacheName, String key, Class<T> clazz) {
 
-        // remove old record with same score (same trading day)
-        redisTemplate.opsForZSet()
-                .removeRangeByScore(redisKey, score, score);
+		String redisKey = buildKey(cacheName, key);
 
-        // add new one
-        redisTemplate.opsForZSet()
-                .add(redisKey, value, score);
+		Set<Object> raw = redisTemplate.opsForZSet().range(redisKey, 0, -1);
 
-        // maintain max size
-        Long size = redisTemplate.opsForZSet().size(redisKey);
+		if (raw == null || raw.isEmpty()) {
+			return Collections.emptyList();
+		}
 
-        if (size != null && size > maxSize) {
-            redisTemplate.opsForZSet()
-                    .removeRange(redisKey, 0, size - maxSize - 1);
-        }
+		touch(redisKey, cacheName);
 
-        touch(redisKey, cacheName);
-    } 
-    
-    public <T> void upsertCompressedZSetSeries(
-            String cacheName,
-            String key,
-            T value,
-            double score,
-            int maxSize
-    ) {
+		return raw.stream().map(clazz::cast).toList();
+	}
+	// =========================
+	// ZSET SERIES CACHE
+	// =========================
 
-        String redisKey = buildKey(cacheName, key);
+	public void appendZSetSeries(String cacheName, String key, Object value, double score, int maxSize) {
 
-        ObjectMapper objectMapper = new ObjectMapper();
-        try {
+		String redisKey = buildKey(cacheName, key);
 
-            byte[] json = objectMapper.writeValueAsBytes(value);
-            byte[] compressed = gzipCompress(json);
+		redisTemplate.opsForZSet().add(redisKey, value, score);
 
-            rawRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+		Long size = redisTemplate.opsForZSet().size(redisKey);
 
-                RedisSerializer<String> keySer =
-                        rawRedisTemplate.getStringSerializer();
+		if (size != null && size > maxSize) {
 
-                byte[] rawKey = keySer.serialize(redisKey);
+			redisTemplate.opsForZSet().removeRange(redisKey, 0, size - maxSize - 1);
+		}
 
-                // remove duplicate timestamp candle
-                connection.zRemRangeByScore(rawKey, score, score);
+		touch(redisKey, cacheName);
+	}
 
-                // insert new candle
-                connection.zAdd(rawKey, score, compressed);
+	public <T> List<T> getLatestZSetSeries(String cacheName, String key, Class<T> clazz, int limit) {
 
-                return null;
-            });
+		String redisKey = buildKey(cacheName, key);
 
-        } catch (Exception e) {
-            throw new RuntimeException("Redis compressed upsert failed", e);
-        }
+		Set<Object> raw = redisTemplate.opsForZSet().reverseRange(redisKey, 0, limit - 1);
 
-        // maintain max size
-        Long size = rawRedisTemplate.opsForZSet().size(redisKey);
+		if (raw == null)
+			return Collections.emptyList();
 
-        if (size != null && size > maxSize) {
-            rawRedisTemplate.opsForZSet()
-                    .removeRange(redisKey, 0, size - maxSize - 1);
-        }
+		touch(redisKey, cacheName);
 
-        touch(redisKey, cacheName);
-    }
-    
-    public <T> void batchUpsertCompressedZSetSeries(
-            String cacheName,
-            String key,
-            List<T> values,
-            ToDoubleFunction<T> scoreExtractor,
-            int maxSize
-    ) {
+		return raw.stream().map(clazz::cast).toList();
+	}
 
-        if (values == null || values.isEmpty()) return;
+	public void upsertZSetSeries(String cacheName, String key, Object value, double score, int maxSize) {
 
-        String redisKey = buildKey(cacheName, key);
-        ObjectMapper objectMapper = new ObjectMapper();
-        // optional but recommended
-        values.sort(Comparator.comparingDouble(scoreExtractor::applyAsDouble));
+		String redisKey = buildKey(cacheName, key);
 
-        for (int i = 0; i < values.size(); i += PIPELINE_CHUNK) {
+		// remove old record with same score (same trading day)
+		redisTemplate.opsForZSet().removeRangeByScore(redisKey, score, score);
 
-            List<T> chunk =
-                    values.subList(
-                            i,
-                            Math.min(i + PIPELINE_CHUNK, values.size())
-                    );
+		// add new one
+		redisTemplate.opsForZSet().add(redisKey, value, score);
 
-            rawRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+		// maintain max size
+		Long size = redisTemplate.opsForZSet().size(redisKey);
 
-                RedisSerializer<String> keySer =
-                        rawRedisTemplate.getStringSerializer();
+		if (size != null && size > maxSize) {
+			redisTemplate.opsForZSet().removeRange(redisKey, 0, size - maxSize - 1);
+		}
 
-                byte[] rawKey = keySer.serialize(redisKey);
+		touch(redisKey, cacheName);
+	}
 
-                for (T v : chunk) {
+	public <T> void upsertCompressedZSetSeries(String cacheName, String key, T value, double score, int maxSize) {
 
-                    double score = scoreExtractor.applyAsDouble(v);
+		String redisKey = buildKey(cacheName, key);
 
-                    try {
+		ObjectMapper objectMapper = new ObjectMapper();
+		try {
 
-                        byte[] json = objectMapper.writeValueAsBytes(v);
-                        byte[] compressed = gzipCompress(json);
+			byte[] json = objectMapper.writeValueAsBytes(value);
+			byte[] compressed = gzipCompress(json);
 
-                        // overwrite same timestamp candle
-                        connection.zRemRangeByScore(rawKey, score, score);
+			rawRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
 
-                        connection.zAdd(rawKey, score, compressed);
+				RedisSerializer<String> keySer = rawRedisTemplate.getStringSerializer();
 
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }
+				byte[] rawKey = keySer.serialize(redisKey);
 
-                return null;
+				// remove duplicate timestamp candle
+				connection.zRemRangeByScore(rawKey, score, score);
 
-            });
-        }
+				// insert new candle
+				connection.zAdd(rawKey, score, compressed);
 
-        // trim series length
-        Long size = rawRedisTemplate.opsForZSet().size(redisKey);
+				return null;
+			});
 
-        if (size != null && size > maxSize) {
+		} catch (Exception e) {
+			throw new RuntimeException("Redis compressed upsert failed", e);
+		}
 
-            rawRedisTemplate.opsForZSet()
-                    .removeRange(redisKey, 0, size - maxSize - 1);
-        }
+		// maintain max size
+		Long size = rawRedisTemplate.opsForZSet().size(redisKey);
 
-        touch(redisKey, cacheName);
-    }
-	
-	public void putCompressedValue(
-	        String cacheName,
-	        String key,
-	        String json
-	) {
+		if (size != null && size > maxSize) {
+			rawRedisTemplate.opsForZSet().removeRange(redisKey, 0, size - maxSize - 1);
+		}
 
-	    if (json == null) {
-	        return;
-	    }
-	    
-	    String redisKey = buildKey(cacheName, key);
+		touch(redisKey, cacheName);
+	}
 
-	    try {
-	    	ObjectMapper objectMapper = new ObjectMapper();
+	public <T> void batchUpsertCompressedZSetSeries(String cacheName, String key, List<T> values,
+			ToDoubleFunction<T> scoreExtractor, int maxSize) {
+
+		if (values == null || values.isEmpty())
+			return;
+
+		String redisKey = buildKey(cacheName, key);
+		ObjectMapper objectMapper = new ObjectMapper();
+		// optional but recommended
+		values.sort(Comparator.comparingDouble(scoreExtractor::applyAsDouble));
+
+		for (int i = 0; i < values.size(); i += PIPELINE_CHUNK) {
+
+			List<T> chunk = values.subList(i, Math.min(i + PIPELINE_CHUNK, values.size()));
+
+			rawRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+
+				RedisSerializer<String> keySer = rawRedisTemplate.getStringSerializer();
+
+				byte[] rawKey = keySer.serialize(redisKey);
+
+				for (T v : chunk) {
+
+					double score = scoreExtractor.applyAsDouble(v);
+
+					try {
+
+						byte[] json = objectMapper.writeValueAsBytes(v);
+						byte[] compressed = gzipCompress(json);
+
+						// overwrite same timestamp candle
+						connection.zRemRangeByScore(rawKey, score, score);
+
+						connection.zAdd(rawKey, score, compressed);
+
+					} catch (Exception e) {
+						throw new RuntimeException(e);
+					}
+				}
+
+				return null;
+
+			});
+		}
+
+		// trim series length
+		Long size = rawRedisTemplate.opsForZSet().size(redisKey);
+
+		if (size != null && size > maxSize) {
+
+			rawRedisTemplate.opsForZSet().removeRange(redisKey, 0, size - maxSize - 1);
+		}
+
+		touch(redisKey, cacheName);
+	}
+
+	public void putCompressedValue(String cacheName, String key, String json) {
+
+		if (json == null) {
+			return;
+		}
+
+		String redisKey = buildKey(cacheName, key);
+
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
 			byte[] jsonByte = objectMapper.writeValueAsBytes(json);
 			byte[] compressed = gzipCompress(jsonByte);
 
-	        rawRedisTemplate.opsForValue().set(
-	                redisKey,
-	                compressed
-	        );
+			rawRedisTemplate.opsForValue().set(redisKey, compressed);
 
-	    } catch (Exception e) {
+		} catch (Exception e) {
 
-	        log.warn("putCompressedValue fail key=" + redisKey
-	                + " , reason=" + e.getMessage(), e);
-	    }
+			log.warn("putCompressedValue fail key=" + redisKey + " , reason=" + e.getMessage(), e);
+		}
 	}
 
 	public byte[] gzipCompress(byte[] data) {
@@ -366,57 +285,82 @@ public class CacheOperatorService {
 			throw new RuntimeException("Compress failed", e);
 		}
 	}
-	
-	public String getCompressedValue(
-	        String cacheName,
-	        String key
-	) {
 
-	    String redisKey = buildKey(cacheName, key);
+	public byte[] gzipDecompressBytes(byte[] compressed) {
 
-	    try {
+		if (compressed == null || compressed.length == 0) {
+			return null;
+		}
 
-	        byte[] compressed =
-	                rawRedisTemplate.opsForValue().get(redisKey);
+		try (ByteArrayInputStream bis = new ByteArrayInputStream(compressed);
+				GZIPInputStream gzip = new GZIPInputStream(bis, 8192);
+				ByteArrayOutputStream out = new ByteArrayOutputStream(Math.max(1024, compressed.length * 3))) {
 
-	        if (compressed == null || compressed.length == 0) {
-	            return null;
-	        }
+			byte[] buffer = new byte[8192];
+			int n;
 
-	        return gzipDecompress(compressed);
+			while ((n = gzip.read(buffer)) >= 0) {
+				if (n > 0) {
+					out.write(buffer, 0, n);
+				}
+			}
 
-	    } catch (Exception e) {
+			return out.toByteArray();
 
-	    	log.warn("getCompressedValue fail key=" + redisKey
-	                + " , reason=" + e.getMessage(), e);
-
-	        return null;
-	    }
+		} catch (IOException e) {
+			throw new IllegalStateException("gzip decompress failed", e);
+		}
 	}
-	
-	public String gzipDecompress(byte[] compressed) {
 
-	    if (compressed == null || compressed.length == 0) {
-	        return null;
-	    }
+	public <T> List<T> getCompressedZSetByScore(String cacheName, String key,
+			Class<T> clazz) {
 
-	    try (
-	            ByteArrayInputStream bis = new ByteArrayInputStream(compressed);
-	            GZIPInputStream gzip = new GZIPInputStream(bis);
-	            ByteArrayOutputStream out = new ByteArrayOutputStream(compressed.length * 2)
-	    ) {
+		String redisKey = buildKey(cacheName, key);
 
-	        byte[] buffer = new byte[4096];
-	        int n;
+		Set<byte[]> raw = rawRedisTemplate.opsForZSet().rangeByScore(redisKey, 0, -1);
 
-	        while ((n = gzip.read(buffer)) != -1) {
-	            out.write(buffer, 0, n);
-	        }
+		if (raw == null || raw.isEmpty())
+			return Collections.emptyList();
+		ObjectMapper objectMapper = new ObjectMapper();
+		List<T> result = new ArrayList<>(raw.size());
 
-	        return out.toString(StandardCharsets.UTF_8);
+		for (byte[] compressed : raw) {
 
-	    } catch (Exception e) {
-	        throw new RuntimeException("gzip decompress fail", e);
-	    }
+			try {
+
+				byte[] json = gzipDecompressBytes(compressed);
+
+				result.add(objectMapper.readValue(json, clazz));
+
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+
+		return result;
+	}
+
+	public <T> T getCompressedValue(String cacheName, String key, Class<T> clazz) {
+
+		String redisKey = buildKey(cacheName, key);
+
+		byte[] compressed = rawRedisTemplate.opsForValue().get(redisKey);
+
+		if (compressed == null)
+			return null;
+
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
+			byte[] json = gzipDecompressBytes(compressed);
+
+			T obj = objectMapper.readValue(json, clazz);
+
+			touch(redisKey, cacheName);
+
+			return obj;
+
+		} catch (Exception e) {
+			throw new RuntimeException("decompress read fail", e);
+		}
 	}
 }

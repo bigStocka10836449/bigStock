@@ -70,7 +70,7 @@ public class BizController {
 		List<String> indicators =  List.of("^SOX","MES=F","MYM=F","MNQ=F");
 		Map<String, String> usHistory = Maps.newHashMap();
 		indicators.stream().forEach(indicator ->{
-			String json = cacheOperatorService.getCompressedValue("market:raw:history", indicator);
+			String json = cacheOperatorService.getCompressedValue("market:raw:history", indicator, String.class);
 			usHistory.put(indicator, json);
 		});
 		USHistoryResponse response = new USHistoryResponse();
