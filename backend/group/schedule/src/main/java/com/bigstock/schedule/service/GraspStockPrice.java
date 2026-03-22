@@ -450,10 +450,11 @@ public class GraspStockPrice {
 
 	}
 
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}", zone= "Asia/Taipei")
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-margin-trading}", zone= "Asia/Taipei")
 	@Transactional
 //	@PostConstruct
 	public void updateMarginTradingAndShortSellingInfo() throws Exception {
+		stockDayPriceService.getCurrentTradeDate();
 		// 先抓DB裡面全部的代號資料
 		List<MarginTradingAndShortSellingInfo> stockTpexarginTradingAndShortSellingInfo = ChromeDriverUtils
 				.graspTpexMarginTradingAndShortSellingInfo(
