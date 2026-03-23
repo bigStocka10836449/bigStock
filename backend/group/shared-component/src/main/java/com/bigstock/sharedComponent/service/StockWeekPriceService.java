@@ -17,17 +17,23 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.repository.query.Param;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
 import com.bigstock.sharedComponent.entity.StockWeekPrice.StockWeekPriceId;
+import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.entity.StockWeekPriceRank;
 import com.bigstock.sharedComponent.repository.StockWeekPriceRankRepository;
 import com.bigstock.sharedComponent.repository.StockWeekPriceRepository;
@@ -49,6 +55,10 @@ public class StockWeekPriceService {
 	private final JdbcTemplate jdbcTemplate;
 	
 	private final DataSource dataSource;
+	
+	private final CacheOperatorService cacheOperatorService;
+	
+	private final RedissonClient redissonClient;
 
 	public List<StockWeekPrice> findAll() {
 		return repository.findAll();
@@ -83,7 +93,44 @@ public class StockWeekPriceService {
 	}
 
 	public List<StockWeekPrice> findStockCodeAndLimit(String stockCode, Integer limit) {
-		return repository.findStockCodeAndLimit(stockCode, limit);
+		List<StockWeekPrice> stockWeekPrices = cacheOperatorService
+				.getCompressedZSetAllScore("ultraLongLivedCache", "stock-weekly:compressed:" + stockCode,
+						StockWeekPrice.class);
+		if (CollectionUtils.isNotEmpty(stockWeekPrices)) {
+			return stockWeekPrices;
+		} else {
+			String lockKey = "lock:findStockCodeAndLimit:cacheName:ultraLongLivedCache:stock-weekly:compressed:"
+					+ stockCode;
+
+			RLock lock = redissonClient.getLock(lockKey);
+			boolean lockAcquired = false;
+			try {
+
+				lockAcquired = lock.tryLock(10, TimeUnit.MINUTES);
+
+				if (lockAcquired) {
+					List<StockWeekPrice> nonCachestockWeekPricess = repository.findStockCodeAndLimit(stockCode, limit);
+					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+							"stock-weekly:compressed:" + stockCode, nonCachestockWeekPricess,
+							marginTradingAndShortSellingInfo -> marginTradingAndShortSellingInfo.getFirstTradingDay().getTime(),
+							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+					return nonCachestockWeekPricess;
+				} else {
+					throw new RuntimeException("Could not acquire lock for " + lockKey);
+				}
+
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new RuntimeException("Interrupted while trying to acquire lock", e);
+			} finally {
+
+				if (lockAcquired && lock.isHeldByCurrentThread()) {
+					lock.unlock();
+				}
+
+			}
+
+		}
 	}
 	
 	public List<StockWeekPrice> findRankByStockCode(String stockCode){

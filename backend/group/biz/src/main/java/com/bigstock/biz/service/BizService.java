@@ -266,7 +266,7 @@ public class BizService {
 
 	    // 以下週/月先不要改
 	    List<SingleStockWeekPriceVo> singleStockWeekPriceVo = stockWeekPriceService
-	            .findStockCodeAndLimit(stockCode, 360).stream()
+	            .findStockCodeAndLimit(stockCode, 500).stream()
 	            .sorted(Comparator.comparing(StockWeekPrice::getWeekOfYear))
 	            .map(stockWeekPrice -> {
 	                SingleStockWeekPriceVo vo = new SingleStockWeekPriceVo();

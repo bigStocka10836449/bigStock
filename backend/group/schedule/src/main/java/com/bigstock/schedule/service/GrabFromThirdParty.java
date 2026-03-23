@@ -357,6 +357,29 @@ public class GrabFromThirdParty {
 						log.warn("stock_info missing : {}", stockCode);
 					}
 				});
+		groupedStockWeekPrice.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
+		.forEach(entry -> {
+			String stockCode = entry.getKey();
+			List<StockWeekPrice> stockWeekPrices = entry.getValue();
+			if (allStockInfoMap.containsKey(stockCode)) {
+				List<StockWeekPrice> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
+						"ultraLongLivedCache", "stock:compressed:" + stockCode, StockWeekPrice.class);
+				if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
+
+					cacheOperatorService.upsertZSetSeries("ultraLongLivedCache",
+							"stock-weekly:compressed:" + stockCode, stockWeekPrices.stream().findFirst().get(),
+							stockWeekPrices.stream().findFirst().get().getFirstTradingDay().getTime(),
+							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+				} else {
+					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+							"stock-weekly:compressed:" + stockCode, stockWeekPrices,
+							stockWeekPrice -> stockWeekPrice.getFirstTradingDay().getTime(),
+							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+				}
+			} else {
+				log.warn("stock_info missing : {}", stockCode);
+			}
+		});
 	}
 
 	public void calculateRSVValueAndLimitDownUp(StockDayPrice stockTwseDayPrice,
