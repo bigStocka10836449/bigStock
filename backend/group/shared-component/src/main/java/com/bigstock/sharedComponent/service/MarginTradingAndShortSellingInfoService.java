@@ -19,9 +19,11 @@ import javax.sql.DataSource;
 
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
+import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.repository.MarginTradingAndShortSellingInfoRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -30,228 +32,262 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class MarginTradingAndShortSellingInfoService {
 
-    private final MarginTradingAndShortSellingInfoRepository repository;
+	private final MarginTradingAndShortSellingInfoRepository repository;
+
+	private final JdbcTemplate jdbcTemplate;
+
 	private final DataSource dataSource;
-	
-	private static final DateTimeFormatter PG_DATE =
-	        DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+	private static final DateTimeFormatter PG_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+	public List<MarginTradingAndShortSellingInfo> getAllRecords() {
+		return repository.findAll();
+	}
 
-    public List<MarginTradingAndShortSellingInfo> getAllRecords() {
-        return repository.findAll();
-    }
+	public Optional<MarginTradingAndShortSellingInfo> getRecordById(
+			MarginTradingAndShortSellingInfo.MarginTradingAndShortSellingInfoId id) {
+		return repository.findById(id);
+	}
 
-    public Optional<MarginTradingAndShortSellingInfo> getRecordById(MarginTradingAndShortSellingInfo.MarginTradingAndShortSellingInfoId id) {
-        return repository.findById(id);
-    }
+	public MarginTradingAndShortSellingInfo saveRecord(MarginTradingAndShortSellingInfo record) {
+		return repository.save(record);
+	}
 
-    public MarginTradingAndShortSellingInfo saveRecord(MarginTradingAndShortSellingInfo record) {
-        return repository.save(record);
-    }
+	public void deleteRecordById(MarginTradingAndShortSellingInfo.MarginTradingAndShortSellingInfoId id) {
+		repository.deleteById(id);
+	}
 
-    public void deleteRecordById(MarginTradingAndShortSellingInfo.MarginTradingAndShortSellingInfoId id) {
-        repository.deleteById(id);
-    }
-    
-    public List<MarginTradingAndShortSellingInfo> saveAll(List<MarginTradingAndShortSellingInfo> marginTradingAndShortSellingInfos){
-    	return repository.saveAll(marginTradingAndShortSellingInfos);
-    }
-    
-    public List<MarginTradingAndShortSellingInfo> findMarginTradingAndShortSellingInfoByDateRange(String stockCode, Date firstDate, Date secondDate){
-    	return repository.findMarginTradingAndShortSellingInfoByDateRange(stockCode, firstDate, secondDate);
-    }
-    
-    public void bulkUpsertMarginTradingAndShortSellingInfo(
-            List<MarginTradingAndShortSellingInfo> data
-    ) throws Exception {
+	public List<MarginTradingAndShortSellingInfo> saveAll(
+			List<MarginTradingAndShortSellingInfo> marginTradingAndShortSellingInfos) {
+		return repository.saveAll(marginTradingAndShortSellingInfos);
+	}
 
-        if (data == null || data.isEmpty()) {
-            return;
-        }
+	public List<MarginTradingAndShortSellingInfo> findMarginTradingAndShortSellingInfoByDateRange(String stockCode,
+			Date firstDate, Date secondDate) {
+		return repository.findMarginTradingAndShortSellingInfoByDateRange(stockCode, firstDate, secondDate);
+	}
 
-        try (Connection connection = dataSource.getConnection()) {
+	public List<MarginTradingAndShortSellingInfo> findByTradingDayBeforEqualLimitTwoFourty(Date startDateMinus360,
+			Date endDate) {
 
-            connection.setAutoCommit(false);
+		String sql = """
+				    select *
+				    from bstock.margin_trading_and_short_selling_info
+				    where trading_day between ? and ?
+				    order by stock_code, trading_day desc
+				""";
 
-            CopyManager copyManager =
-                    new CopyManager(connection.unwrap(BaseConnection.class));
+		return jdbcTemplate.query(sql, ps -> {
+			ps.setFetchSize(1000);
+			ps.setDate(1, new java.sql.Date(startDateMinus360.getTime()));
+			ps.setDate(2, new java.sql.Date(endDate.getTime()));
+		}, (rs, rowNum) -> {
 
-            // create temp table
-            try (Statement stmt = connection.createStatement()) {
-                stmt.execute("""
-                    CREATE TEMP TABLE tmp_margin_trading_and_short_selling_info
-                    (LIKE bstock.margin_trading_and_short_selling_info INCLUDING ALL)
-                    ON COMMIT DROP
-                """);
-            }
+			MarginTradingAndShortSellingInfo s = new MarginTradingAndShortSellingInfo();
 
-            // 2 COPY
-            String copySql = """
-                COPY tmp_margin_trading_and_short_selling_info (
-                    trading_day,
-                    stock_code,
-                    margin_purchase_balance_previous_day,
-                    margin_purchase,
-                    margin_sales,
-                    cash_redemption,
-                    margin_purchase_balance,
-                    margin_purchase_quota,
-                    short_sale_balance_previous_day,
-                    short_sale,
-                    short_convering,
-                    stock_redemption,
-                    short_sale_balance,
-                    short_sale_quota,
-                    offsetting
-                )
-                FROM STDIN WITH (FORMAT csv)
-            """;
+			s.setStockCode(rs.getString("stock_code"));
+			s.setTradingDay(rs.getDate("trading_day"));
+			s.setMarginPurchaseBalancePreviousDay(rs.getString("margin_purchase_balance_previous_day"));
+			s.setMarginPurchase(rs.getString("margin_purchase"));
+			s.setMarginSales(rs.getString("margin_sales"));
+			s.setCashRedemption(rs.getString("cash_redemption"));
+			s.setMarginPurchaseBalance(rs.getString("margin_purchase_balance"));
+			s.setMarginPurchaseQuota(rs.getString("margin_purchase_quota"));
+			s.setShortSaleBalancePreviousDay(rs.getString("short_sale_balance_previous_day"));
+			s.setShortSale(rs.getString("short_sale"));
+			s.setShortConvering(rs.getString("short_convering"));
+			s.setStockRedemption(rs.getString("stock_redemption"));
+			s.setShortSaleBalance(rs.getString("short_sale_balance"));
+			s.setShortSaleQuota(rs.getString("short_sale_quota"));
+			s.setOffsetting(rs.getString("offsetting"));
 
-            PipedOutputStream pos = new PipedOutputStream();
-            PipedInputStream pis = new PipedInputStream(pos, 65536);
+			return s;
+		});
+	}
 
-            ExecutorService executor = Executors.newSingleThreadExecutor();
+	public void bulkUpsertMarginTradingAndShortSellingInfo(List<MarginTradingAndShortSellingInfo> data)
+			throws Exception {
 
-            executor.submit(() -> {
-                try (BufferedWriter writer =
-                             new BufferedWriter(new OutputStreamWriter(pos))) {
+		if (data == null || data.isEmpty()) {
+			return;
+		}
 
-                    for (MarginTradingAndShortSellingInfo item : data) {
-                        writer.write(buildCsvLine(item));
-                        writer.newLine();
-                    }
-                }
-                return null;
-            });
+		try (Connection connection = dataSource.getConnection()) {
 
-            copyManager.copyIn(copySql, pis);
-            executor.shutdown();
+			connection.setAutoCommit(false);
 
-            // ⭐ 3️⃣ UPSERT (NO DELETE)
-            try (Statement stmt = connection.createStatement()) {
-                stmt.execute("""
-                    INSERT INTO bstock.margin_trading_and_short_selling_info AS t (
-                        trading_day,
-                        stock_code,
-                        margin_purchase_balance_previous_day,
-                        margin_purchase,
-                        margin_sales,
-                        cash_redemption,
-                        margin_purchase_balance,
-                        margin_purchase_quota,
-                        short_sale_balance_previous_day,
-                        short_sale,
-                        short_convering,
-                        stock_redemption,
-                        short_sale_balance,
-                        short_sale_quota,
-                        offsetting
-                    )
-                    SELECT DISTINCT ON (trading_day, stock_code)
-                        trading_day,
-                        stock_code,
-                        margin_purchase_balance_previous_day,
-                        margin_purchase,
-                        margin_sales,
-                        cash_redemption,
-                        margin_purchase_balance,
-                        margin_purchase_quota,
-                        short_sale_balance_previous_day,
-                        short_sale,
-                        short_convering,
-                        stock_redemption,
-                        short_sale_balance,
-                        short_sale_quota,
-                        offsetting
-                    FROM tmp_margin_trading_and_short_selling_info
-                    ORDER BY trading_day, stock_code
-                    ON CONFLICT (trading_day, stock_code)
-                    DO UPDATE SET
-                        margin_purchase_balance_previous_day = EXCLUDED.margin_purchase_balance_previous_day,
-                        margin_purchase = EXCLUDED.margin_purchase,
-                        margin_sales = EXCLUDED.margin_sales,
-                        cash_redemption = EXCLUDED.cash_redemption,
-                        margin_purchase_balance = EXCLUDED.margin_purchase_balance,
-                        margin_purchase_quota = EXCLUDED.margin_purchase_quota,
-                        short_sale_balance_previous_day = EXCLUDED.short_sale_balance_previous_day,
-                        short_sale = EXCLUDED.short_sale,
-                        short_convering = EXCLUDED.short_convering,
-                        stock_redemption = EXCLUDED.stock_redemption,
-                        short_sale_balance = EXCLUDED.short_sale_balance,
-                        short_sale_quota = EXCLUDED.short_sale_quota,
-                        offsetting = EXCLUDED.offsetting;
-                """);
-            }
+			CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
 
-            connection.commit();
-        }
-    }
-    
-    private String buildCsvLine(MarginTradingAndShortSellingInfo item) {
+			// create temp table
+			try (Statement stmt = connection.createStatement()) {
+				stmt.execute("""
+						    CREATE TEMP TABLE tmp_margin_trading_and_short_selling_info
+						    (LIKE bstock.margin_trading_and_short_selling_info INCLUDING ALL)
+						    ON COMMIT DROP
+						""");
+			}
 
-        StringBuilder sb = new StringBuilder(256);
+			// 2 COPY
+			String copySql = """
+					    COPY tmp_margin_trading_and_short_selling_info (
+					        trading_day,
+					        stock_code,
+					        margin_purchase_balance_previous_day,
+					        margin_purchase,
+					        margin_sales,
+					        cash_redemption,
+					        margin_purchase_balance,
+					        margin_purchase_quota,
+					        short_sale_balance_previous_day,
+					        short_sale,
+					        short_convering,
+					        stock_redemption,
+					        short_sale_balance,
+					        short_sale_quota,
+					        offsetting
+					    )
+					    FROM STDIN WITH (FORMAT csv)
+					""";
 
-        // ⭐ first column WITHOUT comma
-        appendFirstCsv(sb, formatDate(item.getTradingDay()));
+			PipedOutputStream pos = new PipedOutputStream();
+			PipedInputStream pis = new PipedInputStream(pos, 65536);
 
-        appendCsv(sb, item.getStockCode());
-        appendCsv(sb, item.getMarginPurchaseBalancePreviousDay());
-        appendCsv(sb, item.getMarginPurchase());
-        appendCsv(sb, item.getMarginSales());
-        appendCsv(sb, item.getCashRedemption());
-        appendCsv(sb, item.getMarginPurchaseBalance());
-        appendCsv(sb, item.getMarginPurchaseQuota());
-        appendCsv(sb, item.getShortSaleBalancePreviousDay());
-        appendCsv(sb, item.getShortSale());
-        appendCsv(sb, item.getShortConvering());
-        appendCsv(sb, item.getStockRedemption());
-        appendCsv(sb, item.getShortSaleBalance());
-        appendCsv(sb, item.getShortSaleQuota());
-        appendCsv(sb, item.getOffsetting());
+			ExecutorService executor = Executors.newSingleThreadExecutor();
 
-        return sb.toString();
-    }
-    private void appendFirstCsv(StringBuilder sb, String value) {
+			executor.submit(() -> {
+				try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(pos))) {
 
-        if (value == null) {
-            sb.append("");
-            return;
-        }
+					for (MarginTradingAndShortSellingInfo item : data) {
+						writer.write(buildCsvLine(item));
+						writer.newLine();
+					}
+				}
+				return null;
+			});
 
-        sb.append(value);
-    }
-    private void appendCsv(StringBuilder sb, String value) {
+			copyManager.copyIn(copySql, pis);
+			executor.shutdown();
 
-        sb.append(',');
+			// ⭐ 3️⃣ UPSERT (NO DELETE)
+			try (Statement stmt = connection.createStatement()) {
+				stmt.execute("""
+						    INSERT INTO bstock.margin_trading_and_short_selling_info AS t (
+						        trading_day,
+						        stock_code,
+						        margin_purchase_balance_previous_day,
+						        margin_purchase,
+						        margin_sales,
+						        cash_redemption,
+						        margin_purchase_balance,
+						        margin_purchase_quota,
+						        short_sale_balance_previous_day,
+						        short_sale,
+						        short_convering,
+						        stock_redemption,
+						        short_sale_balance,
+						        short_sale_quota,
+						        offsetting
+						    )
+						    SELECT DISTINCT ON (trading_day, stock_code)
+						        trading_day,
+						        stock_code,
+						        margin_purchase_balance_previous_day,
+						        margin_purchase,
+						        margin_sales,
+						        cash_redemption,
+						        margin_purchase_balance,
+						        margin_purchase_quota,
+						        short_sale_balance_previous_day,
+						        short_sale,
+						        short_convering,
+						        stock_redemption,
+						        short_sale_balance,
+						        short_sale_quota,
+						        offsetting
+						    FROM tmp_margin_trading_and_short_selling_info
+						    ORDER BY trading_day, stock_code
+						    ON CONFLICT (trading_day, stock_code)
+						    DO UPDATE SET
+						        margin_purchase_balance_previous_day = EXCLUDED.margin_purchase_balance_previous_day,
+						        margin_purchase = EXCLUDED.margin_purchase,
+						        margin_sales = EXCLUDED.margin_sales,
+						        cash_redemption = EXCLUDED.cash_redemption,
+						        margin_purchase_balance = EXCLUDED.margin_purchase_balance,
+						        margin_purchase_quota = EXCLUDED.margin_purchase_quota,
+						        short_sale_balance_previous_day = EXCLUDED.short_sale_balance_previous_day,
+						        short_sale = EXCLUDED.short_sale,
+						        short_convering = EXCLUDED.short_convering,
+						        stock_redemption = EXCLUDED.stock_redemption,
+						        short_sale_balance = EXCLUDED.short_sale_balance,
+						        short_sale_quota = EXCLUDED.short_sale_quota,
+						        offsetting = EXCLUDED.offsetting;
+						""");
+			}
 
-        if (value == null || value.isBlank()) {
-            sb.append("");
-            return;
-        }
+			connection.commit();
+		}
+	}
 
-        boolean needQuote =
-                value.contains(",") ||
-                value.contains("\"") ||
-                value.contains("\n") ||
-                value.contains("\r");
+	private String buildCsvLine(MarginTradingAndShortSellingInfo item) {
 
-        if (needQuote) {
-            sb.append('"');
-            sb.append(value.replace("\"", "\"\""));
-            sb.append('"');
-        } else {
-            sb.append(value);
-        }
-    }
-    private String formatDate(Date d) {
+		StringBuilder sb = new StringBuilder(256);
 
-        if (d == null)
-            return null;
+		// ⭐ first column WITHOUT comma
+		appendFirstCsv(sb, formatDate(item.getTradingDay()));
 
-        return d.toInstant()
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate()
-                .toString();
-    }
+		appendCsv(sb, item.getStockCode());
+		appendCsv(sb, item.getMarginPurchaseBalancePreviousDay());
+		appendCsv(sb, item.getMarginPurchase());
+		appendCsv(sb, item.getMarginSales());
+		appendCsv(sb, item.getCashRedemption());
+		appendCsv(sb, item.getMarginPurchaseBalance());
+		appendCsv(sb, item.getMarginPurchaseQuota());
+		appendCsv(sb, item.getShortSaleBalancePreviousDay());
+		appendCsv(sb, item.getShortSale());
+		appendCsv(sb, item.getShortConvering());
+		appendCsv(sb, item.getStockRedemption());
+		appendCsv(sb, item.getShortSaleBalance());
+		appendCsv(sb, item.getShortSaleQuota());
+		appendCsv(sb, item.getOffsetting());
+
+		return sb.toString();
+	}
+
+	private void appendFirstCsv(StringBuilder sb, String value) {
+
+		if (value == null) {
+			sb.append("");
+			return;
+		}
+
+		sb.append(value);
+	}
+
+	private void appendCsv(StringBuilder sb, String value) {
+
+		sb.append(',');
+
+		if (value == null || value.isBlank()) {
+			sb.append("");
+			return;
+		}
+
+		boolean needQuote = value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r");
+
+		if (needQuote) {
+			sb.append('"');
+			sb.append(value.replace("\"", "\"\""));
+			sb.append('"');
+		} else {
+			sb.append(value);
+		}
+	}
+
+	private String formatDate(Date d) {
+
+		if (d == null)
+			return null;
+
+		return d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate().toString();
+	}
 }

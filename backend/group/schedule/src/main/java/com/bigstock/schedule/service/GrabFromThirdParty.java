@@ -579,17 +579,33 @@ public class GrabFromThirdParty {
 				throw new RuntimeException(e);
 			}
 		});
-//		List<StockDayPrice> stockDayPricesFor365Ds = stockDayPriceService
-//				.findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, tradeDate);
-//		Map<String, List<StockDayPrice>> groupedStockDayPrices = stockDayPricesFor365Ds.stream().filter(data -> {
+//		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();
+//		LocalDate tradeDateLdt = LocalDate.ofInstant(currentTradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
+//		Integer years = tradeDateLdt.getYear();
+//		LocalDate tradeDateMinus365 = tradeDateLdt.minusDays(500);
+//		Instant instant = tradeDateMinus365.atStartOfDay(ZoneId.of("Asia/Taipei")).toInstant();
+//		Date tradeDateBefore365Days = Date.from(instant);
+//		List<MarginTradingAndShortSellingInfo> stockDayPricesFor365Ds = marginTradingAndShortSellingInfoService
+//				.findByTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, currentTradeDate);
+		Map<String, List<MarginTradingAndShortSellingInfo>> groupedMarginTradingAndShortSellingInfos = allMarginTradingAndShortSellingInfos.stream()
+//				.filter(data -> {
 //			java.util.Date tradingDay = data.getTradingDay();
 //			LocalDate dataTradeDateLdt = ((java.sql.Date) tradingDay).toLocalDate();
-//			return dataTradeDateLdt.compareTo(tradeDateLdt) < 0;
-//		}
-//
-//		).collect(Collectors.groupingBy(StockDayPrice::getStockCode));
-		marginTradingAndShortSellingInfoService
-				.bulkUpsertMarginTradingAndShortSellingInfo(allMarginTradingAndShortSellingInfos);
+//			return dataTradeDateLdt.compareTo(tradeDateLdt) <= 0;
+//		})
+				.collect(Collectors.groupingBy(MarginTradingAndShortSellingInfo::getStockCode));
+//		marginTradingAndShortSellingInfoService
+//				.bulkUpsertMarginTradingAndShortSellingInfo(allMarginTradingAndShortSellingInfos);
+//		cacheOperatorService
+		groupedMarginTradingAndShortSellingInfos.entrySet().forEach(entry ->{
+			List<MarginTradingAndShortSellingInfo> singleMarginTradingAndShortSellingInfos = entry.getValue();
+			if( CollectionUtils.isNotEmpty(singleMarginTradingAndShortSellingInfos)) {
+				cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+						"marginTrading:compressed:" + entry.getKey(), singleMarginTradingAndShortSellingInfos,
+						marginTradingAndShortSellingInfo -> marginTradingAndShortSellingInfo.getTradingDay().getTime(),
+						CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+			}
+		});
 	}
 
 	public void calculateRSVValueAndLimitDownUp(StockWeekPrice stockWeekPrice,
