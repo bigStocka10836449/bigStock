@@ -153,7 +153,7 @@ public class GrabThirdPartyStockDayPrice {
 				MarginTradingAndShortSellingInfo info = new MarginTradingAndShortSellingInfo();
 
 				String tradingDayStr = text(node, "date");
-				if (tradingDayStr != null && tradingDayStr.length() >= 40) {
+				if (tradingDayStr != null) {
 					info.setTradingDay(Date.from(LocalDate.parse(tradingDayStr.substring(0, 10))
 							.atStartOfDay(ZoneId.systemDefault()).toInstant()));
 				}

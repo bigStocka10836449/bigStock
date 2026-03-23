@@ -1,4 +1,4 @@
-package com.bigstock.biz.service;
+package com.bigstock.schedule.service;
 
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialResponse;
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;

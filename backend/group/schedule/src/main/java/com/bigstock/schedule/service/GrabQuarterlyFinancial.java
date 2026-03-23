@@ -25,8 +25,8 @@ public class GrabQuarterlyFinancial {
 	
 	@Scheduled(cron = "0 40 19 * * ?", zone = "Asia/Taipei")
 	public void syncToDb() {
-        List<QuarterlyFinancialVo> twselist =twseClient.fetch(year, quarter);
-        List<QuarterlyFinancialVo> tpexlist =twseClient.fetch(year, quarter);
+//        List<QuarterlyFinancialVo> twselist =twseClient.fetch(year, quarter);
+//        List<QuarterlyFinancialVo> tpexlist =twseClient.fetch(year, quarter);
         
 	}
 	
