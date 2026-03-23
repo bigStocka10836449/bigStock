@@ -1,5 +1,8 @@
 name: CI
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  
 # Controls when the workflow will run
 on:
   # Triggers the workflow when a tag is pushed
@@ -49,7 +52,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install Zeabur CLI
         run: npm install @zeabur/cli
@@ -129,7 +132,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       # ---------------------------------------
       # Install Zeabur CLI (local install)
