@@ -339,7 +339,7 @@ public class GrabFromThirdParty {
 					String stockCode = entry.getKey();
 					List<StockDayPrice> stockDayPrices = entry.getValue();
 					if (allStockInfoMap.containsKey(stockCode)) {
-						List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getCompressedZSetByScore(
+						List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getCompressedZSetAllScore(
 								"ultraLongLivedCache", "stock:compressed:" + stockCode, StockDayPrice.class);
 						if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
 

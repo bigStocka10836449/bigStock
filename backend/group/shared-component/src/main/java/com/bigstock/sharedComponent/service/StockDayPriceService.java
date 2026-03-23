@@ -89,7 +89,7 @@ public class StockDayPriceService {
 
 	public List<StockDayPrice> findByStockCodeAndStartDateAndEndDateCache(String stockCode, String startDate,
 			String endDate) throws ParseException {
-		List<StockDayPrice> stockDayPrices = cacheOperatorService.getCompressedZSetByScore("ultraLongLivedCache", "stock:compressed:" + stockCode, StockDayPrice.class);
+		List<StockDayPrice> stockDayPrices = cacheOperatorService.getCompressedZSetAllScore("ultraLongLivedCache", "stock:compressed:" + stockCode, StockDayPrice.class);
 		if(!stockDayPrices.isEmpty()) {
 			return stockDayPrices;
 		}
@@ -97,7 +97,7 @@ public class StockDayPriceService {
 	}
 	
 	public List<StockDayPrice> findLastest600StockDayPriceByStockCodeCache(String stockCode) throws ParseException {
-		List<StockDayPrice> stockDayPrices = cacheOperatorService.getCompressedZSetByScore("ultraLongLivedCache", "stock:compressed:" + stockCode, StockDayPrice.class);
+		List<StockDayPrice> stockDayPrices = cacheOperatorService.getCompressedZSetAllScore("ultraLongLivedCache", "stock:compressed:" + stockCode, StockDayPrice.class);
 		if(!stockDayPrices.isEmpty()) {
 			return stockDayPrices;
 		}

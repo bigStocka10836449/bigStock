@@ -193,7 +193,6 @@ public class BizService {
 	                SingleStockDayPriceVo vo = new SingleStockDayPriceVo();
 	               
 	                vo.setStockName(singleStockName);
-	                log.error("Thomas  sssssssssssss = " + singleStockName);
 	                vo.setClosingPrice(closingPrice == null ? null : closingPrice.replaceAll(",", ""));
 	                vo.setOpeningPrice(openingPrice == null ? null : openingPrice.replaceAll(",", ""));
 	                vo.setHighPrice(highPrice == null ? null : highPrice.replaceAll(",", ""));

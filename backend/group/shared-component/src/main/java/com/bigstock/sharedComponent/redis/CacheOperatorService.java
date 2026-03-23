@@ -312,12 +312,12 @@ public class CacheOperatorService {
 		}
 	}
 
-	public <T> List<T> getCompressedZSetByScore(String cacheName, String key,
+	public <T> List<T> getCompressedZSetAllScore(String cacheName, String key,
 			Class<T> clazz) {
 
 		String redisKey = buildKey(cacheName, key);
 
-		Set<byte[]> raw = rawRedisTemplate.opsForZSet().rangeByScore(redisKey, 0, -1);
+		Set<byte[]> raw = rawRedisTemplate.opsForZSet().range(redisKey, 0, -1);
 
 		if (raw == null || raw.isEmpty())
 			return Collections.emptyList();
