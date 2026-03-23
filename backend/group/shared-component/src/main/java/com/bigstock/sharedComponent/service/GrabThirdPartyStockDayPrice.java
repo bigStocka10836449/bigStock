@@ -204,7 +204,7 @@ public class GrabThirdPartyStockDayPrice {
 		String url = String.format(
 				"https://query1.finance.yahoo.com/v8/finance/chart/%s?period1=%d&period2=%d&interval=1d&includePrePost=true&events=div%%7Csplit%%7Cearn&lang=en-US&region=US&source=cosaic",
 				encodedSymbol, period1, period2);
-
+		log.info("grabAndCacheMarketHistoryFromYahoo url : {}", url);
 		HttpGet request = new HttpGet(url);
 
 		request.setHeader(" User-Agent", "Mozilla/5.0");

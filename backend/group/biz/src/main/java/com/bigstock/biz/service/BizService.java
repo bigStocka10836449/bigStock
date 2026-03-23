@@ -139,7 +139,6 @@ public class BizService {
         //stockInfoService.findByIds(matchStocks);
 	    singleInfos = stockInfoService.findByIds(singleStockId);
 	    final String singleStockName = singleInfos.get(0).getStockName().toString();
-	    log.error("Thomas StockName = " +  singleStockName);
 	    // 新增：先用「日K本身」算出日期區間，再查融資融券，同日 merge
 	    Date lastTradingDay = null;   // 最新交易日
 	    Date firstTradingDay = null;  // 最舊交易日

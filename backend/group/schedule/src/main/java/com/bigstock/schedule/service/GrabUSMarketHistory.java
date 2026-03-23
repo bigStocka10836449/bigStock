@@ -31,6 +31,7 @@ public class GrabUSMarketHistory {
 	
 	private final CacheOperatorService cacheOperatorService;
 	
+	@PostConstruct
 	@Scheduled(cron = "0 30 12 * * ?", zone = "Asia/Taipei")
 	public void grabUSHistory() {
 		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();
