@@ -74,13 +74,14 @@ public class GatewayController {
 	@Operation(summary = "依照查詢條件篩選符合的股票代碼", description = "")
 	@PostMapping("StockCodeByFilter")
 	public ResponseEntity<List<StockInfoVo>> getStockCodeByFilter(
-	        @RequestBody List<DynamicFilterStockCodeVo> dynamicFilterStockCodeVos) {
+	        @RequestBody List<DynamicFilterStockCodeVo> dynamicFilterStockCodeVos) throws JsonProcessingException {
 
 	    if (ObjectUtils.isEmpty(dynamicFilterStockCodeVos)
 	            || dynamicFilterStockCodeVos.get(0).getConditions().isEmpty()) {
 	        return ResponseEntity.ok(List.of());
 	    }
-
+	    ObjectMapper objectMapper = new ObjectMapper();
+	    log.info("dynamicFilterStockCodeVos : {}", objectMapper.writeValueAsString(dynamicFilterStockCodeVos) );
 	    List<StockInfoVo> vos = bizService.getMatchStockCodeByCondition(dynamicFilterStockCodeVos);
 	    return ResponseEntity.ok(vos);
 	}

@@ -398,10 +398,7 @@ public class BizService {
 	                dynamicFilterStockCodeVo.getConditions()
 	                        .stream()
 	                        .collect(Collectors.groupingBy(DynamicFilterStockPriceCondition::getType));
-
-	        List<StockDayPrice> stockDayPrices =
-	                stockDayPriceService.findPreviousFiftyTowDaysBeforeLastestDayInfo("2330");
-	        Date lastTradingDay = stockDayPrices.stream().findFirst().get().getTradingDay();
+	        Date lastTradingDay =  stockDayPriceService.getCurrentTradeDate();
 
 	        List<String> matchStocks = switch (aspect) {
 	            case "daily" -> processDaily(dynamicFilterStockPriceConditionsMap, lastTradingDay);
