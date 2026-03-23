@@ -1,8 +1,7 @@
-package com.bigstock.schedule.service;
+package com.bigstock.sharedComponent.service;
 
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialResponse;
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;
-import com.bigstock.sharedComponent.service.StockQuarterFinancialService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

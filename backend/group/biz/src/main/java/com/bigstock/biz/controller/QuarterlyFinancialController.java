@@ -1,14 +1,19 @@
 package com.bigstock.biz.controller;
 
-import com.bigstock.biz.service.QuarterlyFinancialRedisService;
+import java.util.List;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.bigstock.sharedComponent.client.TpexQuarterlyFinancialClient;
 import com.bigstock.sharedComponent.client.TwseQuarterlyFinancialClient;
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;
+import com.bigstock.sharedComponent.service.QuarterlyFinancialRedisService;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
