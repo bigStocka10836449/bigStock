@@ -1,5 +1,6 @@
 package com.bigstock.biz.domain;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -72,9 +73,12 @@ public class StockDayPriceNativeQueryService {
 		    FROM bstock.stock_day_price_rank sdp
 		    WHERE sdp.rank_no <= :limit
 		      AND sdp.trading_day <= :tradingDay
-		      AND sdp.closing_price ~ '^[0-9]+(\\.[0-9]+)?$'
+		     AND (
+			       sdp.closing_price ~ '^[0-9]+$'
+			    OR sdp.closing_price ~ '^[0-9]+\\.[0-9]+$'
+			)
 		    GROUP BY sdp.stock_code
-		    HAVING SUM(CAST(sdp.change_rate as NUMERIC)) >= :totalRate
+		    HAVING SUM(CAST(sdp.change_rate as NUMERIC)) %s :totalRate
 		    ORDER BY sdp.stock_code
 		    """;
 
@@ -231,14 +235,15 @@ public class StockDayPriceNativeQueryService {
 
     @SuppressWarnings("unchecked")
     @Transactional
-    public List<String> findByDateRangeChangeRateOverFilter(Date startDate, Integer limit, String totalChangeRate) {
+    public List<String> findByDateRangeChangeRateOverFilter(Date startDate, Integer limit, String totalChangeRate, String operator) {
         ensureUtf8ClientEncoding();
-
-        Query query = em.createNativeQuery(FIND_DATE_RANGE_SUM_CHANGE_RATE_QUERY, Tuple.class);
+        String op = resolveOperator(operator);
+        BigDecimal rate = parseRate(totalChangeRate);
+        
+        Query query = em.createNativeQuery(FIND_DATE_RANGE_SUM_CHANGE_RATE_QUERY.formatted(op), Tuple.class);
         query.setParameter("tradingDay", startDate);
         query.setParameter("limit", limit);
-        query.setParameter("totalRate", Integer.valueOf(totalChangeRate));
-
+        query.setParameter("totalRate", rate.intValue());
         List<Tuple> tuples = (List<Tuple>) query.getResultList();
         return tuples.stream().map(tuple -> tuple.get("stock_code").toString()).toList();
     }
@@ -342,5 +347,29 @@ public class StockDayPriceNativeQueryService {
         }
 
         return null;
+    }
+    
+    private String resolveOperator(String operator) {
+
+        return switch (operator) {
+            case "eq"  -> "=";
+            case "lte" -> "<=";
+            case "gte" -> ">=";
+            default -> throw new IllegalArgumentException("Invalid operator");
+        };
+
+    }
+    
+    private BigDecimal parseRate(String rate) {
+
+        if (rate == null || rate.isBlank()) {
+            throw new IllegalArgumentException("totalChangeRate cannot be null/blank");
+        }
+
+        try {
+            return new BigDecimal(rate);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid totalChangeRate: " + rate);
+        }
     }
 }

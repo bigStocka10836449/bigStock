@@ -494,7 +494,7 @@ public class BizService {
 				}
 			} else if ("change".equals(type)) {
 				return stockDayPriceNativeQueryService.findByDateRangeChangeRateOverFilter(lastTradingDay,
-						conditions.get(0).getLimit(), conditions.get(0).getValue().get(0));
+						conditions.get(0).getLimit(), conditions.get(0).getValue().get(0), conditions.get(0).getOperator());
 			} else if ("limitUp".equals(type)) {
 				return stockDayPriceService.findTodateReachLimitUp(lastTradingDay).stream()
 						.map(StockDayPrice::getStockCode).toList();
