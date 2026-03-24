@@ -84,7 +84,20 @@ public class GraspShareholderStructureService {
 				log.error(e.getMessage(), e);
 			}
 		});
-		shareholderStructureService.insert(shareholderStructures);
+		try {
+			shareholderStructureService.bulkUpsertShareholderStructure(shareholderStructures);
+		} catch (Exception e) {
+			log.info(String.format("bulkUpsertShareholderStructure inser fail : %s", e.getMessage()), e);
+		}
+		
+//		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();
+//		LocalDate tradeDateLdt = LocalDate.ofInstant(currentTradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
+//		Integer years = tradeDateLdt.getYear();
+//		LocalDate tradeDateMinus365 = tradeDateLdt.minusDays(500);
+//		Instant instant = tradeDateMinus365.atStartOfDay(ZoneId.of("Asia/Taipei")).toInstant();
+//		Date tradeDateBefore365Days = Date.from(instant);
+//		List<MarginTradingAndShortSellingInfo> stockDayPricesFor365Ds = marginTradingAndShortSellingInfoService
+//				.findByTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, currentTradeDate);
 		List<StockInfo> stockInfos = ChromeDriverUtils
 				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2");
 		stockInfoService.insertAll(stockInfos);

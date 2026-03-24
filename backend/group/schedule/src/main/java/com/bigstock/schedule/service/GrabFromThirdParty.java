@@ -363,7 +363,7 @@ public class GrabFromThirdParty {
 			List<StockWeekPrice> stockWeekPrices = entry.getValue();
 			if (allStockInfoMap.containsKey(stockCode)) {
 				List<StockWeekPrice> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
-						"ultraLongLivedCache", "stock:compressed:" + stockCode, StockWeekPrice.class);
+						"ultraLongLivedCache", "stock-weekly:compressed:" + stockCode, StockWeekPrice.class);
 				if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
 
 					cacheOperatorService.upsertZSetSeries("ultraLongLivedCache",
