@@ -617,9 +617,8 @@ public class GrabFromThirdParty {
 //			return dataTradeDateLdt.compareTo(tradeDateLdt) <= 0;
 //		})
 				.collect(Collectors.groupingBy(MarginTradingAndShortSellingInfo::getStockCode));
-//		marginTradingAndShortSellingInfoService
-//				.bulkUpsertMarginTradingAndShortSellingInfo(allMarginTradingAndShortSellingInfos);
-//		cacheOperatorService
+		marginTradingAndShortSellingInfoService
+				.bulkUpsertMarginTradingAndShortSellingInfo(allMarginTradingAndShortSellingInfos);
 		groupedMarginTradingAndShortSellingInfos.entrySet().forEach(entry ->{
 			List<MarginTradingAndShortSellingInfo> singleMarginTradingAndShortSellingInfos = entry.getValue();
 			if( CollectionUtils.isNotEmpty(singleMarginTradingAndShortSellingInfos)) {

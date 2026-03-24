@@ -53,7 +53,7 @@ public class BizController {
 	@GetMapping("stockShareholderStructure/{stockCode}")
 	public ResponseEntity<List<ShareholderStructure>> getStockShareholderStructure(
 			@PathVariable("stockCode") String stockCode) {
-		return ResponseEntity.ok(bizService.getStockShareholderStructure(stockCode, 52));
+		return ResponseEntity.ok(bizService.getStockShareholderStructure(stockCode, 200));
 	}
 	
 	@Operation(summary = "個股漲跌幅排行", description = "market 分為 TEPX 與 TWSE")
