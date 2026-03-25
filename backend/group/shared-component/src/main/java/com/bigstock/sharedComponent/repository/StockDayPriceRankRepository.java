@@ -23,7 +23,7 @@ public interface StockDayPriceRankRepository extends JpaRepository<StockDayPrice
 	
 	@Modifying
 	@Query(value = """
-			DELETE FROM bstock.stock_day_price_rank r WHERE r.rank_No >= 361
+			DELETE FROM bstock.stock_day_price_rank r WHERE r.rank_No >= 520
 			""", nativeQuery = true)
 	void deleteByRankNoLessThanZero();
 	

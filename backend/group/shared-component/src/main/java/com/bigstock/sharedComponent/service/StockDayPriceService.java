@@ -141,15 +141,13 @@ public class StockDayPriceService {
 
 	public List<StockDayPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(Date startDateMinus360,
 			 Date endDate){
-//		List<StockDayPrice> allStockDayPrices = 
 		String sql = """
 		        select stock_code, trading_day, opening_price, closing_price, high_price, low_price, line_k_value, line_d_value
-		        from bstock.stock_day_price
+		        from bstock.stock_day_price_rank
 		        where trading_day between ? and ?
 		          and closing_price not in ('--','----','')
 		        order by stock_code, trading_day desc
 		    """;
-
 		    return jdbcTemplate.query(sql,
 		            ps -> {
 		                ps.setFetchSize(1000);

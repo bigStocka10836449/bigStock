@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -14,10 +15,14 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.io.output.ByteArrayOutputStream;
+import org.apache.poi.ss.formula.functions.T;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.stereotype.Service;
 
@@ -339,6 +344,32 @@ public class CacheOperatorService {
 
 		return result;
 	}
+	
+	public <T> List<T> getCompressedZSetAllScore(String key,
+			Class<T> clazz) {
+
+		Set<byte[]> raw = rawRedisTemplate.opsForZSet().range(key, 0, -1);
+
+		if (raw == null || raw.isEmpty())
+			return Collections.emptyList();
+		ObjectMapper objectMapper = new ObjectMapper();
+		List<T> result = new ArrayList<>(raw.size());
+
+		for (byte[] compressed : raw) {
+
+			try {
+
+				byte[] json = gzipDecompressBytes(compressed);
+
+				result.add(objectMapper.readValue(json, clazz));
+
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+
+		return result;
+	}
 
 	public <T> T getCompressedValue(String cacheName, String key, Class<T> clazz) {
 
@@ -362,5 +393,105 @@ public class CacheOperatorService {
 		} catch (Exception e) {
 			throw new RuntimeException("decompress read fail", e);
 		}
+	}
+	
+	public <T> List<T> getCompressedZSetEntries(
+	        String key,
+	        Class<T> targetClass
+	) {
+		ObjectMapper objectMapper = new ObjectMapper();
+	    Set<ZSetOperations.TypedTuple<byte[]>> tuples =
+	            rawRedisTemplate.opsForZSet()
+	                    .rangeWithScores(key, 0, -1);
+
+	    if (tuples == null || tuples.isEmpty()) {
+	        return Collections.emptyList();
+	    }
+
+	    List<T> result = new ArrayList<>(tuples.size());
+
+	    for (ZSetOperations.TypedTuple<byte[]> tuple : tuples) {
+
+	        byte[] raw = tuple.getValue();
+
+	        try {
+
+	            T obj = objectMapper.readValue(safeDecode(raw), targetClass);
+
+	            result.add(obj);
+
+	        } catch (Exception e) {
+	            throw new RuntimeException(
+	                    "json cast failed → " + targetClass.getSimpleName(),
+	                    e
+	            );
+	        }
+	    }
+
+	    return result;
+	}
+	
+	private byte[] safeDecode(byte[] raw) {
+
+	    if (raw == null) {
+	        return null;
+	    }
+
+	    try {
+
+	        if (isGzip(raw)) {
+	            return gzipDecompressBytes(raw);
+	        }
+
+	        return raw;
+
+	    } catch (Exception e) {
+	        throw new RuntimeException("decode cache value failed", e);
+	    }
+	}
+	
+	public <T> Map<String, List<T>> getAllCompressedZSets( String cacheName, String cacheKey,
+			Class<T> clazz) {
+		String redisKey = buildKey(cacheName, cacheKey);
+	    List<String> keys = scanCompressedStockKeys(redisKey);
+
+	    Map<String, List<T>> result = new HashMap<>();
+
+	    for (String key : keys) {
+	    	List<T> singleCompressedZSetAllScores = getCompressedZSetAllScore(key,clazz);
+			result.put(key, singleCompressedZSetAllScores);
+		}
+
+	    return result;
+	}
+	
+	public List<String> scanCompressedStockKeys(String key) {
+
+	    List<String> result = new ArrayList<>();
+
+	    ScanOptions options =
+	            ScanOptions.scanOptions()
+	                    .match(key)
+	                    .count(1000)
+	                    .build();
+
+	    Cursor<byte[]> cursor =
+	            rawRedisTemplate.getConnectionFactory()
+	                    .getConnection()
+	                    .scan(options);
+
+	    while (cursor.hasNext()) {
+	        result.add(new String(cursor.next()));
+	    }
+
+	    return result;
+	}
+	
+	private boolean isGzip(byte[] data) {
+
+	    return data != null
+	            && data.length >= 2
+	            && data[0] == (byte) 0x1f
+	            && data[1] == (byte) 0x8b;
 	}
 }
