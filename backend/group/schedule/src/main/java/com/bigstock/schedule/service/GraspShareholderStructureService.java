@@ -115,7 +115,7 @@ public class GraspShareholderStructureService {
 				List<ShareholderStructure> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
 						"ultraLongLivedCache", "shareholderStructure:compressed:" + stockCode, ShareholderStructure.class);
 				if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
-					double weekOfYearScore =  weekOfYearToScore(singleShareholderStructures.stream().findFirst().get().getWeekOfYear());
+					double weekOfYearScore =  ShareholderStructureService.weekOfYearToScore(singleShareholderStructures.stream().findFirst().get().getWeekOfYear());
 					cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
 							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures.stream().findFirst().get(),
 							weekOfYearScore,
@@ -124,7 +124,7 @@ public class GraspShareholderStructureService {
 					 
 					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
 							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures,
-							shareholderStructure -> weekOfYearToScore(shareholderStructure.getWeekOfYear()),
+							shareholderStructure -> ShareholderStructureService.weekOfYearToScore(shareholderStructure.getWeekOfYear()),
 							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
 				}
 			} else {
@@ -201,14 +201,7 @@ public class GraspShareholderStructureService {
 		return shareholderStructure;
 	}
 	
-	private double weekOfYearToScore(String weekText) {
 
-	    // 2026W9 -> 2026 , 9
-	    int year = Integer.parseInt(weekText.substring(0, 4));
-	    int week = Integer.parseInt(weekText.substring(5));
-
-	    return year * 100 + week;
-	}
 
 //	@PostConstruct
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-stock-info}", zone= "Asia/Taipei")

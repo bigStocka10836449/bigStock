@@ -11,16 +11,22 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
+import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
+import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.repository.ShareholderStructureRepository;
 import com.bigstock.sharedComponent.repository.StockDayPriceRepository;
 
@@ -32,11 +38,14 @@ import lombok.RequiredArgsConstructor;
 public class ShareholderStructureService {
 	private final ShareholderStructureRepository shareholderStructureRepository;
 
-	private final StockDayPriceRepository stockDayPriceRepository;
 	
 	private final ApplicationContext ctx;
 	
 	private final DataSource dataSource;
+	
+	private final CacheOperatorService cacheOperatorService;
+	
+	private final RedissonClient redissonClient;
 
 	public List<ShareholderStructure> getAll() {
 		return shareholderStructureRepository.findAll();
@@ -75,7 +84,46 @@ public class ShareholderStructureService {
 
 //	@Cacheable(value = "longLivedCache", key = "#stockCode")
 	public List<ShareholderStructure> getShareholderStructureByStockCodeDesc(String stockCode) {
-		return getSelf().getShareholderStructureByStockCodeDescWithDataBase(stockCode);
+		List<ShareholderStructure> shareholderStructures = cacheOperatorService.getCompressedZSetAllScore(
+				"ultraLongLivedCache", "shareholderStructure:compressed:" + stockCode, ShareholderStructure.class);
+		if (CollectionUtils.isNotEmpty(shareholderStructures)) {
+			return shareholderStructures;
+
+		} else {
+			String lockKey = "lock:getShareholderStructureByStockCodeDesc:cacheName:ultraLongLivedCache:shareholderStructure:compressed:"
+					+ stockCode;
+
+			RLock lock = redissonClient.getLock(lockKey);
+			boolean lockAcquired = false;
+			try {
+
+				lockAcquired = lock.tryLock(10, TimeUnit.MINUTES);
+
+				if (lockAcquired) {
+					List<ShareholderStructure> nonCacheShareholderStructures = getSelf()
+							.getShareholderStructureByStockCodeDescWithDataBase(stockCode);
+					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+							"shareholderStructure:compressed:" + stockCode, nonCacheShareholderStructures,
+							shareholderStructure -> ShareholderStructureService
+									.weekOfYearToScore(shareholderStructure.getWeekOfYear()),
+							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+					return nonCacheShareholderStructures;
+				} else {
+					throw new RuntimeException("Could not acquire lock for " + lockKey);
+				}
+
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new RuntimeException("Interrupted while trying to acquire lock", e);
+			} finally {
+
+				if (lockAcquired && lock.isHeldByCurrentThread()) {
+					lock.unlock();
+				}
+
+			}
+
+		}
 	}
 
 	public boolean checkWeekExist(String weekOfYear) {
@@ -96,21 +144,6 @@ public class ShareholderStructureService {
 
 //	@BigStockCacheableWithLock(value = "longLivedCache", key = "#id")
 	public List<ShareholderStructure> getShareholderStructureByStockCodeDescWithDataBase(String stockCode) {
-//		stockDayPriceRepository
-		List<ShareholderStructure> shareholderStructures = shareholderStructureRepository
-				.getShareholderStructureByStockCodeDesc(stockCode);
-		shareholderStructures.stream().forEach(data -> {
-			List<StockDayPrice> stockDayPrices = stockDayPriceRepository.findThisWeekStockDayPrices(data.getStockCode(),
-					data.getWeekOfYear());
-	        Optional<StockDayPrice> minTradingDatePrice = stockDayPrices.stream()
-	                .min(Comparator.comparing(StockDayPrice::getTradingDay));
-
-	        // 找到最大的 tradingDate 的 StockDayPrice 对象
-	        Optional<StockDayPrice> maxTradingDatePrice = stockDayPrices.stream()
-	                .max(Comparator.comparing(StockDayPrice::getTradingDay));
-	        data.setClosingPrice(maxTradingDatePrice.isPresent() ? maxTradingDatePrice.get().getClosingPrice() : "0.0");
-	        data.setOpeningPrice(minTradingDatePrice.isPresent() ? minTradingDatePrice.get().getOpeningPrice() : "0.0");
-		});
 		return shareholderStructureRepository.getShareholderStructureByStockCodeDesc(stockCode);
 	}
 
@@ -325,5 +358,14 @@ public class ShareholderStructureService {
 	
 	private ShareholderStructureService getSelf() {
 		return ctx.getBean(ShareholderStructureService.class);
+	}
+	
+	public static double weekOfYearToScore(String weekText) {
+
+	    // 2026W9 -> 2026 , 9
+	    int year = Integer.parseInt(weekText.substring(0, 4));
+	    int week = Integer.parseInt(weekText.substring(5));
+
+	    return year * 100 + week;
 	}
 }
