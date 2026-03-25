@@ -4,7 +4,9 @@ import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,9 @@ import org.springframework.web.client.RestClientException;
 
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockInfo;
+import com.bigstock.sharedComponent.entity.StockMonthPrice;
+import com.bigstock.sharedComponent.entity.StockWeekPrice;
+import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.service.ShareholderStructureService;
 import com.bigstock.sharedComponent.service.StockInfoService;
 import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
@@ -52,6 +57,8 @@ public class GraspShareholderStructureService {
 	private final ShareholderStructureService shareholderStructureService;
 
 	private final StockInfoService stockInfoService;
+	
+	private final CacheOperatorService cacheOperatorService;
 
 //	@PostConstruct
 	// 每天晚上8點更新
@@ -62,6 +69,15 @@ public class GraspShareholderStructureService {
 		List<Map<Integer, String>> stockCodeWeekInfos = ChromeDriverUtils
 				.graspShareholderStructureFromTDCCApi("https://openapi.tdcc.com.tw/v1/opendata/1-5");
 		List<ShareholderStructure> shareholderStructures = Lists.newArrayList();
+		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
+			return !data.matches(".*[a-zA-Z].*");
+		}).toList();
+		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
+			return !data.matches(".*[a-zA-Z].*");
+		}).toList();
+		List<String> allStockCodes = Lists.newArrayList();
+		allStockCodes.addAll(tpexStockCodes);
+		allStockCodes.addAll(twseStockCodes);
 		stockCodeWeekInfos.stream().forEach(stockCodeWeekInfo -> {
 			String stockCode = stockCodeWeekInfo.get(37);
 			try {
@@ -89,7 +105,32 @@ public class GraspShareholderStructureService {
 		} catch (Exception e) {
 			log.info(String.format("bulkUpsertShareholderStructure inser fail : %s", e.getMessage()), e);
 		}
-		
+		Map<String, List<ShareholderStructure>> groupedShareholderStructures = shareholderStructureService.getAll().stream()
+		.collect(Collectors.groupingBy(ShareholderStructure::getStockCode));
+		groupedShareholderStructures.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
+		.forEach(entry -> {
+			String stockCode = entry.getKey();
+			List<ShareholderStructure> singleShareholderStructures = entry.getValue();
+			if (allStockCodes.contains(stockCode)) {
+				List<ShareholderStructure> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
+						"ultraLongLivedCache", "shareholderStructure:compressed:" + stockCode, ShareholderStructure.class);
+				if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
+					double weekOfYearScore =  weekOfYearToScore(singleShareholderStructures.stream().findFirst().get().getWeekOfYear());
+					cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
+							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures.stream().findFirst().get(),
+							weekOfYearScore,
+							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+				} else {
+					 
+					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures,
+							shareholderStructure -> weekOfYearToScore(shareholderStructure.getWeekOfYear()),
+							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+				}
+			} else {
+				log.warn("stock_info missing : {}", stockCode);
+			}
+		});
 //		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();
 //		LocalDate tradeDateLdt = LocalDate.ofInstant(currentTradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
 //		Integer years = tradeDateLdt.getYear();
@@ -158,6 +199,15 @@ public class GraspShareholderStructureService {
 		shareholderStructure.setStockName(stockName);
 		shareholderStructure.setId(stockCode + shareholderStructure.getWeekOfYear());
 		return shareholderStructure;
+	}
+	
+	private double weekOfYearToScore(String weekText) {
+
+	    // 2026W9 -> 2026 , 9
+	    int year = Integer.parseInt(weekText.substring(0, 4));
+	    int week = Integer.parseInt(weekText.substring(5));
+
+	    return year * 100 + week;
 	}
 
 //	@PostConstruct

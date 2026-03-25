@@ -343,7 +343,7 @@ public class GrabFromThirdParty {
 								"ultraLongLivedCache", "stock:compressed:" + stockCode, StockDayPrice.class);
 						if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
 
-							cacheOperatorService.upsertZSetSeries("ultraLongLivedCache",
+							cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
 									"stock:compressed:" + stockCode, stockDayPrices.stream().findFirst().get(),
 									stockDayPrices.stream().findFirst().get().getTradingDay().getTime(),
 									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
@@ -366,7 +366,7 @@ public class GrabFromThirdParty {
 						"ultraLongLivedCache", "stock-weekly:compressed:" + stockCode, StockWeekPrice.class);
 				if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
 
-					cacheOperatorService.upsertZSetSeries("ultraLongLivedCache",
+					cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
 							"stock-weekly:compressed:" + stockCode, stockWeekPrices.stream().findFirst().get(),
 							stockWeekPrices.stream().findFirst().get().getFirstTradingDay().getTime(),
 							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
