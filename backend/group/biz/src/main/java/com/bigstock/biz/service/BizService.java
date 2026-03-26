@@ -199,9 +199,13 @@ public class BizService {
 	                vo.setLowPrice(lowPrice == null ? null : lowPrice.replaceAll(",", ""));
 	                if(ObjectUtils.isNotEmpty(stockDayPrice.getChange())) {
 	                	vo.setChange(stockDayPrice.getChange());
+	                } else {
+	                	vo.setChange("");
 	                }
 	                if(ObjectUtils.isNotEmpty(stockDayPrice.getChangeRate())) {
 	                	vo.setChangeRate(stockDayPrice.getChangeRate().toString());
+	                } else {
+	                	vo.setChangeRate("");
 	                }
 	                
 	                String tradingDateStr = sdf.format(stockDayPrice.getTradingDay());
