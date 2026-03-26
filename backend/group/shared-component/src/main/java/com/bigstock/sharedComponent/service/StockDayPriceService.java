@@ -18,6 +18,7 @@ import java.util.concurrent.Executors;
 
 import javax.sql.DataSource;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
@@ -142,7 +143,7 @@ public class StockDayPriceService {
 	public List<StockDayPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(Date startDateMinus360,
 			 Date endDate){
 		String sql = """
-		        select stock_code, trading_day, opening_price, closing_price, high_price, low_price, line_k_value, line_d_value
+		        select stock_code, trading_day,change, change_rate, opening_price, closing_price, high_price, low_price, line_k_value, line_d_value
 		        from bstock.stock_day_price_rank
 		        where trading_day between ? and ?
 		          and closing_price not in ('--','----','')
@@ -162,6 +163,10 @@ public class StockDayPriceService {
 		                s.setClosingPrice(rs.getString("closing_price"));
 		                s.setHighPrice(rs.getString("high_price"));
 		                s.setLowPrice(rs.getString("low_price"));
+		                s.setChange(rs.getString("change"));
+		                if(ObjectUtils.isNotEmpty(rs.getString("change_rate"))) {
+		                	s.setChangeRate(Double.valueOf(rs.getString("change_rate")));
+		                }
 		                s.setLineKvalue(rs.getString("line_k_value"));
 		                s.setLineDvalue(rs.getString("line_d_value"));
 		                return s;
