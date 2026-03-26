@@ -197,8 +197,9 @@ public class BizService {
 	                vo.setOpeningPrice(openingPrice == null ? null : openingPrice.replaceAll(",", ""));
 	                vo.setHighPrice(highPrice == null ? null : highPrice.replaceAll(",", ""));
 	                vo.setLowPrice(lowPrice == null ? null : lowPrice.replaceAll(",", ""));
-
-	                vo.setChange(stockDayPrice.getChange());
+	                if(ObjectUtils.isNotEmpty(stockDayPrice.getChange())) {
+	                	vo.setChange(stockDayPrice.getChange());
+	                }
 	                if(ObjectUtils.isNotEmpty(stockDayPrice.getChangeRate())) {
 	                	vo.setChangeRate(stockDayPrice.getChangeRate().toString());
 	                }
