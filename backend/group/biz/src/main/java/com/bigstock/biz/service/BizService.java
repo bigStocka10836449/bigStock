@@ -198,6 +198,9 @@ public class BizService {
 	                vo.setHighPrice(highPrice == null ? null : highPrice.replaceAll(",", ""));
 	                vo.setLowPrice(lowPrice == null ? null : lowPrice.replaceAll(",", ""));
 
+	                vo.setChange(stockDayPrice.getChange());
+	                vo.setChangeRate(stockDayPrice.getChangeRate().toString());
+	                
 	                String tradingDateStr = sdf.format(stockDayPrice.getTradingDay());
 	                vo.setTradingDate(tradingDateStr);
 	                vo.setStockCode(stockCode);

@@ -3,6 +3,7 @@ package com.bigstock.sharedComponent.dto;
 import java.math.BigDecimal;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.persistence.Column;
 import lombok.Data;
 
 /**
@@ -34,6 +35,14 @@ public class SingleStockDayPriceVo {
 	
 	@Schema(name = "成交量(可能會有誤差)", description = "", example = "")
 	private String tradingVolume;
+	
+	
+	@Schema(name = "漲幅(價格)", description = "", example = "")
+	private String change;
+	
+	@Schema(name = "漲幅(%數)", description = "", example = "")
+	private String changeRate;
+	
 	
 	private BigDecimal fiveMa;
 	
