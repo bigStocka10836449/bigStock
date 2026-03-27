@@ -22,9 +22,11 @@ import com.bigstock.biz.service.BizService;
 import com.bigstock.sharedComponent.dto.RankingResponse;
 import com.bigstock.sharedComponent.dto.USHistoryResponse;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
+import com.bigstock.sharedComponent.entity.StockInfo;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.service.RankStockChangeService;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
+import com.bigstock.sharedComponent.service.StockInfoService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Maps;
 
@@ -47,6 +49,13 @@ public class BizController {
 	
 	private final CacheOperatorService cacheOperatorService;
 	
+	private final StockInfoService stockInfoService;
+	
+	@Operation(summary = "股市分類資訊", description = "")
+	@GetMapping("stockInfo")
+	public ResponseEntity<List<StockInfo>> getStockInfo() {
+		return ResponseEntity.ok(stockInfoService.getAllStockInfo());
+	}
 	
 //	@NewSpan("stockShareholderStructure")
 	@Operation(summary = "個別股票持股分布", description = "")

@@ -86,7 +86,7 @@ public class GraspStockPrice {
 		// 先抓DB裡面全部的代號資料
 
 		List<StockDayPrice> stockTpexEmergingStockPrices = ChromeDriverUtils.graspTpexEmergingStockDayPrice();
-		List<StockInfo> allStockInfos = stockInfoService.getAllStockCode().stream().filter(data -> {
+		List<StockInfo> allStockInfos = stockInfoService.getAllStockInfo().stream().filter(data -> {
 			return !data.getStockCode().matches(".*[a-zA-Z].*");
 		}).toList();
 		Map<String, List<StockInfo>> allStockInfoMap = allStockInfos.stream()
