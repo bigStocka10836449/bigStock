@@ -157,7 +157,7 @@ public class RankStockChangeService {
 	        Double closeDouble = StringUtils.isNotBlank(stock.getClosingPrice()) ? Double.valueOf(stock.getClosingPrice()) : 0d;
 	        Double tradingQuantity = closeDouble * tradingVolumeDouble;
 	        map.putAsync("tradingQuantity", tradingQuantity.toString());
-	        ranking.addAsync(stock.getChangeRate(), stockCode);
+	        ranking.addAsync(tradingQuantity, stockCode);
 	    }
 
 	    batch.execute();
