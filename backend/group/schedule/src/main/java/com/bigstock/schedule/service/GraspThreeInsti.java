@@ -50,7 +50,7 @@ public class GraspThreeInsti {
 //	@PostConstruct
 	public void updateThreeInsti() throws Exception {
 
-		List<StockInfo> allStockInfos =  stockInfoService.getAllStockCode().stream().filter(data -> {
+		List<StockInfo> allStockInfos =  stockInfoService.getAllStockInfo().stream().filter(data -> {
 			return !data.getStockCode().matches(".*[a-zA-Z].*");
 		}).toList();
 		Map<String, List<StockInfo>> allStockInfoMap =
@@ -89,7 +89,6 @@ public class GraspThreeInsti {
 		List<StockThreeInstitutionalTrading> dealerOverSells = Lists.newArrayList();
 		List<StockThreeInstitutionalTrading> dealerOverBuys = Lists.newArrayList();
 		dataRangeStockThreeInstitutionalTradingsMap.entrySet().stream().forEach(entry -> {
-			String stockCode = entry.getKey();
 			List<StockThreeInstitutionalTrading> stockCodeStockThreeInstitutionalTradings = entry.getValue();
 			Long foreignTotal = stockCodeStockThreeInstitutionalTradings.stream()
 					.mapToLong(data -> data.getForeignBuy() - data.getForeignSell()).sum();

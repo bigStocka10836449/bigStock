@@ -89,6 +89,12 @@ public class MarginTradingAndShortSellingInfoService {
 				lockAcquired = lock.tryLock(10, TimeUnit.MINUTES);
 
 				if (lockAcquired) {
+					marginTradingAndShortSellingInfos = cacheOperatorService
+							.getCompressedZSetAllScore("ultraLongLivedCache", "marginTrading:compressed:" + stockCode,
+									MarginTradingAndShortSellingInfo.class);
+					if(!marginTradingAndShortSellingInfos.isEmpty()) {
+						return marginTradingAndShortSellingInfos;
+					}
 					List<MarginTradingAndShortSellingInfo> nonCacheMarginTradingAndShortSellingInfos = repository
 							.findMarginTradingAndShortSellingInfoByDateRange(stockCode, firstDate, secondDate);
 					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",

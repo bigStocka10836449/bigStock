@@ -1,27 +1,24 @@
 package com.bigstock.schedule.service;
 
-import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import javax.annotation.PostConstruct;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
 
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockInfo;
-import com.bigstock.sharedComponent.entity.StockMonthPrice;
-import com.bigstock.sharedComponent.entity.StockWeekPrice;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.service.ShareholderStructureService;
 import com.bigstock.sharedComponent.service.StockInfoService;
 import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.common.collect.Lists;
 
 import lombok.RequiredArgsConstructor;
@@ -59,78 +56,80 @@ public class GraspShareholderStructureService {
 	private final StockInfoService stockInfoService;
 	
 	private final CacheOperatorService cacheOperatorService;
+	
+	private final InfraTaskService infraTaskService;
 
-//	@PostConstruct
+	@PostConstruct
 	// 每天晚上8點更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}", zone= "Asia/Taipei")
 	public void updateShareholderStructure()
-			throws RestClientException, URISyntaxException, JsonMappingException, JsonProcessingException {
+			throws Exception {
 		// 先抓DB裡面全部的代號資料
-		List<Map<Integer, String>> stockCodeWeekInfos = ChromeDriverUtils
-				.graspShareholderStructureFromTDCCApi("https://openapi.tdcc.com.tw/v1/opendata/1-5");
-		List<ShareholderStructure> shareholderStructures = Lists.newArrayList();
-		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
-			return !data.matches(".*[a-zA-Z].*");
-		}).toList();
-		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
-			return !data.matches(".*[a-zA-Z].*");
-		}).toList();
-		List<String> allStockCodes = Lists.newArrayList();
-		allStockCodes.addAll(tpexStockCodes);
-		allStockCodes.addAll(twseStockCodes);
-		stockCodeWeekInfos.stream().forEach(stockCodeWeekInfo -> {
-			String stockCode = stockCodeWeekInfo.get(37);
-			try {
-//				if(!stockCode.matches("\\d{4}")) {
-//					return;
+//		List<Map<Integer, String>> stockCodeWeekInfos = ChromeDriverUtils
+//				.graspShareholderStructureFromTDCCApi("https://openapi.tdcc.com.tw/v1/opendata/1-5");
+//		List<ShareholderStructure> shareholderStructures = Lists.newArrayList();
+//		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
+//			return !data.matches(".*[a-zA-Z].*");
+//		}).toList();
+//		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
+//			return !data.matches(".*[a-zA-Z].*");
+//		}).toList();
+//		List<String> allStockCodes = Lists.newArrayList();
+//		allStockCodes.addAll(tpexStockCodes);
+//		allStockCodes.addAll(twseStockCodes);
+//		stockCodeWeekInfos.stream().forEach(stockCodeWeekInfo -> {
+//			String stockCode = stockCodeWeekInfo.get(37);
+//			try {
+////				if(!stockCode.matches("\\d{4}")) {
+////					return;
+////				}
+//				if(stockCode.trim().equals("2330")) {
+//					log.info(stockCode);
 //				}
-				if(stockCode.trim().equals("2330")) {
-					log.info(stockCode);
-				}
-				Optional<StockInfo> stockInfoOp = stockInfoService.findById(stockCode.trim());
-//				if (!stockInfoOp.isPresent()) {
-					log.info("ssList is empty : {}, so create data", stockCode);
-					ShareholderStructure shareholderStructure = refreshStockLatestInfo(stockCode.trim(),
-							stockInfoOp.isPresent() ? stockInfoOp.get().getStockName().trim() : stockCode.trim(), stockCodeWeekInfo);
-					shareholderStructures.add(shareholderStructure);
+//				Optional<StockInfo> stockInfoOp = stockInfoService.findById(stockCode.trim());
+////				if (!stockInfoOp.isPresent()) {
+//					log.info("ssList is empty : {}, so create data", stockCode);
+//					ShareholderStructure shareholderStructure = refreshStockLatestInfo(stockCode.trim(),
+//							stockInfoOp.isPresent() ? stockInfoOp.get().getStockName().trim() : stockCode.trim(), stockCodeWeekInfo);
+//					shareholderStructures.add(shareholderStructure);
+////				} else {
+////					log.info(String.format("ssList is empty : %1s , and StockInfo is not exsits either", stockCode));
+////				}
+//			} catch (InterruptedException e) {
+//				log.error(e.getMessage(), e);
+//			}
+//		});
+//		try {
+//			shareholderStructureService.bulkUpsertShareholderStructure(shareholderStructures);
+//		} catch (Exception e) {
+//			log.info(String.format("bulkUpsertShareholderStructure inser fail : %s", e.getMessage()), e);
+//		}
+//		Map<String, List<ShareholderStructure>> groupedShareholderStructures = shareholderStructureService.getAll().stream()
+//		.collect(Collectors.groupingBy(ShareholderStructure::getStockCode));
+//		groupedShareholderStructures.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
+//		.forEach(entry -> {
+//			String stockCode = entry.getKey();
+//			List<ShareholderStructure> singleShareholderStructures = entry.getValue();
+//			if (allStockCodes.contains(stockCode)) {
+//				List<ShareholderStructure> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
+//						"ultraLongLivedCache", "shareholderStructure:compressed:" + stockCode, ShareholderStructure.class);
+//				if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
+//					double weekOfYearScore =  ShareholderStructureService.weekOfYearToScore(singleShareholderStructures.stream().findFirst().get().getWeekOfYear());
+//					cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
+//							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures.stream().findFirst().get(),
+//							weekOfYearScore,
+//							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
 //				} else {
-//					log.info(String.format("ssList is empty : %1s , and StockInfo is not exsits either", stockCode));
+//					 
+//					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+//							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures,
+//							shareholderStructure -> ShareholderStructureService.weekOfYearToScore(shareholderStructure.getWeekOfYear()),
+//							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
 //				}
-			} catch (InterruptedException e) {
-				log.error(e.getMessage(), e);
-			}
-		});
-		try {
-			shareholderStructureService.bulkUpsertShareholderStructure(shareholderStructures);
-		} catch (Exception e) {
-			log.info(String.format("bulkUpsertShareholderStructure inser fail : %s", e.getMessage()), e);
-		}
-		Map<String, List<ShareholderStructure>> groupedShareholderStructures = shareholderStructureService.getAll().stream()
-		.collect(Collectors.groupingBy(ShareholderStructure::getStockCode));
-		groupedShareholderStructures.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
-		.forEach(entry -> {
-			String stockCode = entry.getKey();
-			List<ShareholderStructure> singleShareholderStructures = entry.getValue();
-			if (allStockCodes.contains(stockCode)) {
-				List<ShareholderStructure> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
-						"ultraLongLivedCache", "shareholderStructure:compressed:" + stockCode, ShareholderStructure.class);
-				if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
-					double weekOfYearScore =  ShareholderStructureService.weekOfYearToScore(singleShareholderStructures.stream().findFirst().get().getWeekOfYear());
-					cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
-							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures.stream().findFirst().get(),
-							weekOfYearScore,
-							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
-				} else {
-					 
-					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
-							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures,
-							shareholderStructure -> ShareholderStructureService.weekOfYearToScore(shareholderStructure.getWeekOfYear()),
-							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
-				}
-			} else {
-				log.warn("stock_info missing : {}", stockCode);
-			}
-		});
+//			} else {
+//				log.warn("stock_info missing : {}", stockCode);
+//			}
+//		});
 //		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();
 //		LocalDate tradeDateLdt = LocalDate.ofInstant(currentTradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
 //		Integer years = tradeDateLdt.getYear();
@@ -141,7 +140,17 @@ public class GraspShareholderStructureService {
 //				.findByTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, currentTradeDate);
 		List<StockInfo> stockInfos = ChromeDriverUtils
 				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2");
-		stockInfoService.insertAll(stockInfos);
+		stockInfoService.refreshStockInfoAtomic(stockInfos);
+		cacheOperatorService.putSnapshotDataListAtomic("ultraLongLivedCache", "stockInfo:compressed", stockInfos);
+        infraTaskService.submitCleanupWithTimeout(
+                "stock-info-cleanup",
+                () -> {
+                    long deleted = cacheOperatorService.cleanupOldSnapshots("ultraLongLivedCache", "stockInfo:compressed", 3);
+                    log.info("Old snapshot cleanup done. namespace={}, deleted={}", ("cache:ultraLongLivedCache:stockInfo:compressed"), deleted);
+                },
+                300,
+                TimeUnit.SECONDS
+        );
 	}
 
 	private ShareholderStructure refreshStockLatestInfo(String stockCode, String stockName,
@@ -204,14 +213,13 @@ public class GraspShareholderStructureService {
 
 
 //	@PostConstruct
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-stock-info}", zone= "Asia/Taipei")
-	public void updateStockInfo() throws InterruptedException, JsonMappingException, RestClientException,
-			JsonProcessingException, URISyntaxException {
-		List<StockInfo> stockInfos = ChromeDriverUtils
-				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2");
-		stockInfoService.insertAll(stockInfos);
-		log.info("finsh sync updateStockInfo ");
-	}
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-stock-info}", zone= "Asia/Taipei")
+//	public void updateStockInfo() throws Exception {
+//		List<StockInfo> stockInfos = ChromeDriverUtils
+//				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2");
+//		stockInfoService.refreshStockInfoAtomic(stockInfos);
+//		log.info("finsh sync updateStockInfo ");
+//	}
 	
 
 	
