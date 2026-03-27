@@ -197,47 +197,64 @@ public class GrabThirdPartyStockDayPrice {
 		}
 	}
 
-	public String grabAndCacheMarketHistoryFromYahoo(String symbol, long period1, long period2) {
+	public String grabAndCacheMarketHistoryFromYahoo(
+	        String symbol,
+	        long period1,
+	        long period2
+	) {
 
-		String encodedSymbol = URLEncoder.encode(symbol, StandardCharsets.UTF_8);
+	    String encodedSymbol = URLEncoder.encode(symbol, StandardCharsets.UTF_8);
 
-		String url = String.format(
-				"https://query1.finance.yahoo.com/v8/finance/chart/%s?period1=%d&period2=%d&interval=1d&includePrePost=true&events=div%%7Csplit%%7Cearn&lang=en-US&region=US&source=cosaic",
-				encodedSymbol, period1, period2);
-		log.info("grabAndCacheMarketHistoryFromYahoo url : {}", url);
-		HttpGet request = new HttpGet(url);
+	    String url = String.format(
+	            "https://query1.finance.yahoo.com/v8/finance/chart/%s?period1=%d&period2=%d&interval=1d&includePrePost=true&events=div%%7Csplit%%7Cearn&lang=en-US&region=US&source=cosaic",
+	            encodedSymbol, period1, period2
+	    );
 
-		request.setHeader(" User-Agent", "Mozilla/5.0");
-		request.setHeader("Accept", "application/json");
+	    int maxRetries = 5;
+	    long delayMillis = 30_000L;
 
-		try (CloseableHttpResponse response = closeableHttpClient.execute(request)) {
+	    for (int attempt = 1; attempt <= maxRetries; attempt++) {
 
-			int status = response.getStatusLine().getStatusCode();
+	        log.info("Yahoo request attempt {} for symbol={}, url={}", attempt, symbol, url);
 
-			if (status == 200) {
+	        HttpGet request = new HttpGet(url);
+	        request.setHeader("User-Agent", "Mozilla/5.0");
+	        request.setHeader("Accept", "application/json");
 
-				String body = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
-//				
-//	            String redisKey = "market:history:" + symbol;
-//
-//	            redisTemplate.opsForValue().set(
-//	                    redisKey,
-//	                    body   // ⭐ raw json
-//	            );
+	        try (CloseableHttpResponse response = closeableHttpClient.execute(request)) {
 
-				Log.info("Yahoo history cached {}", symbol);
-				return body;
+	            int status = response.getStatusLine().getStatusCode();
 
-			} else {
+	            if (status == 200) {
 
-				Log.warn(String.format("Yahoo history fail %1s status=%2s", symbol, String.valueOf(status)));
-			}
+	                String body = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
 
-		} catch (Exception e) {
+	                log.info("Yahoo history success {} on attempt {}", symbol, attempt);
+	                return body;
+	            }
 
-			Log.warn(symbol + " yahoo history error:" + e.getMessage(), e);
-		}
-		return StringUtils.EMPTY;
+	            log.warn("Yahoo history fail {} status={} attempt={}", symbol, status, attempt);
+
+	        } catch (Exception e) {
+
+	            log.warn("Yahoo history error {} attempt={} msg={}", symbol, attempt, e.getMessage(), e);
+	        }
+
+	        // 嘗試retry，30後重新執行
+	        if (attempt < maxRetries) {
+	            try {
+	                log.info("Retrying {} after {} seconds...", symbol, delayMillis / 1000);
+	                Thread.sleep(delayMillis);
+	            } catch (InterruptedException ie) {
+	                Thread.currentThread().interrupt();
+	                log.warn("Retry interrupted for {}", symbol);
+	                break;
+	            }
+	        }
+	    }
+
+	    log.error("Yahoo history FAILED after {} attempts for {}", maxRetries, symbol);
+	    return StringUtils.EMPTY;
 	}
 
 	private String text(JsonNode node, String fieldName) {
