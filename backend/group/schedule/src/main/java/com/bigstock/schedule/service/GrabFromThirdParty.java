@@ -334,6 +334,10 @@ public class GrabFromThirdParty {
 				.toList();
 		rankStockChangeService.writeStockListToRedis(needRankTPEXs, allStockInfoMap, "TPEX");
 		rankStockChangeService.writeStockListToRedis(needRankTWSEs, allStockInfoMap, "TWSE");
+		//成交量排名
+		rankStockChangeService.writeStockListTradingQuantityRankToRedis(allStockDayPrices.stream()
+				.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
+						&& ObjectUtils.isNotEmpty(data.getChangeRate()))).toList(), allStockInfoMap);
 		groupedStockDayPrices.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
 				.forEach(entry -> {
 					String stockCode = entry.getKey();

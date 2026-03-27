@@ -59,85 +59,78 @@ public class GraspShareholderStructureService {
 	
 	private final InfraTaskService infraTaskService;
 
-	@PostConstruct
+//	@PostConstruct
 	// 每天晚上8點更新
 	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}", zone= "Asia/Taipei")
 	public void updateShareholderStructure()
 			throws Exception {
 		// 先抓DB裡面全部的代號資料
-//		List<Map<Integer, String>> stockCodeWeekInfos = ChromeDriverUtils
-//				.graspShareholderStructureFromTDCCApi("https://openapi.tdcc.com.tw/v1/opendata/1-5");
-//		List<ShareholderStructure> shareholderStructures = Lists.newArrayList();
-//		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
-//			return !data.matches(".*[a-zA-Z].*");
-//		}).toList();
-//		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
-//			return !data.matches(".*[a-zA-Z].*");
-//		}).toList();
-//		List<String> allStockCodes = Lists.newArrayList();
-//		allStockCodes.addAll(tpexStockCodes);
-//		allStockCodes.addAll(twseStockCodes);
-//		stockCodeWeekInfos.stream().forEach(stockCodeWeekInfo -> {
-//			String stockCode = stockCodeWeekInfo.get(37);
-//			try {
-////				if(!stockCode.matches("\\d{4}")) {
-////					return;
-////				}
-//				if(stockCode.trim().equals("2330")) {
-//					log.info(stockCode);
+		List<Map<Integer, String>> stockCodeWeekInfos = ChromeDriverUtils
+				.graspShareholderStructureFromTDCCApi("https://openapi.tdcc.com.tw/v1/opendata/1-5");
+		List<ShareholderStructure> shareholderStructures = Lists.newArrayList();
+		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
+			return !data.matches(".*[a-zA-Z].*");
+		}).toList();
+		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
+			return !data.matches(".*[a-zA-Z].*");
+		}).toList();
+		List<String> allStockCodes = Lists.newArrayList();
+		allStockCodes.addAll(tpexStockCodes);
+		allStockCodes.addAll(twseStockCodes);
+		stockCodeWeekInfos.stream().forEach(stockCodeWeekInfo -> {
+			String stockCode = stockCodeWeekInfo.get(37);
+			try {
+//				if(!stockCode.matches("\\d{4}")) {
+//					return;
 //				}
-//				Optional<StockInfo> stockInfoOp = stockInfoService.findById(stockCode.trim());
-////				if (!stockInfoOp.isPresent()) {
-//					log.info("ssList is empty : {}, so create data", stockCode);
-//					ShareholderStructure shareholderStructure = refreshStockLatestInfo(stockCode.trim(),
-//							stockInfoOp.isPresent() ? stockInfoOp.get().getStockName().trim() : stockCode.trim(), stockCodeWeekInfo);
-//					shareholderStructures.add(shareholderStructure);
-////				} else {
-////					log.info(String.format("ssList is empty : %1s , and StockInfo is not exsits either", stockCode));
-////				}
-//			} catch (InterruptedException e) {
-//				log.error(e.getMessage(), e);
-//			}
-//		});
-//		try {
-//			shareholderStructureService.bulkUpsertShareholderStructure(shareholderStructures);
-//		} catch (Exception e) {
-//			log.info(String.format("bulkUpsertShareholderStructure inser fail : %s", e.getMessage()), e);
-//		}
-//		Map<String, List<ShareholderStructure>> groupedShareholderStructures = shareholderStructureService.getAll().stream()
-//		.collect(Collectors.groupingBy(ShareholderStructure::getStockCode));
-//		groupedShareholderStructures.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
-//		.forEach(entry -> {
-//			String stockCode = entry.getKey();
-//			List<ShareholderStructure> singleShareholderStructures = entry.getValue();
-//			if (allStockCodes.contains(stockCode)) {
-//				List<ShareholderStructure> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
-//						"ultraLongLivedCache", "shareholderStructure:compressed:" + stockCode, ShareholderStructure.class);
-//				if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
-//					double weekOfYearScore =  ShareholderStructureService.weekOfYearToScore(singleShareholderStructures.stream().findFirst().get().getWeekOfYear());
-//					cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
-//							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures.stream().findFirst().get(),
-//							weekOfYearScore,
-//							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+				if(stockCode.trim().equals("2330")) {
+					log.info(stockCode);
+				}
+				Optional<StockInfo> stockInfoOp = stockInfoService.findById(stockCode.trim());
+//				if (!stockInfoOp.isPresent()) {
+					log.info("ssList is empty : {}, so create data", stockCode);
+					ShareholderStructure shareholderStructure = refreshStockLatestInfo(stockCode.trim(),
+							stockInfoOp.isPresent() ? stockInfoOp.get().getStockName().trim() : stockCode.trim(), stockCodeWeekInfo);
+					shareholderStructures.add(shareholderStructure);
 //				} else {
-//					 
-//					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
-//							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures,
-//							shareholderStructure -> ShareholderStructureService.weekOfYearToScore(shareholderStructure.getWeekOfYear()),
-//							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+//					log.info(String.format("ssList is empty : %1s , and StockInfo is not exsits either", stockCode));
 //				}
-//			} else {
-//				log.warn("stock_info missing : {}", stockCode);
-//			}
-//		});
-//		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();
-//		LocalDate tradeDateLdt = LocalDate.ofInstant(currentTradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
-//		Integer years = tradeDateLdt.getYear();
-//		LocalDate tradeDateMinus365 = tradeDateLdt.minusDays(500);
-//		Instant instant = tradeDateMinus365.atStartOfDay(ZoneId.of("Asia/Taipei")).toInstant();
-//		Date tradeDateBefore365Days = Date.from(instant);
-//		List<MarginTradingAndShortSellingInfo> stockDayPricesFor365Ds = marginTradingAndShortSellingInfoService
-//				.findByTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, currentTradeDate);
+			} catch (InterruptedException e) {
+				log.error(e.getMessage(), e);
+			}
+		});
+		try {
+			shareholderStructureService.bulkUpsertShareholderStructure(shareholderStructures);
+		} catch (Exception e) {
+			log.info(String.format("bulkUpsertShareholderStructure inser fail : %s", e.getMessage()), e);
+		}
+		Map<String, List<ShareholderStructure>> groupedShareholderStructures = shareholderStructureService.getAll().stream()
+		.collect(Collectors.groupingBy(ShareholderStructure::getStockCode));
+		groupedShareholderStructures.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
+		.forEach(entry -> {
+			String stockCode = entry.getKey();
+			List<ShareholderStructure> singleShareholderStructures = entry.getValue();
+			if (allStockCodes.contains(stockCode)) {
+				List<ShareholderStructure> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
+						"ultraLongLivedCache", "shareholderStructure:compressed:" + stockCode, ShareholderStructure.class);
+				if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
+					double weekOfYearScore =  ShareholderStructureService.weekOfYearToScore(singleShareholderStructures.stream().findFirst().get().getWeekOfYear());
+					cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
+							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures.stream().findFirst().get(),
+							weekOfYearScore,
+							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+				} else {
+					 
+					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures,
+							shareholderStructure -> ShareholderStructureService.weekOfYearToScore(shareholderStructure.getWeekOfYear()),
+							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+				}
+			} else {
+				log.warn("stock_info missing : {}", stockCode);
+			}
+		});
+
 		List<StockInfo> stockInfos = ChromeDriverUtils
 				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2");
 		stockInfoService.refreshStockInfoAtomic(stockInfos);

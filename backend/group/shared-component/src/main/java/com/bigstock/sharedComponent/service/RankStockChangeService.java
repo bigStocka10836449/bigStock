@@ -73,6 +73,8 @@ public class RankStockChangeService {
 	    batch.execute();
 	}
 	
+	
+	
 	public void writeStockListRankToRedis(List<StockDayPriceRank> list, Map<String, List<StockInfo>> allStockInfoMaps , String market) {
 
 	    RBatch batch = redissonClient.createBatch();
@@ -107,6 +109,54 @@ public class RankStockChangeService {
 	        map.putAsync("change", stock.getChange());
 	        map.putAsync("limitUp", stock.getLimitUp());
 	        map.putAsync("limitDown", stock.getLimitDown());
+	        Double tradingVolumeDouble = StringUtils.isNotBlank(stock.getTradingVolume()) ? Double.valueOf(stock.getTradingVolume()) : 0d;
+	        Double closeDouble = StringUtils.isNotBlank(stock.getClosingPrice()) ? Double.valueOf(stock.getClosingPrice()) : 0d;
+	        Double tradingQuantity = closeDouble * tradingVolumeDouble;
+	        map.putAsync("tradingQuantity", tradingQuantity.toString());
+	        ranking.addAsync(stock.getChangeRate(), stockCode);
+	    }
+
+	    batch.execute();
+	}
+	
+	public void writeStockListTradingQuantityRankToRedis(List<StockDayPrice> list, Map<String, List<StockInfo>> allStockInfoMaps) {
+
+	    RBatch batch = redissonClient.createBatch();
+
+	    RScoredSortedSetAsync<String> ranking =
+	            batch.getScoredSortedSet(
+	                    RANK_KEY_PREFIX  + "tradingQuantity:changeRate");
+
+	    ranking.deleteAsync(); // clear previous ranking
+
+	    for (StockDayPrice stock : list) {
+	    	if (stock.getClosingPrice().equals("---") || stock.getClosingPrice().equals("----")
+					|| stock.getClosingPrice().equals("--") || stock.getClosingPrice().equals("-") || stock.getLowPrice().equals("--")
+					|| stock.getLowPrice().equals("---") || stock.getLowPrice().equals("----")
+					|| StringUtils.isBlank(stock.getClosingPrice())) {
+				continue;
+			}
+	        String stockCode = stock.getStockCode();
+	        String stockKey = "stock:tradingQuantity:" + stockCode;
+
+	        RMapAsync<String, Object> map =
+	                batch.getMap(stockKey);
+
+	        map.putAsync("stockName", allStockInfoMaps.containsKey(stockCode) ? allStockInfoMaps.get(stockCode).get(0).getStockName() : stockCode);
+	        map.putAsync("open", stock.getOpeningPrice());
+	        map.putAsync("close", stock.getClosingPrice());
+	        map.putAsync("high", stock.getHighPrice());
+	        map.putAsync("low", stock.getLowPrice());
+	        map.putAsync("changeRate", stock.getChangeRate());
+	        map.putAsync("change", stock.getChange());
+	        map.putAsync("tradingVolume", stock.getTradingVolume());
+	        map.putAsync("change", stock.getChange());
+	        map.putAsync("limitUp", stock.getLimitUp());
+	        map.putAsync("limitDown", stock.getLimitDown());
+	        Double tradingVolumeDouble = StringUtils.isNotBlank(stock.getTradingVolume()) ? Double.valueOf(stock.getTradingVolume()) : 0d;
+	        Double closeDouble = StringUtils.isNotBlank(stock.getClosingPrice()) ? Double.valueOf(stock.getClosingPrice()) : 0d;
+	        Double tradingQuantity = closeDouble * tradingVolumeDouble;
+	        map.putAsync("tradingQuantity", tradingQuantity.toString());
 	        ranking.addAsync(stock.getChangeRate(), stockCode);
 	    }
 
@@ -174,6 +224,9 @@ public class RankStockChangeService {
 	            response.setOpeningPrice(castToBigDecimal(stockMap.get("open")));
 	            response.setLimitUp(castToBigDecimal(stockMap.get("limitUp")));
 	            response.setLimitDown(castToBigDecimal(stockMap.get("limitDown")));
+	            if(stockMap.containsKey("tradingQuantity")) {
+	            	response.setTradingQuantity(castToBigDecimal(stockMap.get("tradingQuantity")));
+	            } 
 	        }
 
 	        result.add(response);

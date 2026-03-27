@@ -2,7 +2,6 @@ package com.bigstock.sharedComponent.dto;
 
 import java.math.BigDecimal;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
@@ -18,4 +17,5 @@ public class RankingResponse {
     private BigDecimal closingPrice;
     private BigDecimal limitUp;
     private BigDecimal limitDown;
+    private BigDecimal tradingQuantity;
 }
