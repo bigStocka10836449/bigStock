@@ -288,7 +288,7 @@ public class ShareholderStructureService {
 	                    over_1000_board_lot_people,
 	                    total_people
 	                )
-	                SELECT DISTINCT ON (stock_code, count_date)
+	                SELECT DISTINCT ON (id)
 	                    *
 	                FROM tmp_shareholder_structure
 	                ORDER BY stock_code, count_date
