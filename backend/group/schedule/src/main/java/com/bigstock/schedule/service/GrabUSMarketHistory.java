@@ -58,7 +58,7 @@ public class GrabUSMarketHistory {
 		cacheOperatorService.putCompressedValue("market:raw:history", "WTX&", json);
 	}
 	
-	@Scheduled(cron = "0 00 16 * * ?", zone = "Asia/Taipei")
+	@Scheduled(cron = "0 20 17 * * ?", zone = "Asia/Taipei")
 	public void grabTWPMHistory() {
 		String json = grabThirdPartyStockDayPrice.grabAndCacheTWPMMarketHistoryFromYahoo();
 		cacheOperatorService.putCompressedValue("market:raw:history", "WTX00", json);
