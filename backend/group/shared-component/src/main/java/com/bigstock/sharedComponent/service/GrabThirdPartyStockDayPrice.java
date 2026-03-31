@@ -197,6 +197,162 @@ public class GrabThirdPartyStockDayPrice {
 		}
 	}
 
+	
+/*
+ * 
+ * https://tw.stock.yahoo.com/_td-stock/api/resource/FinanceChartService.ApacLibraCharts;period=d;symbols=%5B%22WTX%26%22%5D?bkt=c1-stock-pc-homepage&device=desktop&ecma=modern&feature=enableGAMAds%2CenableGAMEdgeToEdge%2CenableEvPlayer%2CuseCG%2CuseCGV2&intl=tw&lang=zh-Hant-TW&partner=none&region=TW&site=finance&tz=Asia%2FTaipei
+ * List<String> indicators =  List.of("^SOX","MES=F","MYM=F","MNQ=F");
+			indicators.stream().forEach(indicator -> {
+				String json = grabThirdPartyStockDayPrice.grabAndCacheMarketHistoryFromYahoo(indicator,
+						tradeDateLdtBefore400.atStartOfDay(ZoneOffset.UTC).toInstant().getEpochSecond(),
+						tradeDateLdt.atStartOfDay(ZoneOffset.UTC).toInstant().getEpochSecond());
+				cacheOperatorService.putCompressedValue("market:raw:history", indicator, json);
+				try {
+					Thread.sleep(2000);
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+			});
+		}
+ */
+	
+	/**
+	 * 台指PM近 歷史資訊
+	 * @return
+	 */
+	public String grabAndCacheTWPMNMarketHistoryFromYahoo() {
+			
+			 String symbolsJson = "[\"" + "WTX&" + "\"]";
+			 String encodedSymbols = URLEncoder.encode(symbolsJson, StandardCharsets.UTF_8);
+
+			 String url = "https://tw.stock.yahoo.com/_td-stock/api/resource/FinanceChartService.ApacLibraCharts"
+			            + ";period=d"
+			            + ";symbols=" + encodedSymbols
+			            + "?bkt=c1-stock-pc-homepage"
+			            + "&device=desktop"
+			            + "&ecma=modern"
+			            + "&feature=enableGAMAds%2CenableGAMEdgeToEdge%2CenableEvPlayer%2CuseCG%2CuseCGV2"
+			            + "&intl=tw"
+			            + "&lang=zh-Hant-TW"
+			            + "&partner=none"
+			            + "&region=TW"
+			            + "&site=finance"
+			            + "&tz=Asia%2FTaipei";
+			
+			  int maxRetries = 5;
+			    long delayMillis = 30_000L;
+			    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+
+			        log.info("Yahoo request attempt {} for symbol={}, url={}", attempt, "TWPMN", url);
+
+			        HttpGet request = new HttpGet(url);
+			        request.setHeader("User-Agent", "Mozilla/5.0");
+			        request.setHeader("Accept", "application/json");
+
+			        try (CloseableHttpResponse response = closeableHttpClient.execute(request)) {
+
+			            int status = response.getStatusLine().getStatusCode();
+
+			            if (status == 200) {
+
+			                String body = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+
+			                log.info("Yahoo history success {} on attempt {}", "TWPMN", attempt);
+			                return body;
+			            }
+
+			            log.warn("Yahoo history fail {} status={} attempt={}", "TWPMN", status, attempt);
+
+			        } catch (Exception e) {
+
+			            log.warn("Yahoo history error {} attempt={} msg={}", "TWPMN", attempt, e.getMessage(), e);
+			        }
+
+			        // 嘗試retry，30後重新執行
+			        if (attempt < maxRetries) {
+			            try {
+			                log.info("Retrying {} after {} seconds...", "TWPMN", delayMillis / 1000);
+			                Thread.sleep(delayMillis);
+			            } catch (InterruptedException ie) {
+			                Thread.currentThread().interrupt();
+			                log.warn("Retry interrupted for {}", "TWPMN");
+			                break;
+			            }
+			        }
+			    }
+
+			    log.error("Yahoo history FAILED after {} attempts for {}", maxRetries, "TWPMN");
+			    return StringUtils.EMPTY;
+	}
+	
+	/**
+	 * 台指歷史資訊
+	 * @return
+	 */
+	public String grabAndCacheTWPMMarketHistoryFromYahoo() {
+		 String symbolsJson = "[\"" + "WTX00" + "\"]";
+		 String encodedSymbols = URLEncoder.encode(symbolsJson, StandardCharsets.UTF_8);
+
+		 String url = "https://tw.stock.yahoo.com/_td-stock/api/resource/FinanceChartService.ApacLibraCharts"
+		            + ";period=d"
+		            + ";symbols=" + encodedSymbols
+		            + "?bkt=c1-stock-pc-homepage"
+		            + "&device=desktop"
+		            + "&ecma=modern"
+		            + "&feature=enableGAMAds%2CenableGAMEdgeToEdge%2CenableEvPlayer%2CuseCG%2CuseCGV2"
+		            + "&intl=tw"
+		            + "&lang=zh-Hant-TW"
+		            + "&partner=none"
+		            + "&region=TW"
+		            + "&site=finance"
+		            + "&tz=Asia%2FTaipei";
+		
+		  int maxRetries = 5;
+		    long delayMillis = 30_000L;
+		    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+
+		        log.info("Yahoo request attempt {} for symbol={}, url={}", attempt, "TWPMN", url);
+
+		        HttpGet request = new HttpGet(url);
+		        request.setHeader("User-Agent", "Mozilla/5.0");
+		        request.setHeader("Accept", "application/json");
+
+		        try (CloseableHttpResponse response = closeableHttpClient.execute(request)) {
+
+		            int status = response.getStatusLine().getStatusCode();
+
+		            if (status == 200) {
+
+		                String body = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+
+		                log.info("Yahoo history success {} on attempt {}", "TWPMN", attempt);
+		                return body;
+		            }
+
+		            log.warn("Yahoo history fail {} status={} attempt={}", "TWPMN", status, attempt);
+
+		        } catch (Exception e) {
+
+		            log.warn("Yahoo history error {} attempt={} msg={}", "TWPMN", attempt, e.getMessage(), e);
+		        }
+
+		        // 嘗試retry，30後重新執行
+		        if (attempt < maxRetries) {
+		            try {
+		                log.info("Retrying {} after {} seconds...", "TWPMN", delayMillis / 1000);
+		                Thread.sleep(delayMillis);
+		            } catch (InterruptedException ie) {
+		                Thread.currentThread().interrupt();
+		                log.warn("Retry interrupted for {}", "TWPMN");
+		                break;
+		            }
+		        }
+		    }
+
+		    log.error("Yahoo history FAILED after {} attempts for {}", maxRetries, "TWPMN");
+		    return StringUtils.EMPTY;
+}
+	
 	public String grabAndCacheMarketHistoryFromYahoo(
 	        String symbol,
 	        long period1,

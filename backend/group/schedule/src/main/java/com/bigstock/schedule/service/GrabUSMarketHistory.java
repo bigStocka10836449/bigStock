@@ -49,5 +49,18 @@ public class GrabUSMarketHistory {
 				throw new RuntimeException(e);
 			}
 		});
+		
+	}
+	
+	@Scheduled(cron = "0 00 8 * * ?", zone = "Asia/Taipei")
+	public void grabTWPMNHistory() {
+		String json = grabThirdPartyStockDayPrice.grabAndCacheTWPMNMarketHistoryFromYahoo();
+		cacheOperatorService.putCompressedValue("market:raw:history", "WTX&", json);
+	}
+	
+	@Scheduled(cron = "0 00 16 * * ?", zone = "Asia/Taipei")
+	public void grabTWPMHistory() {
+		String json = grabThirdPartyStockDayPrice.grabAndCacheTWPMMarketHistoryFromYahoo();
+		cacheOperatorService.putCompressedValue("market:raw:history", "WTX00", json);
 	}
 }

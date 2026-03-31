@@ -73,10 +73,10 @@ public class BizController {
 		return rankStockChangeService.getRanking(market, limit, order);
 	}
 	
-	@Operation(summary = "SOX、MES=F、MYM=F、MNQ=F過去歷史", description = "market 分為 TEPX 與 TWSE")
+	@Operation(summary = "^SOX\",\"MES=F\",\"MYM=F\",\"MNQ=F\",\"WTX00\",\"WTX&過去歷史", description = "market 分為 TEPX 與 TWSE")
 	@GetMapping("market/USHistory")
 	public USHistoryResponse getUSHistory() throws InterruptedException, ExecutionException {
-		List<String> indicators =  List.of("^SOX","MES=F","MYM=F","MNQ=F");
+		List<String> indicators =  List.of("^SOX","MES=F","MYM=F","MNQ=F","WTX00","WTX&");
 		Map<String, String> usHistory = Maps.newHashMap();
 		indicators.stream().forEach(indicator ->{
 			String json = cacheOperatorService.getCompressedValue("market:raw:history", indicator, String.class);
