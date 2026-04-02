@@ -243,62 +243,110 @@ public class ShareholderStructureService {
 
 	        // ⭐ 3️⃣ UPSERT
 	        try (Statement stmt = connection.createStatement()) {
-	            stmt.execute("""
-	                INSERT INTO bstock.shareholder_structure AS t (
-	                    id,
-	                    stock_code,
-	                    stock_name,
-	                    week_of_year,
-	                    count_date,
-	                    opening_price,
-	                    closing_price,
-	                    price_change,
-	                    price_change_percent,
-	                    tdcc_stock,
-	                    less_1_board_lot,
-	                    between_1_and_5_board_lot,
-	                    between_5_and_10_board_lot,
-	                    between_10_and_15_board_lot,
-	                    between_15_and_20_board_lot,
-	                    between_20_and_30_board_lot,
-	                    between_30_and_40_board_lot,
-	                    between_40_and_50_board_lot,
-	                    between_50_and_100_board_lot,
-	                    between_100_and_200_board_lot,
-	                    between_200_and_400_board_lot,
-	                    between_400_and_600_board_lot,
-	                    between_600_and_800_board_lot,
-	                    between_800_and_1000_board_lot,
-	                    over_1000_board_lot,
-	                    stock_total,
-	                    less_1_board_lot_people,
-	                    between_1_and_5_board_lot_people,
-	                    between_5_and_10_board_lot_people,
-	                    between_10_and_15_board_lot_people,
-	                    between_15_and_20_board_lot_people,
-	                    between_20_and_30_board_lot_people,
-	                    between_30_and_40_board_lot_people,
-	                    between_40_and_50_board_lot_people,
-	                    between_50_and_100_board_lot_people,
-	                    between_100_and_200_board_lot_people,
-	                    between_200_and_400_board_lot_people,
-	                    between_400_and_600_board_lot_people,
-	                    between_600_and_800_board_lot_people,
-	                    between_800_and_1000_board_lot_people,
-	                    over_1000_board_lot_people,
-	                    total_people
-	                )
-	                SELECT DISTINCT ON (id)
-	                    *
-	                FROM tmp_shareholder_structure
-	                ORDER BY stock_code, count_date
-	                ON CONFLICT (id)
-	                DO UPDATE SET
-	                    closing_price = EXCLUDED.closing_price,
-	                    price_change = EXCLUDED.price_change,
-	                    price_change_percent = EXCLUDED.price_change_percent,
-	                    total_people = EXCLUDED.total_people
-	            """);
+	        	stmt.execute("""
+	        		    INSERT INTO bstock.shareholder_structure AS t (
+	        		        id,
+	        		        stock_code,
+	        		        stock_name,
+	        		        week_of_year,
+	        		        count_date,
+	        		        opening_price,
+	        		        closing_price,
+	        		        price_change,
+	        		        price_change_percent,
+	        		        tdcc_stock,
+	        		        less_1_board_lot,
+	        		        between_1_and_5_board_lot,
+	        		        between_5_and_10_board_lot,
+	        		        between_10_and_15_board_lot,
+	        		        between_15_and_20_board_lot,
+	        		        between_20_and_30_board_lot,
+	        		        between_30_and_40_board_lot,
+	        		        between_40_and_50_board_lot,
+	        		        between_50_and_100_board_lot,
+	        		        between_100_and_200_board_lot,
+	        		        between_200_and_400_board_lot,
+	        		        between_400_and_600_board_lot,
+	        		        between_600_and_800_board_lot,
+	        		        between_800_and_1000_board_lot,
+	        		        over_1000_board_lot,
+	        		        stock_total,
+	        		        less_1_board_lot_people,
+	        		        between_1_and_5_board_lot_people,
+	        		        between_5_and_10_board_lot_people,
+	        		        between_10_and_15_board_lot_people,
+	        		        between_15_and_20_board_lot_people,
+	        		        between_20_and_30_board_lot_people,
+	        		        between_30_and_40_board_lot_people,
+	        		        between_40_and_50_board_lot_people,
+	        		        between_50_and_100_board_lot_people,
+	        		        between_100_and_200_board_lot_people,
+	        		        between_200_and_400_board_lot_people,
+	        		        between_400_and_600_board_lot_people,
+	        		        between_600_and_800_board_lot_people,
+	        		        between_800_and_1000_board_lot_people,
+	        		        over_1000_board_lot_people,
+	        		        total_people
+	        		    )
+	        		    SELECT
+	        		        id,
+	        		        stock_code,
+	        		        stock_name,
+	        		        week_of_year,
+	        		        count_date,
+	        		        opening_price,
+	        		        closing_price,
+	        		        price_change,
+	        		        price_change_percent,
+	        		        tdcc_stock,
+	        		        less_1_board_lot,
+	        		        between_1_and_5_board_lot,
+	        		        between_5_and_10_board_lot,
+	        		        between_10_and_15_board_lot,
+	        		        between_15_and_20_board_lot,
+	        		        between_20_and_30_board_lot,
+	        		        between_30_and_40_board_lot,
+	        		        between_40_and_50_board_lot,
+	        		        between_50_and_100_board_lot,
+	        		        between_100_and_200_board_lot,
+	        		        between_200_and_400_board_lot,
+	        		        between_400_and_600_board_lot,
+	        		        between_600_and_800_board_lot,
+	        		        between_800_and_1000_board_lot,
+	        		        over_1000_board_lot,
+	        		        stock_total,
+	        		        less_1_board_lot_people,
+	        		        between_1_and_5_board_lot_people,
+	        		        between_5_and_10_board_lot_people,
+	        		        between_10_and_15_board_lot_people,
+	        		        between_15_and_20_board_lot_people,
+	        		        between_20_and_30_board_lot_people,
+	        		        between_30_and_40_board_lot_people,
+	        		        between_40_and_50_board_lot_people,
+	        		        between_50_and_100_board_lot_people,
+	        		        between_100_and_200_board_lot_people,
+	        		        between_200_and_400_board_lot_people,
+	        		        between_400_and_600_board_lot_people,
+	        		        between_600_and_800_board_lot_people,
+	        		        between_800_and_1000_board_lot_people,
+	        		        over_1000_board_lot_people,
+	        		        total_people
+	        		    FROM (
+	        		        SELECT *,
+	        		               ROW_NUMBER() OVER (
+	        		                   PARTITION BY id
+	        		                   ORDER BY count_date DESC
+	        		               ) as rn
+	        		        FROM tmp_shareholder_structure
+	        		    ) s
+	        		    WHERE rn = 1
+	        		    ON CONFLICT (id)
+	        		    DO UPDATE SET
+	        		        closing_price = EXCLUDED.closing_price,
+	        		        price_change = EXCLUDED.price_change,
+	        		        price_change_percent = EXCLUDED.price_change_percent,
+	        		        total_people = EXCLUDED.total_people
+	        		""");
 	        }
 
 	        connection.commit();

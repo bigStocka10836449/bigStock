@@ -77,7 +77,7 @@ public class GraspShareholderStructureService {
 		List<String> allStockCodes = Lists.newArrayList();
 		allStockCodes.addAll(tpexStockCodes);
 		allStockCodes.addAll(twseStockCodes);
-		stockCodeWeekInfos.stream().forEach(stockCodeWeekInfo -> {
+		stockCodeWeekInfos.stream().filter(stockCodeWeekInfo -> allStockCodes.contains(stockCodeWeekInfo.get(37).trim())).forEach(stockCodeWeekInfo -> {
 			String stockCode = stockCodeWeekInfo.get(37);
 			try {
 //				if(!stockCode.matches("\\d{4}")) {
