@@ -7,7 +7,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.bigstock.sharedComponent.dto.ThreeInstitutionalTradingResponse;
+import com.bigstock.sharedComponent.service.GraspThreeInsti;
 import com.bigstock.sharedComponent.service.StockThreeInstitutionalTradingService;
+import com.bigstock.sharedComponent.service.StockThreeInstitutionalTradingService.SyncResult;
 import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -16,10 +18,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ThreeInstiService {
 
-    private final org.redisson.api.RedissonClient redissonClient;
-
-    // ✅ shared-component service：負責 Redis → DB
-    private final StockThreeInstitutionalTradingService stockThreeInstiService;
+    private final GraspThreeInsti graspThreeInsti;
 
     /**
      * @throws Exception 
@@ -28,10 +27,11 @@ public class ThreeInstiService {
     public StockThreeInstitutionalTradingService.SyncResult fetchToRedisAndSyncDb(String yyyyMMdd, Duration ttl) throws Exception {
 
         // ① 先抓資料 
-        List<ThreeInstitutionalTradingResponse> twseThreeInstitutionalTradingResponses = ChromeDriverUtils.grabThreeInstiTwse(yyyyMMdd);
-        List<ThreeInstitutionalTradingResponse> tpexThreeInstitutionalTradingResponses = ChromeDriverUtils.grabThreeInstiTpex(yyyyMMdd);
+//        List<ThreeInstitutionalTradingResponse> twseThreeInstitutionalTradingResponses = ChromeDriverUtils.grabThreeInstiTwse(yyyyMMdd);
+//        List<ThreeInstitutionalTradingResponse> tpexThreeInstitutionalTradingResponses = ChromeDriverUtils.grabThreeInstiTpex(yyyyMMdd);
         // ② 同步寫入 DB（新增功能）
-        return stockThreeInstiService.syncFromRedisToDb(yyyyMMdd, twseThreeInstitutionalTradingResponses, tpexThreeInstitutionalTradingResponses);
+        SyncResult result = graspThreeInsti.updateThreeInstiManually(yyyyMMdd);
+        return result;
     }
     
 //    public StockThreeInstitutionalTradingService.SyncResult fetchAndUpsertDb(
