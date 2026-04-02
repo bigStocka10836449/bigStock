@@ -2,6 +2,7 @@ package com.bigstock.sharedComponent.service;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -172,11 +173,8 @@ public class GraspThreeInsti {
 		Map<String, List<StockInfo>> allStockInfoMap =
 				allStockInfos.stream()
 			        .collect(Collectors.groupingBy(StockInfo::getStockCode));
-		// 抓台積電今日交易資訊當作日期參考
-		List<StockDayPrice> stockTpexDayPrices = grabThirdPartyStockDayPrice.grabFromYahoo("2330");
-		Date tradeDate = stockTpexDayPrices.stream().findFirst().get().getTradingDay();
-		LocalDate lod = tradeDate.toInstant().atZone(ZoneId.of("Asia/Taipei")).toLocalDate();
-
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+		LocalDate lod = LocalDate.parse(yyyyMMdd, formatter);
 		List<ThreeInstitutionalTradingResponse> twseThreeInstitutionalTradingResponses = ChromeDriverUtils
 				.grabThreeInstiTwse(yyyyMMdd);
 		List<ThreeInstitutionalTradingResponse> tpexThreeInstitutionalTradingResponses = ChromeDriverUtils
