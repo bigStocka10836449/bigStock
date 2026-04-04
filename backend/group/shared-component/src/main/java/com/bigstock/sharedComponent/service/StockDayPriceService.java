@@ -142,7 +142,11 @@ public class StockDayPriceService {
 	public List<StockDayPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(Date startDateMinus360,
 			 Date endDate){
 		String sql = """
-		        select stock_code, trading_day,change, change_rate, opening_price, closing_price, high_price, low_price, line_k_value, line_d_value
+		        select stock_code, trading_day,change, change_rate, opening_price,
+		         closing_price, high_price, low_price,
+		         start_of_week_date,end_of_week_date,week_of_year,
+		         trading_volume,limit_up,limit_down, line_k_value, line_d_value,five_ma,twenty_ma,ten_ma
+		         ,sixty_ma,one_twenty_ma,two_fourty_ma
 		        from bstock.stock_day_price_rank
 		        where trading_day between ? and ?
 		          and closing_price not in ('--','----','')
@@ -166,8 +170,20 @@ public class StockDayPriceService {
 		                if(ObjectUtils.isNotEmpty(rs.getString("change_rate"))) {
 		                	s.setChangeRate(Double.valueOf(rs.getString("change_rate")));
 		                }
+		                s.setTradingVolume(rs.getString("trading_volume"));
+		                s.setEndOfWeekDate(rs.getDate("end_of_week_date"));
+		                s.setWeekOfYear(rs.getString("week_of_year"));
+		                s.setStartOfWeekDate(rs.getDate("start_of_week_date"));
+		                s.setLimitDown(rs.getString("limit_down"));
+		                s.setLimitUp(rs.getString("limit_up"));
 		                s.setLineKvalue(rs.getString("line_k_value"));
 		                s.setLineDvalue(rs.getString("line_d_value"));
+		                s.setFiveDaysMa(rs.getString("five_ma"));
+		                s.setTenDaysMa(rs.getString("ten_ma"));
+		                s.setTwentyDaysMa(rs.getString("twenty_ma"));
+		                s.setSixtyDaysMa(rs.getString("sixty_ma"));
+		                s.setOneTwentyDaysMa(rs.getString("one_twenty_ma"));
+		                s.setTwoFourtyDaysMa(rs.getString("two_fourty_ma"));
 		                return s;
 		            }
 		    );

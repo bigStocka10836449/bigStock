@@ -61,7 +61,7 @@ public class StockDayPriceRank {
 	@Column(name = "trading_volume")
 	private String tradingVolume;
 	
-	@Column(name = "lmit_up")
+	@Column(name = "limit_up")
 	private String limitUp;
 	
 	@Column(name = "limit_down")
