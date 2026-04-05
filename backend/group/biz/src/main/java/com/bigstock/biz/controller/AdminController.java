@@ -74,46 +74,5 @@ public class AdminController {
 		return ResponseEntity.ok().build();
 	}
 	
-	@PostMapping("insertStockInfoTags")
-	public ResponseEntity<String> insertStockInfoTags(
-			@RequestBody IndustryRequest request) {
-		   List<StockInfoTagMapping> mappingList = new ArrayList<>();
-		    Map<String, Set<String>> stockTagMap = new HashMap<>();
-
-		    for (List<String> row : request.getData()) {
-
-		        String tag = row.get(0).trim().toUpperCase();
-		        String tagName = row.get(1).trim();
-		        String stockStr = row.get(2);
-		        StockInfoTagMapping stockInfoTagMapping = new StockInfoTagMapping();
-		        stockInfoTagMapping.setTag(tag);
-		        stockInfoTagMapping.setTagName(tagName);
-		        // 
-		        mappingList.add(stockInfoTagMapping);
-
-		        //
-		        String[] stocks = stockStr.split("、");
-
-		        for (String stock : stocks) {
-		            String stockCode = stock.trim();
-
-		            stockTagMap
-		                .computeIfAbsent(stockCode, k -> new LinkedHashSet<>())
-		                .add(tag);
-		        }
-		    }
-
-		    //
-		    stockInfoTagMappingService.bulkUpsert(mappingList);
-
-		    // ✅ 2. bulk upsert stock tags
-		    stockTagMap.entrySet().forEach(entry -> {
-		    	entry.getKey();
-		    	List<String> list = entry.getValue().stream()
-	                       .collect(Collectors.toList());
-		    	stockInfoTagService.upsertTags(entry.getKey(), list);
-		    });
-		return ResponseEntity.ok().build();
-	}
 
 }
