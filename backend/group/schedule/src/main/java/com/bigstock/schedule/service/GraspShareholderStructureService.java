@@ -114,7 +114,7 @@ public class GraspShareholderStructureService {
 				List<ShareholderStructure> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
 						"ultraLongLivedCache", "shareholderStructure:compressed:" + stockCode, ShareholderStructure.class);
 				if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
-					double weekOfYearScore =  ShareholderStructureService.weekOfYearToScore(singleShareholderStructures.stream().findFirst().get().getWeekOfYear());
+					double weekOfYearScore =  ShareholderStructureService.weekOfYearToScore(singleShareholderStructures.get(singleShareholderStructures.size() - 1).getWeekOfYear());
 					cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
 							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures.get(singleShareholderStructures.size() - 1),
 							weekOfYearScore,

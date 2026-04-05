@@ -1,9 +1,6 @@
 package com.bigstock.sharedComponent.service;
 
-import java.io.BufferedWriter;
-import java.io.OutputStreamWriter;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
+import java.io.Reader;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
@@ -11,10 +8,9 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import javax.sql.DataSource;
 
@@ -246,104 +242,116 @@ public class StockDayPriceService {
 		stockDayPriceRankRepository.updateRankNo();
 	}
 	
-	@Transactional
-	public void bulkUpsertDayRankPrices(
-	        List<StockDayPriceRank> data,
-	        Date tradingDate) throws Exception {
+	public void bulkUpsertDayRankPrices(List<StockDayPriceRank> data, Date tradingDate) throws Exception {
 
-	    if (data == null || data.isEmpty()) {
-	        return;
-	    }
+		if (data == null || data.isEmpty()) {
+			return;
+		}
 
-	    try (Connection connection = dataSource.getConnection()) {
+		try (Connection connection = dataSource.getConnection()) {
 
-	        connection.setAutoCommit(false);
+			connection.setAutoCommit(false);
 
-	        CopyManager copyManager =
-	                new CopyManager(connection.unwrap(BaseConnection.class));
+			CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
 
-	        // 1️⃣ 建立 TEMP TABLE
-	        try (Statement stmt = connection.createStatement()) {
-	            stmt.execute("""
-	                CREATE TEMP TABLE tmp_stock_day_price_rank
-	                (LIKE bstock.stock_day_price_rank INCLUDING ALL)
-	                ON COMMIT DROP
-	            """);
-	        }
+			// TEMP TABLE
+			try (Statement stmt = connection.createStatement()) {
+				stmt.execute("""
+						    CREATE TEMP TABLE tmp_stock_day_price_rank
+						    (LIKE bstock.stock_day_price_rank INCLUDING ALL)
+						    ON COMMIT DROP
+						""");
+			}
 
-	        // 2️⃣ COPY INTO TEMP TABLE
-	        String copySql = """
-	            COPY tmp_stock_day_price_rank (
-	                stock_code,
-	                trading_day,
-	                month_of_year,
-	                opening_price,
-	                closing_price,
-	                high_price,
-	                low_price,
-	                start_of_week_date,
-	                end_of_week_date,
-	                "change",
-	                change_rate,
-	                week_of_year,
-	                trading_volume,
-	                lmit_up,
-	                limit_down,
-	                line_k_value,
-	                line_d_value,
-	                line_rsv_value,
-	                five_ma,
-	                twenty_ma,
-	                ten_ma,
-	                sixty_ma,
-	                one_twenty_ma,
-	                two_fourty_ma,
-	                rank_no
-	            )
-	            FROM STDIN WITH (FORMAT csv)
-	        """;
+			Reader reader = new Reader() {
 
-	        PipedOutputStream pos = new PipedOutputStream();
-	        PipedInputStream pis = new PipedInputStream(pos, 65536);
+				private final Iterator<StockDayPriceRank> it = data.iterator();
+				private String currentLine = null;
+				private int index = 0;
 
-	        ExecutorService executor = Executors.newSingleThreadExecutor();
+				@Override
+				public int read(char[] cbuf, int off, int len) {
 
-	        executor.submit(() -> {
-	            try (BufferedWriter writer =
-	                         new BufferedWriter(new OutputStreamWriter(pos))) {
+					try {
+						int count = 0;
 
-	                for (StockDayPriceRank item : data) {
-	                    writer.write(buildCsvLine(item));
-	                    writer.newLine();
-	                }
-	            }
-	            return null;
-	        });
+						while (count < len) {
 
-	        copyManager.copyIn(copySql, pis);
+							if (currentLine == null || index >= currentLine.length()) {
+								if (!it.hasNext())
+									break;
 
-	        executor.shutdown();
+								currentLine = buildCsvLine(it.next()) + "\n";
+								index = 0;
+							}
 
-	        // 3️ 刪除該交易日舊資料（只刪單日）
-	        try (PreparedStatement ps = connection.prepareStatement("""
-	           DELETE FROM bstock.stock_day_price_rank t
-				USING tmp_stock_day_price_rank tmp
-				WHERE t.stock_code = tmp.stock_code
-				AND t.trading_day = tmp.trading_day
-	        """)) {
-	            ps.executeUpdate();
-	        }
+							cbuf[off + count] = currentLine.charAt(index++);
+							count++;
+						}
 
-	        // 4️⃣ Merge
-	        try (Statement stmt = connection.createStatement()) {
-	            stmt.execute("""
-	                INSERT INTO bstock.stock_day_price_rank
-	                SELECT * FROM tmp_stock_day_price_rank
-	            """);
-	        }
+						return count == 0 ? -1 : count;
 
-	        connection.commit();
-	    }
+					} catch (Exception e) {
+						throw new RuntimeException(e);
+					}
+				}
+
+				@Override
+				public void close() {
+				}
+			};
+
+			copyManager.copyIn("""
+					    COPY tmp_stock_day_price_rank (
+					        stock_code,
+					        trading_day,
+					        month_of_year,
+					        opening_price,
+					        closing_price,
+					        high_price,
+					        low_price,
+					        start_of_week_date,
+					        end_of_week_date,
+					        "change",
+					        change_rate,
+					        week_of_year,
+					        trading_volume,
+					        lmit_up,
+					        limit_down,
+					        line_k_value,
+					        line_d_value,
+					        line_rsv_value,
+					        five_ma,
+					        twenty_ma,
+					        ten_ma,
+					        sixty_ma,
+					        one_twenty_ma,
+					        two_fourty_ma,
+					        rank_no
+					    )
+					    FROM STDIN WITH (FORMAT csv)
+					""", reader);
+
+			// DELETE
+			try (PreparedStatement ps = connection.prepareStatement("""
+					    DELETE FROM bstock.stock_day_price_rank t
+					    USING tmp_stock_day_price_rank tmp
+					    WHERE t.stock_code = tmp.stock_code
+					    AND t.trading_day = tmp.trading_day
+					""")) {
+				ps.executeUpdate();
+			}
+
+			// INSERT
+			try (Statement stmt = connection.createStatement()) {
+				stmt.execute("""
+						    INSERT INTO bstock.stock_day_price_rank
+						    SELECT * FROM tmp_stock_day_price_rank
+						""");
+			}
+
+			connection.commit();
+		}
 	}
 	
 	private String buildCsvLine(StockDayPriceRank item) {
