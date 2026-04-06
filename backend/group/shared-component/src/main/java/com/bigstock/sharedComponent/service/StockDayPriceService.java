@@ -316,7 +316,7 @@ public class StockDayPriceService {
 					        change_rate,
 					        week_of_year,
 					        trading_volume,
-					        lmit_up,
+					        limit_up,
 					        limit_down,
 					        line_k_value,
 					        line_d_value,

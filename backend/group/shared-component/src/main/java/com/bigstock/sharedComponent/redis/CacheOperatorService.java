@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -23,6 +24,7 @@ import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.stereotype.Service;
@@ -42,7 +44,8 @@ public class CacheOperatorService {
 	@Autowired
 	private RedisTemplate<String, Object> redisTemplate;
 	
-	
+	@Autowired
+	private StringRedisTemplate stringRedisTemplate;
 
 	@Autowired
 	@Qualifier("rawRedisTemplate")
@@ -455,7 +458,76 @@ public class CacheOperatorService {
 	        throw new RuntimeException("decode cache value failed", e);
 	    }
 	}
+	
 	public <T> void putSnapshotDataListAtomic(
+			String cacheName, String key,
+	        List<T> data
+	) {
+
+		String redisKey = buildKey(cacheName, key);
+	    try {
+	    	ObjectMapper objectMapper = new ObjectMapper();
+			byte[] jsonByte = objectMapper.writeValueAsBytes(data);
+
+	        String versionKey =
+	        		redisKey + ":v" + System.currentTimeMillis();
+
+	        byte[] versionKeyByte = versionKey.getBytes();
+	        
+	        String activeKey =
+	        		redisKey + ":active";
+
+	     // write snapshot blob
+	        rawRedisTemplate.opsForValue()
+	                .set(versionKey, jsonByte);
+
+	        // atomic pointer swap
+	        rawRedisTemplate.opsForValue()
+	                .set(activeKey, versionKeyByte);
+
+	    } catch (Exception e) {
+
+	        log.error("put snapshot failed redisKey={}", redisKey, e);
+	    }
+	}
+	
+	public <T> List<T> getSnapshotDataList(
+			String cacheName, String key,
+	        Class<T> clazz
+	) {
+		String redisKey = buildKey(cacheName, key);
+	    try {
+	    	ObjectMapper objectMapper = new ObjectMapper();
+	        String activeKey = redisKey + ":active";
+
+		    byte[] activeVersionBytes =
+		            rawRedisTemplate.opsForValue().get(activeKey);
+	        if (activeVersionBytes == null) {
+	            return List.of();
+	        }
+	        String versionKey = new String(activeVersionBytes);
+	        byte[] json =
+	                rawRedisTemplate.opsForValue()
+	                        .get(versionKey);
+
+	        if (json == null) {
+	            return List.of();
+	        }
+
+
+	        JavaType type = objectMapper.getTypeFactory()
+	                .constructCollectionType(List.class, clazz);
+
+	        return objectMapper.readValue(json, type);
+
+	    } catch (Exception e) {
+
+	        log.error("read snapshot failed redisKey={}", redisKey, e);
+	        return List.of();
+	    }
+	}
+	
+	public <T> void putSnapshotDataListCompressedAtomic(
 			String cacheName, String key,
 	        List<T> data
 	) {
@@ -488,7 +560,7 @@ public class CacheOperatorService {
 	    }
 	}
 	
-	public <T> List<T> getSnapshotDataList(
+	public <T> List<T> getSnapshotDataListDeCompressed(
 			String cacheName, String key,
 	        Class<T> clazz
 	) {
@@ -606,6 +678,58 @@ public class CacheOperatorService {
 
 	    return pipelineDelete(deleteList);
 	}
+	
+	
+	   // ---------- SET ----------
+    public void putSet(String key, Collection<String> values) {
+        if (values == null || values.isEmpty()) return;
+
+        stringRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            byte[] k = key.getBytes();
+            for (String v : values) {
+                connection.sAdd(k, v.getBytes());
+            }
+            return null;
+        });
+    }
+
+    //  ----   -一般正常流程
+    public Set<String> getSet(String key) {
+        Set<String> result = stringRedisTemplate.opsForSet().members(key);
+        return result != null ? result : Collections.emptySet();
+    }
+
+    public void addToSet(String key, String value) {
+    	stringRedisTemplate.opsForSet().add(key, value);
+    }
+
+    // ---------- HASH ----------
+    public void putHash(String key, Map<String, String> map) {
+    	stringRedisTemplate.opsForHash().putAll(key, map);
+    }
+
+    public Map<Object, Object> getHash(String key) {
+        return stringRedisTemplate.opsForHash().entries(key);
+    }
+
+    // ---------- STRING ----------
+    public void putValue(String key, String value) {
+    	stringRedisTemplate.opsForValue().set(key, value);
+    }
+
+    public String getValue(String key) {
+        return stringRedisTemplate.opsForValue().get(key);
+    }
+
+    // ---------- COMMON ----------
+    public void delete(String key) {
+    	stringRedisTemplate.delete(key);
+    }
+
+    public boolean exists(String key) {
+        Boolean exist = stringRedisTemplate.hasKey(key);
+        return Boolean.TRUE.equals(exist);
+    }
 	
 	private List<String> scanKeys(String pattern) {
 

@@ -18,6 +18,7 @@ import com.bigstock.biz.dto.IndustryRequest;
 import com.bigstock.sharedComponent.entity.StockInfoTagMapping;
 import com.bigstock.sharedComponent.service.StockInfoTagMappingService;
 import com.bigstock.sharedComponent.service.StockInfoTagService;
+import com.bigstock.sharedComponent.service.StockTagCacheService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,8 @@ public class AdminController {
 	private final StockInfoTagService stockInfoTagService;
 	
 	private final StockInfoTagMappingService stockInfoTagMappingService;
+	
+	private final StockTagCacheService stockTagCacheService;
 
 	@PostMapping("insertStockInfoTags")
 	public ResponseEntity<String> insertStockInfoTags(
@@ -59,6 +62,7 @@ public class AdminController {
 		                .computeIfAbsent(stockCode, k -> new LinkedHashSet<>())
 		                .add(tag);
 		        }
+		        stockTagCacheService.cacheTagStocks(tag, tagName, List.of(stocks));
 		    }
 
 		    //
@@ -66,10 +70,10 @@ public class AdminController {
 
 		    // ✅ 2. bulk upsert stock tags
 		    stockTagMap.entrySet().forEach(entry -> {
-		    	entry.getKey();
 		    	List<String> list = entry.getValue().stream()
 	                       .collect(Collectors.toList());
 		    	stockInfoTagService.upsertTags(entry.getKey(), list);
+		    	stockTagCacheService.cacheStockTags(entry.getKey(), list);
 		    });
 		return ResponseEntity.ok().build();
 	}

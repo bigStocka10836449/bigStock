@@ -134,7 +134,7 @@ public class GraspShareholderStructureService {
 		List<StockInfo> stockInfos = ChromeDriverUtils
 				.getStockInfoByTdccApi("https://openapi.tdcc.com.tw/v1/opendata/1-2");
 		stockInfoService.refreshStockInfoAtomic(stockInfos);
-		cacheOperatorService.putSnapshotDataListAtomic("ultraLongLivedCache", "stockInfo:compressed", stockInfos);
+		cacheOperatorService.putSnapshotDataListCompressedAtomic("ultraLongLivedCache", "stockInfo:compressed", stockInfos);
         infraTaskService.submitCleanupWithTimeout(
                 "stock-info-cleanup",
                 () -> {

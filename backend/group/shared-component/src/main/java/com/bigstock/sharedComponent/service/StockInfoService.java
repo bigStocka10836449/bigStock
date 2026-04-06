@@ -38,7 +38,7 @@ public class StockInfoService {
 	private final RedissonClient redissonClient;
 	
 	public List<StockInfo> getAllStockInfo() {
-		List<StockInfo> stockInfos = cacheOperatorService.getSnapshotDataList("ultraLongLivedCache",
+		List<StockInfo> stockInfos = cacheOperatorService.getSnapshotDataListDeCompressed("ultraLongLivedCache",
 				"stockInfo:compressed", StockInfo.class);
 		if (stockInfos.isEmpty()) {
 			return stockInfos;
@@ -52,14 +52,14 @@ public class StockInfoService {
 				lockAcquired = lock.tryLock(10, TimeUnit.MINUTES);
 
 				if (lockAcquired) {
-					stockInfos = cacheOperatorService.getSnapshotDataList("ultraLongLivedCache", "stockInfo:compressed",
+					stockInfos = cacheOperatorService.getSnapshotDataListDeCompressed("ultraLongLivedCache", "stockInfo:compressed",
 							StockInfo.class);
 
 					if (!stockInfos.isEmpty()) {
 						return stockInfos;
 					}
 					List<StockInfo> nonCacheSstockInfos = stockInfoRepository.getAllStockInfo();
-					cacheOperatorService.putSnapshotDataListAtomic("ultraLongLivedCache", "stockInfo:compressed",
+					cacheOperatorService.putSnapshotDataListCompressedAtomic("ultraLongLivedCache", "stockInfo:compressed",
 							nonCacheSstockInfos);
 					return nonCacheSstockInfos;
 				} else {
