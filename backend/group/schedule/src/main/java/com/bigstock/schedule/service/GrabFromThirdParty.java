@@ -63,7 +63,7 @@ public class GrabFromThirdParty {
 
 	private final MarginTradingAndShortSellingInfoService marginTradingAndShortSellingInfoService;
 
-//	@PostConstruct
+	@PostConstruct
 	@Scheduled(cron = "0 55 15 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
@@ -81,15 +81,15 @@ public class GrabFromThirdParty {
 		allStockCodes.addAll(tpexStockCodes);
 		allStockCodes.addAll(twseStockCodes);
 		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
-//		allStockCodes.forEach(stockCode -> {
-//			allStockDayPrices.addAll(grabThirdPartyStockDayPrice.grabFromYahoo(stockCode));
-//			try {
-//				Thread.sleep(2000);
-//			} catch (InterruptedException e) {
-//				log.warn(stockCode + e.getMessage(), e);
-//			}
-//		});
-//		stockDayPriceService.upsertBatch(allStockDayPrices);
+		allStockCodes.forEach(stockCode -> {
+			allStockDayPrices.addAll(grabThirdPartyStockDayPrice.grabFromYahoo(stockCode));
+			try {
+				Thread.sleep(2000);
+			} catch (InterruptedException e) {
+				log.warn(stockCode + e.getMessage(), e);
+			}
+		});
+		stockDayPriceService.upsertBatch(allStockDayPrices);
 		Date tradeDate = allStockDayPrices.stream().findFirst().get().getTradingDay();
 		LocalDate tradeDateLdt = LocalDate.ofInstant(tradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
 		Integer years = tradeDateLdt.getYear();

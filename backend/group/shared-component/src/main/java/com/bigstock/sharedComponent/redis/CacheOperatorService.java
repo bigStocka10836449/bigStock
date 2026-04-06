@@ -41,6 +41,8 @@ public class CacheOperatorService {
 
 	@Autowired
 	private RedisTemplate<String, Object> redisTemplate;
+	
+	
 
 	@Autowired
 	@Qualifier("rawRedisTemplate")
