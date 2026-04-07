@@ -1,7 +1,9 @@
 package com.bigstock.sharedComponent.service;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,15 +33,25 @@ public class StockTagCacheService {
         log.info("Old snapshot cleanup done. namespace={}, deleted={}", ("cache:ultraLongLivedCache:stockTags:"+stockCode), deleted);
     }
 
-    public List<String> getStockTags(String stockCode) {
+    public List<Map> getStockTags(String stockCode) {
     	List<String> stockTags = cache.getSnapshotDataList("ultraLongLivedCache",
-				"stockInfo:"+stockCode, String.class);
-        return stockTags;
+				"stockTags:"+stockCode, String.class);
+    	List<Map> tagMapping = Lists.newArrayList();
+    	stockTags.stream().forEach(stockTag ->{
+    		List<Map> tagInfos = cache.getSnapshotDataList("ultraLongLivedCache",
+    				"tagInfo:"+stockTag, Map.class);
+        	Optional<Map> tagInfoOp =  tagInfos.stream().findFirst();
+        	Map<String, String> mapping = Maps.newHashMap();
+        	mapping.put("code", stockTag);
+        	mapping.put("title", tagInfoOp.isPresent() ? tagInfoOp.get().get("title").toString() : "");
+        	tagMapping.add(mapping);
+    	});
+        return tagMapping;
     }
 
     // ---------- tag → stocks ----------
 	public void cacheTagStocks(String tag, String tagMeta, Collection<String> stockCodes) {
-		JSONObject tagInfo = new JSONObject();
+		Map<String, Object> tagInfo = new HashMap<>();
 		tagInfo.put("title", tagMeta);
 		tagInfo.put("stockCodes", stockCodes);
 		cache.putSnapshotDataListAtomic("ultraLongLivedCache", "tagInfo:" + tag, Lists.newArrayList(tagInfo));
@@ -48,18 +61,16 @@ public class StockTagCacheService {
 	}
 
     public List<String> getTagStocks(String tag) {
-    	List<JSONObject> tagInfos = cache.getSnapshotDataList("ultraLongLivedCache",
-				"tagInfo:"+tag, JSONObject.class);
-    	Optional<JSONObject> tagInfoOp =  tagInfos.stream().findFirst();
+    	List<Map> tagInfos = cache.getSnapshotDataList("ultraLongLivedCache",
+				"tagInfo:"+tag, Map.class);
+    	Optional<Map> tagInfoOp =  tagInfos.stream().findFirst();
     	if(tagInfoOp.isEmpty()) {
     		return Lists.newArrayList();
     	}
-    	JSONArray jsonArray = tagInfoOp.get().getJSONArray("stockCodes");
+    	Object stockCodesOb = tagInfoOp.get().get("stockCodes");
+    	List<String> jsonArray = Lists.newArrayList(stockCodesOb.toString().replace("[", "").replace("]", "").split(","));
 
-    	List<String> stockCodes = IntStream.range(0, jsonArray.length())
-    	        .mapToObj(jsonArray::getString)
-    	        .collect(Collectors.toList());
-        return stockCodes;
+        return jsonArray;
     }
 
 }

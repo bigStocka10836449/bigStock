@@ -23,10 +23,12 @@ import com.bigstock.sharedComponent.dto.RankingResponse;
 import com.bigstock.sharedComponent.dto.USHistoryResponse;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockInfo;
+import com.bigstock.sharedComponent.entity.StockInfoTag;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.service.RankStockChangeService;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
 import com.bigstock.sharedComponent.service.StockInfoService;
+import com.bigstock.sharedComponent.service.StockTagCacheService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Maps;
 
@@ -51,11 +53,26 @@ public class BizController {
 	
 	private final StockInfoService stockInfoService;
 	
+	private final StockTagCacheService stockTagCacheService;
+	
 	@Operation(summary = "股市分類資訊", description = "")
 	@GetMapping("stockInfo")
 	public ResponseEntity<List<StockInfo>> getStockInfo() {
 		return ResponseEntity.ok(stockInfoService.getAllStockInfo());
 	}
+	
+	@Operation(summary = "股市分類資訊,回傳多組分類", description = "BBB,FFFF")
+	@GetMapping("tagInfo/{stockCode}")
+	public ResponseEntity<List<Map>> getStockInfoTag(@PathVariable("stockCode") String stockCode) {
+		return ResponseEntity.ok(stockTagCacheService.getStockTags(stockCode));
+	}
+	
+	@Operation(summary = "依照分類資訊回傳對應分類的個股代號,回傳多組分類", description = "1240,3554")
+	@GetMapping("tagStocks/{tag}")
+	public ResponseEntity<List<String>> getTagStocks(@PathVariable("tag") String tag) {
+		return ResponseEntity.ok(stockTagCacheService.getTagStocks(tag));
+	}
+	
 	
 //	@NewSpan("stockShareholderStructure")
 	@Operation(summary = "個別股票持股分布", description = "")

@@ -509,11 +509,9 @@ public class CacheOperatorService {
 	        byte[] json =
 	                rawRedisTemplate.opsForValue()
 	                        .get(versionKey);
-
 	        if (json == null) {
 	            return List.of();
 	        }
-
 
 	        JavaType type = objectMapper.getTypeFactory()
 	                .constructCollectionType(List.class, clazz);

@@ -24,6 +24,8 @@ public class StockInfoTagService {
     private final DataSource dataSource;
     private final StockInfoTagRepository tagRepository;
 
+    
+    
     // =====================================================
     // 1. SINGLE UPSERT (atomic, no race condition)
     // =====================================================
