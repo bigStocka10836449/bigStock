@@ -491,6 +491,62 @@ public class CacheOperatorService {
 	    }
 	}
 	
+	public <T> void putDataList(String cacheName, String key, List<T> data) {
+
+		String redisKey = buildKey(cacheName, key);
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
+			byte[] jsonByte = objectMapper.writeValueAsBytes(data);
+
+			rawRedisTemplate.opsForValue().set(redisKey, jsonByte);
+
+		} catch (Exception e) {
+
+			log.error("put dataList failed redisKey={}", redisKey, e);
+		}
+	}
+	
+	public <T> List<T> getDataList(String cacheName, String key, Class<T> clazz) {
+	    String redisKeyPattern = buildKey(cacheName, key);
+
+	    List<T> result = new ArrayList<>();
+	    ObjectMapper objectMapper = new ObjectMapper();
+
+	    RedisConnection connection = null;
+	    Cursor<byte[]> cursor = null;
+
+	    try {
+	        connection = rawRedisTemplate.getConnectionFactory().getConnection();
+
+	        cursor = connection.scan(ScanOptions.scanOptions()
+	                .match(redisKeyPattern)
+	                .count(100)
+	                .build());
+
+	        while (cursor.hasNext()) {
+	            byte[] currentKey = cursor.next();
+
+	            // ✅ IMPORTANT: use connection.get(), NOT redisTemplate
+	            byte[] value = connection.get(currentKey);
+				JavaType type = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
+
+				List<T> list = objectMapper.readValue(value, type);
+				result.addAll(list);
+			}
+
+	        return result;
+
+	    } catch (Exception e) {
+	        log.error("get dataList failed redisKey={}", redisKeyPattern, e);
+	        return List.of();
+	    } finally {
+	        try {
+	            if (cursor != null) cursor.close();
+	            if (connection != null) connection.close();
+	        } catch (Exception ignore) {}
+	    }
+	}
+	
 	public <T> List<T> getSnapshotDataList(
 			String cacheName, String key,
 	        Class<T> clazz
@@ -679,11 +735,12 @@ public class CacheOperatorService {
 	
 	
 	   // ---------- SET ----------
-    public void putSet(String key, Collection<String> values) {
+    public void putSet(String cacheName, String cacheKey, Collection<String> values) {
         if (values == null || values.isEmpty()) return;
+        String redisKey = buildKey(cacheName, cacheKey);
 
         stringRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
-            byte[] k = key.getBytes();
+            byte[] k = redisKey.getBytes();
             for (String v : values) {
                 connection.sAdd(k, v.getBytes());
             }
@@ -692,8 +749,9 @@ public class CacheOperatorService {
     }
 
     //  ----   -一般正常流程
-    public Set<String> getSet(String key) {
-        Set<String> result = stringRedisTemplate.opsForSet().members(key);
+    public Set<String> getSet(String cacheName, String cacheKey) {
+    	String redisKey = buildKey(cacheName, cacheKey);
+        Set<String> result = stringRedisTemplate.opsForSet().members(redisKey);
         return result != null ? result : Collections.emptySet();
     }
 
