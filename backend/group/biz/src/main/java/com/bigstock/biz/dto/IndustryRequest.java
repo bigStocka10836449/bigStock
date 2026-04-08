@@ -12,5 +12,5 @@ public class IndustryRequest {
     private List<String> title;
 
     @JsonProperty("Data")
-    private List<IndustryData> data;
+    private List<List<String>> data;
 }
