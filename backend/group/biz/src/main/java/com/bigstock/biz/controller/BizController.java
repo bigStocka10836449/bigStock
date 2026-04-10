@@ -61,6 +61,12 @@ public class BizController {
 		return ResponseEntity.ok(stockInfoService.getAllStockInfo());
 	}
 	
+	@Operation(summary = "股市分類資訊", description = "")
+	@PostMapping("realTimeNewsImport")
+	public ResponseEntity<List<StockInfo>> realTimeNewsImport() {
+		return ResponseEntity.ok(stockInfoService.getAllStockInfo());
+	}
+	
 	@Operation(summary = "股市分類資訊代號對照表", description = "BBB,FFFF")
 	@GetMapping("tagsMapping")
 	public ResponseEntity<Map<String, String>> getTagsMapping() {
