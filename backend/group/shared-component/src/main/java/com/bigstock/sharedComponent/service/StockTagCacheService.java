@@ -123,7 +123,7 @@ public class StockTagCacheService {
     	List<String> stockCodes = Lists.newArrayList(stockCodesOb.toString().replace("[", "").replace("]", "").split(","));
     	Map<String, String> partStockCodeMapping = Maps.newHashMap();
     	stockCodes.forEach(stockCode ->{
-    		partStockCodeMapping.put(stockCode, stockCodeMapping.get(stockCode));
+    		partStockCodeMapping.put(stockCode.trim(), stockCodeMapping.get(stockCode.trim()));
     	});
         return partStockCodeMapping;
     }
