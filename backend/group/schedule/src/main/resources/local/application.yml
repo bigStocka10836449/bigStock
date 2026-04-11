@@ -40,7 +40,7 @@ spring:
         max-idle: 500
         min-idle: 10
         max-wait: 100000
-    port: 30815      
+    port: 32666      
 logging:
   config: classpath:logback.xml
   

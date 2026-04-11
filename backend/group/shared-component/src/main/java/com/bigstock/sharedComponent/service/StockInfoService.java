@@ -40,7 +40,7 @@ public class StockInfoService {
 	public List<StockInfo> getAllStockInfo() {
 		List<StockInfo> stockInfos = cacheOperatorService.getSnapshotDataListDeCompressed("ultraLongLivedCache",
 				"stockInfo:compressed", StockInfo.class);
-		if (stockInfos.isEmpty()) {
+		if (!stockInfos.isEmpty()) {
 			return stockInfos;
 		} else {
 			String lockKey = "lock:getAllStockInfo:cacheName:ultraLongLivedCache:stockInfo:compressed";
