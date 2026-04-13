@@ -14,17 +14,23 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.biz.dto.NewsDataInfo;
+import com.bigstock.biz.schedule.GraspTWPMOnTheFly;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class NewsStreamConsumer {
 
     private final StringRedisTemplate redisTemplate;
+    
+    private final GraspTWPMOnTheFly graspTWPMOnTheFly;
 
     private static final String STREAM_KEY = "news_stream_for_server";
     private static final String GROUP = "news_group";
@@ -70,10 +76,10 @@ public class NewsStreamConsumer {
                         		content,
                             new TypeReference<List<NewsDataInfo>>() {}
                         );
-                        // 👉 YOUR LOGIC HERE
-                        processNews(title, content, source);
+            
+                        processNews(title, list, source);
 
-                        // ✅ ACK
+    
                         redisTemplate.opsForStream()
                                 .acknowledge(STREAM_KEY, GROUP, msg.getId());
                     }
@@ -85,11 +91,10 @@ public class NewsStreamConsumer {
         }
     }
 
-    private void processNews(String title, String content, String source) {
-        System.out.println("Processing: " + title);
-
-        // 1. Save to DB
-        // 2. Cache
-        // 3. WebSocket push
+    private void processNews(String title, List<NewsDataInfo> list, String source) throws JsonProcessingException {
+        log.info("Processing: " + title);
+        ObjectMapper objectMapper = new ObjectMapper();
+        String newsDataInfoStr = objectMapper.writeValueAsString(list);
+        graspTWPMOnTheFly.newsDataBroadCase(newsDataInfoStr);
     }
 }

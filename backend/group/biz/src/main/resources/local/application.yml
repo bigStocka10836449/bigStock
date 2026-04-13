@@ -48,7 +48,7 @@ spring:
         max-idle: 500
         min-idle: 10
         max-wait: 100000
-    port: 30815
+    port: 32666
   mail:
     host: smtp.gmail.com
     port: 587
