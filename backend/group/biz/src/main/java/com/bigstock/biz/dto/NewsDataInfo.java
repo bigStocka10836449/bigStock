@@ -16,7 +16,7 @@ public class NewsDataInfo {
 
 	private NewsData data;
 
-	private Integer important;
+	private Boolean important;
 	private List<Remark> remark;
 
 	private List<Integer> channel;
