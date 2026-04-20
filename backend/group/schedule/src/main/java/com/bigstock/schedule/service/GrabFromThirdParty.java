@@ -64,7 +64,7 @@ public class GrabFromThirdParty {
 	private final MarginTradingAndShortSellingInfoService marginTradingAndShortSellingInfoService;
 
 //	@PostConstruct
-	@Scheduled(cron = "0 50 08 * * ?", zone = "Asia/Taipei")
+	@Scheduled(cron = "0 20 18 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
