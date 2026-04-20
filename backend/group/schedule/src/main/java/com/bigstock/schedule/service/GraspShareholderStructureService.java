@@ -105,8 +105,12 @@ public class GraspShareholderStructureService {
 			log.info(String.format("bulkUpsertShareholderStructure inser fail : %s", e.getMessage()), e);
 		}
 		Map<String, List<ShareholderStructure>> groupedShareholderStructures = shareholderStructureService.getAll().stream()
+		.collect(Collectors.groupingBy(
+	            s -> s.getStockCode() == null ? null : s.getStockCode().trim()
+		        ));
+		Map<String, List<ShareholderStructure>> newestGroupedShareholderStructures = shareholderStructures.stream()
 		.collect(Collectors.groupingBy(ShareholderStructure::getStockCode));
-		groupedShareholderStructures.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
+		newestGroupedShareholderStructures.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
 		.forEach(entry -> {
 			String stockCode = entry.getKey();
 			List<ShareholderStructure> singleShareholderStructures = entry.getValue();
@@ -122,7 +126,7 @@ public class GraspShareholderStructureService {
 				} else {
 					 
 					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
-							"shareholderStructure:compressed:" + stockCode, singleShareholderStructures,
+							"shareholderStructure:compressed:" + stockCode, groupedShareholderStructures.get(stockCode),
 							shareholderStructure -> ShareholderStructureService.weekOfYearToScore(shareholderStructure.getWeekOfYear()),
 							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
 				}
