@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClientException;
 
+import com.bigstock.biz.dto.FinancialCalendarImportChunkRequest;
 import com.bigstock.biz.dto.MarginTradingAndShortSellingInfoVO;
 import com.bigstock.biz.service.BizService;
 import com.bigstock.sharedComponent.dto.RankingResponse;
@@ -66,8 +67,8 @@ public class BizController {
 	
 	@Operation(summary = "股市分類資訊", description = "")
 	@PostMapping("financialCalendarImport/{year}/{month}/{platForm}")
-	public ResponseEntity<List<StockInfo>> financialCalendarImport(@PathVariable("year") Integer year, @PathVariable("month") Integer month,@PathVariable("platForm") String platForm, @RequestBody List<FinancialCalendar> cteeFinancialCalendars) throws Exception {
-		financialCalendarService.importFinancialCalendar(year, month, cteeFinancialCalendars, platForm);
+	public ResponseEntity<List<StockInfo>> financialCalendarImport(@PathVariable("year") Integer year, @PathVariable("month") Integer month,@PathVariable("platForm") String platForm, @RequestBody FinancialCalendarImportChunkRequest financialCalendarImportChunkRequest) throws Exception {
+		financialCalendarService.importFinancialCalendar(year, month, financialCalendarImportChunkRequest.getBatch(), platForm);
 		return ResponseEntity.ok().build();
 	}
 	
