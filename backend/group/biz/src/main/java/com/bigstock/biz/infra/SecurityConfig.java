@@ -89,7 +89,7 @@ public class SecurityConfig {
 //                auth.requestMatchers(HttpMethod.POST, publicPaths).permitAll();
 //                auth.requestMatchers(HttpMethod.PUT, publicPaths).permitAll();
 					auth.requestMatchers("/gateway/swagger/**", "/api/biz/swagger/**", "/biz/swagger/**","/ws/**",
-							"/v3/api-docs/**", "/swagger-ui/**", "/webjars/**", "/auth/**","/biz/stockShareholderStructure/**").permitAll();
+							"/v3/api-docs/**", "/swagger-ui/**", "/webjars/**", "/auth/**","/biz/stockShareholderStructure/**","/biz/financialCalendarImport/**").permitAll();
 
 					/*
 					 * ========================================================= 動態 Role → Path（反轉成
