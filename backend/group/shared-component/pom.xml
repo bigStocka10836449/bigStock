@@ -90,6 +90,10 @@
 			<artifactId>spring-data-redis</artifactId>
 			<scope>compile</scope>
 		</dependency>
+		<dependency>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>okhttp</artifactId>
+		</dependency>
 		<!-- https://mvnrepository.com/artifact/io.socket/socket.io-client -->
 	</dependencies>
 

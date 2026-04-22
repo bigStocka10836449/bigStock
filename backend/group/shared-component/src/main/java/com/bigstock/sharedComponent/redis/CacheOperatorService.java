@@ -778,8 +778,9 @@ public class CacheOperatorService {
     }
 
     // ---------- COMMON ----------
-    public void delete(String key) {
-    	stringRedisTemplate.delete(key);
+    public void delete(String cacheName, String key) {
+    	String redisKey = buildKey(cacheName, key);
+    	stringRedisTemplate.delete(redisKey);
     }
 
     public boolean exists(String key) {
@@ -815,6 +816,7 @@ public class CacheOperatorService {
 
 	    return keys;
 	}
+	
 	
 	private long pipelineDelete(List<String> keys) {
 

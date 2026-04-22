@@ -21,10 +21,11 @@ import com.bigstock.biz.dto.MarginTradingAndShortSellingInfoVO;
 import com.bigstock.biz.service.BizService;
 import com.bigstock.sharedComponent.dto.RankingResponse;
 import com.bigstock.sharedComponent.dto.USHistoryResponse;
+import com.bigstock.sharedComponent.entity.FinancialCalendar;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockInfo;
-import com.bigstock.sharedComponent.entity.StockInfoTag;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
+import com.bigstock.sharedComponent.service.FinancialCalendarService;
 import com.bigstock.sharedComponent.service.RankStockChangeService;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
 import com.bigstock.sharedComponent.service.StockInfoService;
@@ -55,6 +56,8 @@ public class BizController {
 	
 	private final StockTagCacheService stockTagCacheService;
 	
+	private final FinancialCalendarService financialCalendarService;
+	
 	@Operation(summary = "股市分類資訊", description = "")
 	@GetMapping("stockInfo")
 	public ResponseEntity<List<StockInfo>> getStockInfo() {
@@ -62,10 +65,12 @@ public class BizController {
 	}
 	
 	@Operation(summary = "股市分類資訊", description = "")
-	@PostMapping("realTimeNewsImport")
-	public ResponseEntity<List<StockInfo>> realTimeNewsImport() {
-		return ResponseEntity.ok(stockInfoService.getAllStockInfo());
+	@PostMapping("financialCalendarImport/{year}/{month}/{platForm}")
+	public ResponseEntity<List<StockInfo>> financialCalendarImport(@PathVariable("year") Integer year, @PathVariable("month") Integer month,@PathVariable("platForm") String platForm, @RequestBody List<FinancialCalendar> cteeFinancialCalendars) throws Exception {
+		financialCalendarService.importFinancialCalendar(year, month, cteeFinancialCalendars, platForm);
+		return ResponseEntity.ok().build();
 	}
+	
 	
 	@Operation(summary = "股市分類資訊代號對照表", description = "BBB,FFFF")
 	@GetMapping("tagsMapping")

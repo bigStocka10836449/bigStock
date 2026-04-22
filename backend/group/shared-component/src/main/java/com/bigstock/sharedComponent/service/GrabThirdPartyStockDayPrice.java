@@ -7,13 +7,17 @@ import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.IsoFields;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -27,14 +31,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import com.bigstock.sharedComponent.entity.FinancialCalendar;
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.esotericsoftware.minlog.Log;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Lists;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +55,115 @@ public class GrabThirdPartyStockDayPrice {
 	private final ObjectMapper mapper = new ObjectMapper();
 
 	private final CloseableHttpClient closeableHttpClient;
+	
+	public List<FinancialCalendar> grabFinancialCalendar(int year, int month, String platFont) {
+
+
+		//  CTEE URL
+//		String cteeUrl = String.format("https://www.ctee.com.tw/api/calendar/%d%02d", year, month);
+
+		//  First day
+		LocalDate firstDay = LocalDate.of(year, month, 1);
+
+		//  Last day
+		YearMonth yearMonth = YearMonth.of(year, month);
+		LocalDate lastDay = yearMonth.atEndOfMonth();
+
+		//  MoneyDJ URL
+		String moneyDjUrl = String.format("https://www.moneydj.com/us/rest/eventlist?timeshift=-480&from=%s&to=%s",
+				firstDay, lastDay);
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("User-Agent", "Mozilla/5.0");
+		headers.set("Accept", "application/json, text/plain, */*");
+
+		headers.set("Accept-Language", "zh-TW,zh;q=0.9,en;q=0.8");
+
+		HttpEntity<Void> entityh = new HttpEntity<>(headers);
+		
+		int maxRetries = 5;
+	    long delayMillis = 30_000L;
+	    List<FinancialCalendar> financialCalendars = Lists.newArrayList();
+//		for (int attempt = 1; attempt <= maxRetries; attempt++) {
+//			try {
+//
+//				OkHttpClient client = new OkHttpClient();
+//
+//				Request request = new Request.Builder()
+//				    .url(cteeUrl)
+//				    .addHeader("User-Agent", "Mozilla/5.0")
+//				    .addHeader("Referer", "https://www.ctee.com.tw/")
+//				    .build();
+//
+//				Response response = client.newCall(request).execute();
+//
+//			    ObjectMapper objectMapper = new ObjectMapper();
+//
+//				String cteeResponseBody =  response.body().string();
+//				Map<String, List<Map<String, Object>>> parsed =
+//					    objectMapper.readValue(
+//					    		cteeResponseBody,
+//					        new TypeReference<Map<String, List<Map<String, Object>>>>() {}
+//					    );
+//				financialCalendars.addAll(mapCteeResponse(parsed));
+//
+//			} catch (Exception e) {
+//				// 嘗試retry，30後重新執行
+//				if (attempt < maxRetries) {
+//					try {
+//						log.info("grabFinancialCalendar ctee url: {} , error: {} , Retrying  after {} seconds...", cteeUrl, e.getMessage(),
+//								 delayMillis / 1000);
+//						Thread.sleep(delayMillis);
+//					} catch (InterruptedException ie) {
+//						Thread.currentThread().interrupt();
+//						log.warn("grabFinancialCalendar ctee Retry interrupted for {}", ie.getMessage());
+//						return Collections.emptyList();
+//					}
+//				} else {
+//					Log.warn(" grabFinancialCalendar ctee Error , so fast skip:" + e.getMessage());
+//				}
+//			}
+//	    
+//	    
+//	    }
+		for (int attempt = 1; attempt <= maxRetries; attempt++) {
+			try {
+
+				ResponseEntity<String> response = restTemplate.exchange(URI.create(moneyDjUrl), HttpMethod.GET, entityh,
+						String.class);
+
+
+			    ObjectMapper objectMapper = new ObjectMapper();
+
+				String cteeResponseBody = response.getBody();
+				List<Map<String, Object>> parsed =
+					    objectMapper.readValue(
+					    		cteeResponseBody,
+					        new TypeReference<List<Map<String, Object>>>() {}
+					    );
+				financialCalendars.addAll(mapMoneyDjResponse(parsed, platFont));
+
+			} catch (Exception e) {
+				// 嘗試retry，30後重新執行
+				if (attempt < maxRetries) {
+					try {
+						log.info("grabFinancialCalendar ctee url: {} , error: {} , Retrying  after {} seconds...", moneyDjUrl, e.getMessage(),
+								 delayMillis / 1000);
+						Thread.sleep(delayMillis);
+					} catch (InterruptedException ie) {
+						Thread.currentThread().interrupt();
+						log.warn("grabFinancialCalendar ctee Retry interrupted for {}", ie.getMessage());
+						return Collections.emptyList();
+					}
+				} else {
+					Log.warn(" grabFinancialCalendar ctee Error , so fast skip:" + e.getMessage());
+				}
+			}
+	    
+	    
+	    }
+		return financialCalendars;
+	}
 
 	public List<StockDayPrice> grabFromYahoo(String stockCode) {
 
@@ -488,5 +607,115 @@ public class GrabThirdPartyStockDayPrice {
 			return BigDecimal.ZERO;
 		}
 		return new BigDecimal(value.trim());
+	}
+	
+	private List<FinancialCalendar> mapCteeResponse(Map<String, List<Map<String, Object>>> response) {
+
+	    List<FinancialCalendar> result = new ArrayList<>();
+
+	    for (Map.Entry<String, List<Map<String, Object>>> entry : response.entrySet()) {
+
+	        String dateKey = entry.getKey(); // e.g. "2026-04-01"
+	        LocalDate eventDate = LocalDate.parse(dateKey);
+
+	        List<Map<String, Object>> events = entry.getValue();
+
+	        for (Map<String, Object> e : events) {
+
+	            FinancialCalendar fc = new FinancialCalendar();
+
+	            // ✅ ID (important)
+	            Object articleIdObj = e.get("articleID");
+	            if (articleIdObj != null) {
+	                fc.setId(String.valueOf(articleIdObj));
+	                fc.setArticleId(Long.valueOf(String.valueOf(articleIdObj)));
+	            } else {
+	                // fallback (for special entries without articleID)
+	                fc.setId(UUID.randomUUID().toString());
+	            }
+
+	            // ✅ date Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset))
+				ZoneId zoneId = ZoneId.of("Asia/Taipei");
+	        	ZoneOffset zoneOffset = zoneId.getRules().getOffset(eventDate.atStartOfDay());
+	            fc.setEventDate(Date.from(eventDate.atStartOfDay().toInstant(zoneOffset)));
+
+	            // ✅ year / month
+	            fc.setYear(String.valueOf(eventDate.getYear()));
+	            fc.setMonth(String.format("%02d", eventDate.getMonthValue()));
+
+	            // ✅ title
+	            fc.setTitle((String) e.get("title"));
+
+	            // ✅ data type
+	            if (e.get("dataType") != null) {
+	                fc.setDataType(e.get("dataType").toString());
+	            }
+
+	            fc.setDataTypeName((String) e.get("dataTypeName"));
+
+	            // ✅ hyperlink
+	            fc.setHyperLink((String) e.get("hyperLink"));
+
+	            // ✅ source
+	            fc.setSorucePlatfont("CTEE");
+
+	            result.add(fc);
+	        }
+	    }
+
+	    return result;
+	}
+	
+	public List<FinancialCalendar> mapMoneyDjResponse(List<Map<String, Object>> response, String platFont) {
+
+	    List<FinancialCalendar> result = new ArrayList<>();
+
+	    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd H:mm");
+
+	    for (Map<String, Object> e : response) {
+
+	        FinancialCalendar fc = new FinancialCalendar();
+	        fc.setSorucePlatfont(platFont);
+	        // ✅ ID
+	        String id = (String) e.get("id");
+	        fc.setId(platFont+id);
+
+	        // ✅ year & month (from id)
+	        String year = id.substring(0, 4);
+	        String month = id.substring(4, 6);
+
+	        fc.setYear(year);
+	        fc.setMonth(month);
+
+	        // ✅ event_date
+	        String startDateStr = (String) e.get("start_date");
+	        LocalDate eventDate = LocalDate.parse(startDateStr, formatter);
+	        ZoneId zoneId = ZoneId.of("Asia/Taipei");
+        	ZoneOffset zoneOffset = zoneId.getRules().getOffset(eventDate.atStartOfDay());
+            fc.setEventDate(Date.from(eventDate.atStartOfDay().toInstant(zoneOffset)));
+
+	        // ✅ data_type (convert String → Integer)
+	        String type = (String) e.get("type");
+	        fc.setDataType(type);
+
+	        // ✅ data_type_name
+	        fc.setDataTypeName((String) e.get("text"));
+
+	        // ✅ title
+	        fc.setTitle(((String) e.get("details")).split(":")[1]);
+
+	        // ✅ hyperlink (not provided)
+	        fc.setHyperLink(null);
+
+	        // ✅ article_id (not provided)
+	        fc.setArticleId(null);
+
+	        // ✅ source
+	        fc.setSorucePlatfont("MONEYDJ");
+
+	        result.add(fc);
+	    }
+
+	    return result;
 	}
 }
