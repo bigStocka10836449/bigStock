@@ -32,6 +32,8 @@ public class FinancialCalendarService {
 
 	private final CacheOperatorService cacheOperatorService;
 	
+	
+	
 	@Transactional
 	public void importFinancialCalendar(int year, int month, List<FinancialCalendar> list, String platForm) throws Exception {
 		List<FinancialCalendar> finallist =  list.stream().filter(financialCalendar -> ObjectUtils.isNotEmpty(financialCalendar.getDataType())).map(financialCalendar ->{

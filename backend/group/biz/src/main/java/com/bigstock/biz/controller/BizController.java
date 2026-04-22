@@ -65,13 +65,19 @@ public class BizController {
 		return ResponseEntity.ok(stockInfoService.getAllStockInfo());
 	}
 	
-	@Operation(summary = "股市分類資訊", description = "")
+	@Operation(summary = "匯入財經行事曆", description = "")
 	@PostMapping("financialCalendarImport/{year}/{month}/{platForm}")
 	public ResponseEntity<List<StockInfo>> financialCalendarImport(@PathVariable("year") Integer year, @PathVariable("month") Integer month,@PathVariable("platForm") String platForm, @RequestBody FinancialCalendarImportChunkRequest financialCalendarImportChunkRequest) throws Exception {
 		financialCalendarService.importFinancialCalendar(year, month, financialCalendarImportChunkRequest.getBatch(), platForm);
 		return ResponseEntity.ok().build();
 	}
 	
+	@Operation(summary = "財經行事曆", description = "")
+	@GetMapping("financialCalendar")
+	public ResponseEntity<List<StockInfo>> financialCalendar() throws Exception {
+		financialCalendarService.importFinancialCalendar(year, month, financialCalendarImportChunkRequest.getBatch(), platForm);
+		return ResponseEntity.ok().build();
+	}
 	
 	@Operation(summary = "股市分類資訊代號對照表", description = "BBB,FFFF")
 	@GetMapping("tagsMapping")

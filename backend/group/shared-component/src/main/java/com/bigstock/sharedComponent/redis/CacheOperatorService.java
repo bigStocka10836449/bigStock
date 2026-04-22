@@ -666,6 +666,43 @@ public class CacheOperatorService {
 	    return result;
 	}
 	
+	public <T> Map<String, List<T>> getAllSnapshotDataList( String cacheName, String cacheKey,
+			Class<T> clazz) {
+		String redisKey = buildKey(cacheName, cacheKey);
+	    List<String> keys = scaKeys(redisKey);
+
+	    Map<String, List<T>> result = new HashMap<>();
+
+	    for (String key : keys) {
+	    	List<T> singleCompressedZSetAllScores = getSnapshotDataList(key,clazz);
+			result.put(key, singleCompressedZSetAllScores);
+		}
+
+	    return result;
+	}
+	
+	public List<String> scaKeys(String key) {
+
+	    List<String> result = new ArrayList<>();
+
+	    ScanOptions options =
+	            ScanOptions.scanOptions()
+	                    .match(key)
+	                    .count(1000)
+	                    .build();
+
+	    Cursor<byte[]> cursor =
+	    		stringRedisTemplate.getConnectionFactory()
+	                    .getConnection()
+	                    .keyCommands().scan(options);
+	    
+	    while (cursor.hasNext()) {
+	        result.add(new String(cursor.next()));
+	    }
+
+	    return result;
+	}
+	
 	public List<String> scanCompressedStockKeys(String key) {
 
 	    List<String> result = new ArrayList<>();
