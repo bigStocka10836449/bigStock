@@ -6,16 +6,23 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.hibernate.Session;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.bigstock.sharedComponent.entity.FinancialCalendar;
+import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
+import com.bigstock.sharedComponent.repository.FinancialCalendarRepository;
+import com.google.common.collect.Lists;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -29,10 +36,79 @@ public class FinancialCalendarService {
 	private EntityManager em;
 
 	private static final int CHUNK_SIZE = 5000;
+	
+	private static final List<String> PLAT_FORMS = List.of("moDj", "ctee");
 
 	private final CacheOperatorService cacheOperatorService;
 	
+	private final FinancialCalendarRepository financialCalendarRepository;
 	
+	private final RedissonClient redissonClient;
+	
+	public List<FinancialCalendar> getFinancialCalendar() {
+		LocalDate ld = LocalDate.now();
+		ld = ld.minusMonths(6);
+		List<FinancialCalendar> allValidFinancialCalendars = Lists.newArrayList();
+		for(int index = 0 ; index < 10 ; index++) {
+			int year = ld.getYear();
+			int monthValue = ld.getMonthValue();
+			PLAT_FORMS.forEach(platForm ->{
+				List<FinancialCalendar> currentFinancialCalendars = cacheOperatorService.getSnapshotDataList("ultraLongLivedCache",
+						"financialCalendar:" + year + ":" + String.format("%02d", monthValue) + ":"+ platForm, FinancialCalendar.class);
+				if(CollectionUtils.isNotEmpty(currentFinancialCalendars)) {
+					allValidFinancialCalendars.addAll(currentFinancialCalendars);
+				} else {
+					String lockKey = "lock:findAllBySorucePlatfontAndYearAndMonth:cacheName:ultraLongLivedCache:financialCalendar:platForm:"
+							+ platForm;
+					RLock lock = redissonClient.getLock(lockKey);
+					boolean lockAcquired = false;
+					try {
+
+						lockAcquired = lock.tryLock(10, TimeUnit.MINUTES);
+
+						if (lockAcquired) {
+							currentFinancialCalendars = cacheOperatorService.getSnapshotDataList("ultraLongLivedCache",
+									"financialCalendar:" + year + ":" + String.format("%02d", monthValue) + ":"+ platForm, FinancialCalendar.class);
+							if(!currentFinancialCalendars.isEmpty()) {
+								allValidFinancialCalendars.addAll(currentFinancialCalendars);
+								return;
+							}
+							currentFinancialCalendars = financialCalendarRepository.findAllBySorucePlatfontAndYearAndMonth(platForm, year, monthValue);
+							if(CollectionUtils.isNotEmpty(currentFinancialCalendars)) {
+								allValidFinancialCalendars.addAll(currentFinancialCalendars);
+							} 
+							cacheOperatorService.putSnapshotDataListAtomic("ultraLongLivedCache",
+									"financialCalendar:" + year+ ":" + String.format("%02d", monthValue) + ":" + platForm,
+									allValidFinancialCalendars);
+							LocalDate innerLd = LocalDate.now();
+							
+							innerLd = innerLd.minusMonths(24);
+							cacheOperatorService.delete("ultraLongLivedCache",
+									"financialCalendar:" + innerLd.getYear() + ":" + String.format("%02d", innerLd.getMonth().getValue()) + ":"+ platForm);
+							cacheOperatorService.cleanupOldSnapshots("ultraLongLivedCache", "financialCalendar:" + innerLd.getYear() + ":" + String.format("%02d", innerLd.getMonth().getValue()) + ":" + platForm, 2);
+							return ;
+						} else {
+							throw new RuntimeException("Could not acquire lock for " + lockKey);
+						}
+
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+						throw new RuntimeException("Interrupted while trying to acquire lock", e);
+					} finally {
+
+						if (lockAcquired && lock.isHeldByCurrentThread()) {
+							lock.unlock();
+						}
+
+					}
+
+		
+				}
+			});
+			ld = ld.plusMonths(1);
+		}
+		return allValidFinancialCalendars;
+	}
 	
 	@Transactional
 	public void importFinancialCalendar(int year, int month, List<FinancialCalendar> list, String platForm) throws Exception {

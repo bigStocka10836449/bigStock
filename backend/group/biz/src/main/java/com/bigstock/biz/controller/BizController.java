@@ -74,9 +74,8 @@ public class BizController {
 	
 	@Operation(summary = "財經行事曆", description = "")
 	@GetMapping("financialCalendar")
-	public ResponseEntity<List<StockInfo>> financialCalendar() throws Exception {
-		financialCalendarService.importFinancialCalendar(year, month, financialCalendarImportChunkRequest.getBatch(), platForm);
-		return ResponseEntity.ok().build();
+	public ResponseEntity<List<FinancialCalendar>> financialCalendar() throws Exception {
+		return ResponseEntity.ok(financialCalendarService.getFinancialCalendar());
 	}
 	
 	@Operation(summary = "股市分類資訊代號對照表", description = "BBB,FFFF")
