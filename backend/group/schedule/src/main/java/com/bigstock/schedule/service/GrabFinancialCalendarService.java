@@ -7,6 +7,7 @@ import javax.annotation.PostConstruct;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.threeten.bp.LocalDate;
 
 import com.bigstock.sharedComponent.entity.FinancialCalendar;
@@ -28,6 +29,8 @@ public class GrabFinancialCalendarService {
 	private final GrabThirdPartyStockDayPrice grabThirdPartyStockDayPrice;
 	
 	private final FinancialCalendarService financialCalendarService;
+	
+	private final RestTemplate restTemplate = new RestTemplate();
 
 //	@PostConstruct
 	@Scheduled(cron = "0 45 21 * * ?", zone = "Asia/Taipei")
@@ -56,6 +59,7 @@ public class GrabFinancialCalendarService {
 		cacheOperatorService.cleanupOldSnapshots("ultraLongLivedCache", "financialCalendar:" + ld.getYear() + ":" + String.format("%02d", ld.getMonth().getValue()) + ":moDj", 2);
 		financialCalendarService.refreshData(moneyDjFinancialCalendars);
 		financialCalendarService.refreshData(secondmoneyDjFinancialCalendars);
+		
 	}
 
 }

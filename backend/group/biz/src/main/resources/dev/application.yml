@@ -93,4 +93,10 @@ schedule:
     tpex-baseurl: https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=%1s&stkno=%2s&_=17225  
     twse-baseurl: https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=%1s&stockNo=%2s&_=16481  
     search-start-date: 2024-05-05
-    search-end-date: 2024-11-05    
+    search-end-date: 2024-11-05   
+fcm:
+  json: ${FCM_SERVICE_ACCOUNT_JSON:}
+  json-base64: ${FCM_SERVICE_ACCOUNT_JSON_BASE64:}
+  config-path: ${FCM_CONFIG_PATH:}    
+    
+     

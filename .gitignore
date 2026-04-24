@@ -16,3 +16,4 @@ backend/group/shared-component/target/
 backend/group/schedule/docker/google-api-cloud-speech-to-text.json
 *.rej
 backend/group/biz/src/main/resources/init/ShareholderStructureInfo (2).zip
+backend/group/biz/src/main/resources/local/google-services.json

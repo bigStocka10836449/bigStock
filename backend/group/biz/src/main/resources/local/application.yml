@@ -106,7 +106,10 @@ schedule:
     search-end-date: 2025-12-07
      # date格式 yyyyMMdd 
     twse-baseurl: https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=%1s&stockNo=%2s&response=json&_=1730439477455    
-    
+fcm:
+  json: ${FCM_SERVICE_ACCOUNT_JSON:}
+  json-base64: ${FCM_SERVICE_ACCOUNT_JSON_BASE64:}
+  config-path: classpath:google-services.json
     
 #opentracing:
 #  jaeger:
