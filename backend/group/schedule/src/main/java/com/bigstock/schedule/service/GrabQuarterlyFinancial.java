@@ -28,53 +28,58 @@ public class GrabQuarterlyFinancial {
 	private final TwseQuarterlyFinancialClient twseClient;
 	private final QuarterlyFinancialRedisService quarterlyFinancialRedisService;
 
+	@PostConstruct
 	@Scheduled(cron = "0 30 19 * * ?", zone = "Asia/Taipei")
-	public void syncToDb() {
-		YearQuarter yearQuarter = GrabQuarterlyFinancial.resolveLatestReportQuarter();
-		List<QuarterlyFinancialVo> twselist = Lists.newArrayList();
-		try {
-			twselist = twseClient.fetch(yearQuarter.year(), yearQuarter.quarter());
-		} catch (Exception e) {
-			log.info("skip twseQuarterlyFinancial - error: {}", e.getMessage());
-		}
-		List<QuarterlyFinancialVo> tpexlist = Lists.newArrayList();
-		try {
-			tpexlist = tpexClient.fetch(yearQuarter.year(), yearQuarter.quarter());
-		} catch (Exception e) {
-			log.info("skip tpexQuarterlyFinancial - error: {}", e.getMessage());
-		}
-		if(!tpexlist.isEmpty()) {
-			quarterlyFinancialRedisService.write(yearQuarter.year(),  yearQuarter.quarter(), "TPEX", tpexlist);
-		}
-		if(!twselist.isEmpty()) {
-			quarterlyFinancialRedisService.write(yearQuarter.year(),  yearQuarter.quarter(), "TWSE", twselist);
+	public void syncToDb() throws InterruptedException {
+		List<YearQuarter> yearQuarters = GrabQuarterlyFinancial.resolveLastTwoReportQuarters();
+		for(YearQuarter yearQuarter : yearQuarters) {
+			List<QuarterlyFinancialVo> twselist = Lists.newArrayList();
+			try {
+				twselist = twseClient.fetch(yearQuarter.year(), yearQuarter.quarter());
+			} catch (Exception e) {
+				log.info("skip twseQuarterlyFinancial - error: {}", e.getMessage());
+			}
+			List<QuarterlyFinancialVo> tpexlist = Lists.newArrayList();
+			try {
+				tpexlist = tpexClient.fetch(yearQuarter.year(), yearQuarter.quarter());
+			} catch (Exception e) {
+				log.info("skip tpexQuarterlyFinancial - error: {}", e.getMessage());
+			}
+			if(!tpexlist.isEmpty()) {
+				quarterlyFinancialRedisService.write(yearQuarter.year(),  yearQuarter.quarter(), "TPEX", tpexlist);
+			}
+			if(!twselist.isEmpty()) {
+				quarterlyFinancialRedisService.write(yearQuarter.year(),  yearQuarter.quarter(), "TWSE", twselist);
+			}
+			Thread.sleep(3000);
 		}
 	}
+	
+	private static YearQuarter previousQuarter(YearQuarter current) {
+	    int year = current.year();
+	    int quarter = current.quarter();
 
-	public static YearQuarter resolveLatestReportQuarter() {
+	    if (quarter == 1) {
+	        return new YearQuarter(year - 1, 4);
+	    }
+	    return new YearQuarter(year, quarter - 1);
+	}
 
-		LocalDate now = LocalDate.now();
+	public static List<YearQuarter> resolveLastTwoReportQuarters() {
 
-		int year = now.getYear();
-		int month = now.getMonthValue();
+	    LocalDate now = LocalDate.now();
 
-		int currentQuarter = (month - 1) / 3 + 1;
+	    int year = now.getYear();
+	    int month = now.getMonthValue();
 
-		int targetQuarter;
-		int targetYear = year;
+	    int currentQuarter = (month - 1) / 3 + 1;
 
-		if (currentQuarter == 1) {
+	    YearQuarter current = new YearQuarter(year, currentQuarter);
 
-			// previous quarter is last year's Q4
-			targetQuarter = 4;
-			targetYear = year - 1;
+	    YearQuarter last = previousQuarter(current);
+	    YearQuarter secondLast = previousQuarter(last);
 
-		} else {
-
-			targetQuarter = currentQuarter - 1;
-		}
-
-		return new YearQuarter(targetYear, targetQuarter);
+	    return List.of(last, secondLast);
 	}
 
 	public static class YearQuarter {

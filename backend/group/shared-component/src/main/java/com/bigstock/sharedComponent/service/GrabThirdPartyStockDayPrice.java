@@ -711,7 +711,7 @@ public class GrabThirdPartyStockDayPrice {
 	        fc.setArticleId(null);
 
 	        // ✅ source
-	        fc.setSorucePlatfont("MONEYDJ");
+	        fc.setSorucePlatfont("moDj");
 
 	        result.add(fc);
 	    }

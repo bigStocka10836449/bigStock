@@ -1,15 +1,17 @@
 package com.bigstock.sharedComponent.repository;
 
-import com.bigstock.sharedComponent.dto.QuarterlyFinancialResponse;
-import com.esotericsoftware.minlog.Log;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.bigstock.sharedComponent.dto.QuarterlyFinancialResponse;
+
+import lombok.RequiredArgsConstructor;
 
 @Repository
 @RequiredArgsConstructor
@@ -60,8 +62,16 @@ public class StockQuarterFinancialUpsertRepository {
     public int batchUpsert(List<QuarterlyFinancialResponse> list) {
         if (list == null || list.isEmpty()) return 0;
 
-        List<MapSqlParameterSource> params = new ArrayList<>(list.size());
+        Map<String, QuarterlyFinancialResponse> dedup = new LinkedHashMap<>();
+
         for (QuarterlyFinancialResponse dto : list) {
+            String key = dto.getStockId() + "|" + dto.getMarket() + "|" + dto.getYear() + "|" + dto.getQuarter();
+            dedup.put(key, dto); // overwrite duplicates
+        }
+
+        List<QuarterlyFinancialResponse> cleaned = new ArrayList<>(dedup.values());
+        List<MapSqlParameterSource> params = new ArrayList<>(cleaned.size());
+        for (QuarterlyFinancialResponse dto : cleaned) {
             if (dto == null) continue;
 
             String stockId = safe(dto.getStockId());

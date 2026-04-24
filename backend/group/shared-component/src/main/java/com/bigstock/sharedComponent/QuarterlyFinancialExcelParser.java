@@ -1,5 +1,9 @@
 package com.bigstock.sharedComponent;
 
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,12 +13,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ooxml.POIXMLDocument;
+import org.apache.poi.poifs.filesystem.POIFSFileSystem;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Component;
 
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;
@@ -27,81 +34,221 @@ public class QuarterlyFinancialExcelParser {
     private static final Pattern CODE_NAME_RELAX =
             Pattern.compile("^\\s*(\\d{4,6})[\\s\\u3000]*([^\\s].+?)\\s*$");
 
-    public List<QuarterlyFinancialVo> parse(InputStream is, int year, int quarter, String market) {
+    private List<QuarterlyFinancialVo> parseXls(InputStream is, int year, int quarter, String market) {
         try (HSSFWorkbook wb = new HSSFWorkbook(is)) {
-            Sheet sheet = wb.getSheetAt(0);
-
-            ColumnLocate cl = locateColumnsByMergedHeaders(sheet);
-            int dataStartRow = locateDataStartRow(sheet, cl);
-
-            List<QuarterlyFinancialVo> out = new ArrayList<>();
-
-            for (int r = dataStartRow; r <= sheet.getLastRowNum(); r++) {
-                Row row = sheet.getRow(r);
-                if (row == null) continue;
-
-                // --- stockId / stockName ---
-                String stockId = null;
-                String stockName = null;
-
-                // 優先：分欄
-                if (cl.stockIdCol >= 0) {
-                    String id = ExcelCellUtils.getCellString(row.getCell(cl.stockIdCol));
-                    if (id != null) id = normalizeCellText(id);
-                    if (id != null && id.matches("^\\d{4,6}$")) stockId = id;
-                }
-                if (cl.stockNameCol >= 0) {
-                    String nm = ExcelCellUtils.getCellString(row.getCell(cl.stockNameCol));
-                    if (nm != null) nm = normalizeCellText(nm);
-                    if (nm != null && !nm.isBlank()) stockName = nm;
-                }
-
-                // fallback：合併欄（代號+名稱同一格）
-                if (stockId == null || stockName == null) {
-                    String merged = ExcelCellUtils.getCellString(row.getCell(cl.fallbackMergedCol));
-                    if (merged != null) {
-                        merged = normalizeCellText(merged);
-                        Matcher m = CODE_NAME_RELAX.matcher(merged);
-                        if (m.find()) {
-                            if (stockId == null) stockId = m.group(1).trim();
-                            if (stockName == null) stockName = m.group(2).trim();
-                        }
-                    }
-                }
-
-                if (stockId == null || stockName == null || stockName.isBlank()) continue;
-
-                QuarterlyFinancialVo vo = new QuarterlyFinancialVo();
-                vo.setStockId(stockId);
-                vo.setStockName(stockName);
-                vo.setMarket(market);
-
-                vo.setYear(year);
-                vo.setQuarter(quarter);
-                vo.setPeriodStartMonth(1);
-                vo.setPeriodEndMonth(quarter * 3);
-                vo.setUnit("TWD");
-
-                // 財務欄位（可抓就抓；抓不到就 null）
-                vo.setOperatingRevenue(readLong(row, cl.operatingRevenueCol));
-                vo.setOperatingProfit(readLong(row, cl.operatingProfitCol));
-                vo.setNonOperatingIncomeExpense(readLong(row, cl.nonOperatingIncomeExpenseCol));
-                vo.setNetProfitAfterTax(readLong(row, cl.netProfitAfterTaxCol));
-
-                vo.setCapitalStockEndPeriod(readLong(row, cl.capitalStockEndPeriodCol));
-                vo.setEarningsPerShare(readRatio(row, cl.earningsPerShareCol));
-                vo.setNetAssetValuePerShare(readRatio(row, cl.netAssetValuePerShareCol));
-                vo.setQuickRatio(readRatio(row, cl.quickRatioCol));
-                vo.setCurrentRatio(readRatio(row, cl.currentRatio));
-                vo.setDepn(readRatio(row, cl.depn));;
-                out.add(vo);
-            }
-
-            return out;
+            return parseSheet(wb.getSheetAt(0), year, quarter, market);
         } catch (Exception e) {
-            throw new RuntimeException("parse quarterly financial xls failed: " + e.getMessage(), e);
+            throw new RuntimeException("parse xls failed: " + e.getMessage(), e);
         }
     }
+
+    private List<QuarterlyFinancialVo> parseXlsx(InputStream is, int year, int quarter, String market) {
+        try (XSSFWorkbook wb = new XSSFWorkbook(is)) {
+            return parseSheet(wb.getSheetAt(0), year, quarter, market);
+        } catch (Exception e) {
+            throw new RuntimeException("parse xlsx failed: " + e.getMessage(), e);
+        }
+    }
+    
+    private List<QuarterlyFinancialVo> parseSheet(Sheet sheet, int year, int quarter, String market) {
+
+        ColumnLocate cl = locateColumnsByMergedHeaders(sheet);
+        int dataStartRow = locateDataStartRow(sheet, cl);
+
+        List<QuarterlyFinancialVo> out = new ArrayList<>();
+
+        for (int r = dataStartRow; r <= sheet.getLastRowNum(); r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+
+            // --- stockId / stockName ---
+            String stockId = null;
+            String stockName = null;
+
+            // 優先：分欄
+            if (cl.stockIdCol >= 0) {
+                String id = ExcelCellUtils.getCellString(row.getCell(cl.stockIdCol));
+                if (id != null) id = normalizeCellText(id);
+                if (id != null && id.matches("^\\d{4,6}$")) stockId = id;
+            }
+            if (cl.stockNameCol >= 0) {
+                String nm = ExcelCellUtils.getCellString(row.getCell(cl.stockNameCol));
+                if (nm != null) nm = normalizeCellText(nm);
+                if (nm != null && !nm.isBlank()) stockName = nm;
+            }
+
+            // fallback：合併欄（代號+名稱同一格）
+            if (stockId == null || stockName == null) {
+                String merged = ExcelCellUtils.getCellString(row.getCell(cl.fallbackMergedCol));
+                if (merged != null) {
+                    merged = normalizeCellText(merged);
+                    Matcher m = CODE_NAME_RELAX.matcher(merged);
+                    if (m.find()) {
+                        if (stockId == null) stockId = m.group(1).trim();
+                        if (stockName == null) stockName = m.group(2).trim();
+                    }
+                }
+            }
+
+            if (stockId == null || stockName == null || stockName.isBlank()) continue;
+
+            QuarterlyFinancialVo vo = new QuarterlyFinancialVo();
+            vo.setStockId(stockId);
+            vo.setStockName(stockName);
+            vo.setMarket(market);
+
+            vo.setYear(year);
+            vo.setQuarter(quarter);
+            vo.setPeriodStartMonth(1);
+            vo.setPeriodEndMonth(quarter * 3);
+            vo.setUnit("TWD");
+
+            // 財務欄位（可抓就抓；抓不到就 null）
+            vo.setOperatingRevenue(readLong(row, cl.operatingRevenueCol));
+            vo.setOperatingProfit(readLong(row, cl.operatingProfitCol));
+            vo.setNonOperatingIncomeExpense(readLong(row, cl.nonOperatingIncomeExpenseCol));
+            vo.setNetProfitAfterTax(readLong(row, cl.netProfitAfterTaxCol));
+
+            vo.setCapitalStockEndPeriod(readLong(row, cl.capitalStockEndPeriodCol));
+            vo.setEarningsPerShare(readRatio(row, cl.earningsPerShareCol));
+            vo.setNetAssetValuePerShare(readRatio(row, cl.netAssetValuePerShareCol));
+            vo.setQuickRatio(readRatio(row, cl.quickRatioCol));
+            vo.setCurrentRatio(readRatio(row, cl.currentRatio));
+            vo.setDepn(readRatio(row, cl.depn));;
+            out.add(vo);
+        }
+
+        return out;
+    } 
+
+    public List<QuarterlyFinancialVo> parse(InputStream is, int year, int quarter, String market) {
+        try {
+            byte[] data = readAllBytes(is);
+
+            if (isXls(data)) {
+                return parseXls(new ByteArrayInputStream(data), year, quarter, market);
+            }
+
+            if (isXlsx(data)) {
+                return parseXlsx(new ByteArrayInputStream(data), year, quarter, market);
+            }
+
+            // ❌ NOT EXCEL → print preview
+            String preview = new String(data, 0, Math.min(200, data.length));
+            throw new RuntimeException("Invalid Excel file. Response preview:\n" + preview);
+
+        } catch (Exception e) {
+            throw new RuntimeException("parse quarterly financial failed: " + e.getMessage(), e);
+        }
+    }
+    
+    private boolean isXls(byte[] data) {
+        if (data.length < 8) return false;
+
+        // OLE2 magic header
+        byte[] ole2 = new byte[] {
+            (byte)0xD0, (byte)0xCF, (byte)0x11, (byte)0xE0,
+            (byte)0xA1, (byte)0xB1, (byte)0x1A, (byte)0xE1
+        };
+
+        for (int i = 0; i < ole2.length; i++) {
+            if (data[i] != ole2[i]) return false;
+        }
+        return true;
+    }
+
+    private boolean isXlsx(byte[] data) {
+        if (data.length < 4) return false;
+
+        // ZIP header (xlsx is zip-based)
+        return (data[0] == 0x50 && data[1] == 0x4B);
+    }
+    
+    private byte[] readAllBytes(InputStream is) throws IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        byte[] tmp = new byte[4096];
+        int n;
+        while ((n = is.read(tmp)) != -1) {
+            buffer.write(tmp, 0, n);
+        }
+        return buffer.toByteArray();
+    }
+    
+//    public List<QuarterlyFinancialVo> parse(InputStream is, int year, int quarter, String market) {
+//        try (HSSFWorkbook wb = new HSSFWorkbook(is)) {
+//            Sheet sheet = wb.getSheetAt(0);
+//
+//            ColumnLocate cl = locateColumnsByMergedHeaders(sheet);
+//            int dataStartRow = locateDataStartRow(sheet, cl);
+//
+//            List<QuarterlyFinancialVo> out = new ArrayList<>();
+//
+//            for (int r = dataStartRow; r <= sheet.getLastRowNum(); r++) {
+//                Row row = sheet.getRow(r);
+//                if (row == null) continue;
+//
+//                // --- stockId / stockName ---
+//                String stockId = null;
+//                String stockName = null;
+//
+//                // 優先：分欄
+//                if (cl.stockIdCol >= 0) {
+//                    String id = ExcelCellUtils.getCellString(row.getCell(cl.stockIdCol));
+//                    if (id != null) id = normalizeCellText(id);
+//                    if (id != null && id.matches("^\\d{4,6}$")) stockId = id;
+//                }
+//                if (cl.stockNameCol >= 0) {
+//                    String nm = ExcelCellUtils.getCellString(row.getCell(cl.stockNameCol));
+//                    if (nm != null) nm = normalizeCellText(nm);
+//                    if (nm != null && !nm.isBlank()) stockName = nm;
+//                }
+//
+//                // fallback：合併欄（代號+名稱同一格）
+//                if (stockId == null || stockName == null) {
+//                    String merged = ExcelCellUtils.getCellString(row.getCell(cl.fallbackMergedCol));
+//                    if (merged != null) {
+//                        merged = normalizeCellText(merged);
+//                        Matcher m = CODE_NAME_RELAX.matcher(merged);
+//                        if (m.find()) {
+//                            if (stockId == null) stockId = m.group(1).trim();
+//                            if (stockName == null) stockName = m.group(2).trim();
+//                        }
+//                    }
+//                }
+//
+//                if (stockId == null || stockName == null || stockName.isBlank()) continue;
+//
+//                QuarterlyFinancialVo vo = new QuarterlyFinancialVo();
+//                vo.setStockId(stockId);
+//                vo.setStockName(stockName);
+//                vo.setMarket(market);
+//
+//                vo.setYear(year);
+//                vo.setQuarter(quarter);
+//                vo.setPeriodStartMonth(1);
+//                vo.setPeriodEndMonth(quarter * 3);
+//                vo.setUnit("TWD");
+//
+//                // 財務欄位（可抓就抓；抓不到就 null）
+//                vo.setOperatingRevenue(readLong(row, cl.operatingRevenueCol));
+//                vo.setOperatingProfit(readLong(row, cl.operatingProfitCol));
+//                vo.setNonOperatingIncomeExpense(readLong(row, cl.nonOperatingIncomeExpenseCol));
+//                vo.setNetProfitAfterTax(readLong(row, cl.netProfitAfterTaxCol));
+//
+//                vo.setCapitalStockEndPeriod(readLong(row, cl.capitalStockEndPeriodCol));
+//                vo.setEarningsPerShare(readRatio(row, cl.earningsPerShareCol));
+//                vo.setNetAssetValuePerShare(readRatio(row, cl.netAssetValuePerShareCol));
+//                vo.setQuickRatio(readRatio(row, cl.quickRatioCol));
+//                vo.setCurrentRatio(readRatio(row, cl.currentRatio));
+//                vo.setDepn(readRatio(row, cl.depn));;
+//                out.add(vo);
+//            }
+//
+//            return out;
+//        } catch (Exception e) {
+//            throw new RuntimeException("parse quarterly financial xls failed: " + e.getMessage(), e);
+//        }
+//    }
 
     // =========================================================
     //  Column locate: keyword + fallback (merged headers + merged region aware)

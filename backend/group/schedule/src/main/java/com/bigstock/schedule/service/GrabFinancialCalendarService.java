@@ -29,7 +29,7 @@ public class GrabFinancialCalendarService {
 	
 	private final FinancialCalendarService financialCalendarService;
 
-	@PostConstruct
+//	@PostConstruct
 	@Scheduled(cron = "0 45 21 * * ?", zone = "Asia/Taipei")
 	public void grabFinancialCalendar() throws Exception {
 		LocalDate ld = LocalDate.now();
