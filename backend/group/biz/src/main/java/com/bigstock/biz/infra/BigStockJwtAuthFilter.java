@@ -43,14 +43,14 @@ public class BigStockJwtAuthFilter extends OncePerRequestFilter {
             log.info("Request URL: {}", request.getRequestURI());
         }
 
-        // 白名單
+        // 白名單 ,"/device/**"
         if (path.startsWith("/actuator/")
                 || path.startsWith("/auth/")
                 || path.startsWith("/api/guest-token")
                 || path.startsWith("/api/refresh-token")
                 || path.contains("/swagger")
                 || path.contains("/webjars")||
-                path.contains("/auth/") || path.contains("/stockShareholderStructure")|| path.contains("/financialCalendarImport")|| path.contains("/ws")) {
+                path.contains("/auth/") || path.contains("/stockShareholderStructure")|| path.contains("/financialCalendarImport")|| path.contains("/device") || path.contains("/ws")) {
 
             filterChain.doFilter(request, response);
             return;
