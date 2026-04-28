@@ -34,4 +34,7 @@ public class FcmRecord {
 
     @Column(name = "updated_at")
     private Date updatedAt;
+    
+    @Column(name = "allowed_jwt")
+    private String allowedJwt;
 }

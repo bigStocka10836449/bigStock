@@ -1,25 +1,35 @@
 package com.bigstock.biz.infra;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.Date;
+import java.util.Objects;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-
+import org.apache.http.HttpException;
+import org.redisson.api.RScript;
+import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.util.DigestUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+
+import com.bigstock.sharedComponent.service.FcmRecordService;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Component
 public class BigStockJwtAuthFilter extends OncePerRequestFilter {
@@ -28,6 +38,12 @@ public class BigStockJwtAuthFilter extends OncePerRequestFilter {
 
     @Value("${server.oauth2.secret-key}")
     private String secretKey;
+    
+    @Autowired
+	private RedissonClient redissonClient;
+	
+    @Autowired
+	private FcmRecordService fcmRecordService;
 
 
     @Override
@@ -66,7 +82,23 @@ public class BigStockJwtAuthFilter extends OncePerRequestFilter {
 
         try {
             Claims claims = parseJwtToken(token);
+    		// 3. 將 IP + User-Agent 做 MD5 hash，作為限流 key
+    		String identifier = fcmRecord.getFcmToken() + ":" + userAgent;
+    		String key = "rl:guest-token:tb:" + DigestUtils.md5DigestAsHex(identifier.getBytes(StandardCharsets.UTF_8));
+    		long now = System.currentTimeMillis() / 1000;
+    		RScript script = redissonClient.getScript(StringCodec.INSTANCE);
+    		String scriptText = new String(
+    				Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("rate_limit_token_bucket.lua"))
+    						.readAllBytes(),
+    				StandardCharsets.UTF_8);
 
+    		Long allowed = script.eval(RScript.Mode.READ_WRITE, scriptText, RScript.ReturnType.INTEGER,
+    				Collections.singletonList(key), "4", // 每秒補 10 token
+    				"30", // 最大桶容量
+    				String.valueOf(now));
+    		if (allowed == null || allowed == 0) {
+    			throw new HttpException("Rate limit exceeded");
+    		}
             String role = claims.get("role", String.class);
             if ("Guest".equals(role)) {
                 filterChain.doFilter(request, response);

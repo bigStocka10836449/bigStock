@@ -25,8 +25,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
 import com.bigstock.biz.vo.UserInloginInfo;
+import com.bigstock.sharedComponent.entity.FcmRecord;
 import com.bigstock.sharedComponent.entity.RoleInfo;
 import com.bigstock.sharedComponent.entity.UserAccount;
+import com.bigstock.sharedComponent.service.FcmRecordService;
 import com.bigstock.sharedComponent.service.RoleInfoService;
 import com.bigstock.sharedComponent.service.UserAccountService;
 import com.google.common.collect.Lists;
@@ -55,6 +57,8 @@ public class OauthTokenService {
 	private final UserAccountService userAccountService;
 
 	private final RedissonClient redissonClient;
+	
+	private final FcmRecordService fcmRecordService;
 	
 
 	public ResponseEntity<?> userLoginHandle(UserInloginInfo userInloginInfo) {
@@ -85,36 +89,33 @@ public class OauthTokenService {
 	
 	public ResponseEntity<?> getTmpToken(HttpServletRequest request, String guestId) throws IOException, HttpException {
 
-		// 1. 取得 IP，優先從 X-Forwarded-For 中讀取（多個時取第一個），否則 fallback 到 remote IP
-		String ip = Optional.ofNullable(request.getHeader("X-Forwarded-For"))
-		        .map(xff -> xff.split(",")[0].trim())
-		        .orElseGet(request::getRemoteAddr);
 
 		// 2. 取得 User-Agent，預設為 unknown
-		String userAgent = Optional.ofNullable(request.getHeader("User-Agent"))
-		        .orElse("unknown");
-
-		// 3. 將 IP + User-Agent 做 MD5 hash，作為限流 key
-		String identifier = ip + ":" + userAgent;
-		String key = "rl:guest-token:tb:" + DigestUtils.md5DigestAsHex(identifier.getBytes(StandardCharsets.UTF_8));
-		long now = System.currentTimeMillis() / 1000;
-		RScript script = redissonClient.getScript(StringCodec.INSTANCE);
-		String scriptText = new String(
-				Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("rate_limit_token_bucket.lua"))
-						.readAllBytes(),
-				StandardCharsets.UTF_8);
-
-		Long allowed = script.eval(RScript.Mode.READ_WRITE, scriptText, RScript.ReturnType.INTEGER,
-				Collections.singletonList(key), "1", // 每秒補 1 token
-				"10", // 最大桶容量
-				String.valueOf(now));
-		if (allowed == null || allowed == 0) {
-			throw new HttpException("Rate limit exceeded");
-		}
+//		String userAgent = Optional.ofNullable(request.getHeader("User-Agent"))
+//		        .orElse("unknown");
+		String fcmToken = request.getHeader("Authorization");
+		FcmRecord  fcmRecord = fcmRecordService.validateVerifiedDevice(fcmToken);
+//		// 3. 將 IP + User-Agent 做 MD5 hash，作為限流 key
+//		String identifier = fcmRecord.getFcmToken() + ":" + userAgent;
+//		String key = "rl:guest-token:tb:" + DigestUtils.md5DigestAsHex(identifier.getBytes(StandardCharsets.UTF_8));
+//		long now = System.currentTimeMillis() / 1000;
+//		RScript script = redissonClient.getScript(StringCodec.INSTANCE);
+//		String scriptText = new String(
+//				Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("rate_limit_token_bucket.lua"))
+//						.readAllBytes(),
+//				StandardCharsets.UTF_8);
+//
+//		Long allowed = script.eval(RScript.Mode.READ_WRITE, scriptText, RScript.ReturnType.INTEGER,
+//				Collections.singletonList(key), "4", // 每秒補 10 token
+//				"30", // 最大桶容量
+//				String.valueOf(now));
+//		if (allowed == null || allowed == 0) {
+//			throw new HttpException("Rate limit exceeded");
+//		}
 
 		if (guestId == null || !(redissonClient.getBucket("guest:" + guestId)).isExists()) {
 			guestId = UUID.randomUUID().toString();
-			redissonClient.getBucket("guest:" + guestId).set("1", Duration.ofHours(1));
+			redissonClient.getBucket("guest:" + guestId).set("1", Duration.ofDays(999999));
 		}
 
 		RBucket<String> jwtBucket = redissonClient.getBucket("jwt:" + guestId);
@@ -122,11 +123,13 @@ public class OauthTokenService {
 
 		if (token == null) {
 			token = createTempAccessToken(guestId, "Guest");
-			jwtBucket.set(token, Duration.ofHours(1));
+			jwtBucket.set(token, Duration.ofDays(999999));
 		}
 		Claims claims = parseJwtToken(token);
 		ResponseCookie cookie = ResponseCookie.from("guest_id", guestId).httpOnly(true).secure(true).sameSite("Strict")
 				.path("/").maxAge(Duration.ofHours(1)).build();
+		fcmRecord.setAllowedJwt(token);
+		fcmRecordService.save(fcmRecord);
 		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
 				.header("X-Refreshed-Token", "Bearer " + token)
 				.body(Map.of("token", token, "exp", claims.getExpiration()));
@@ -272,7 +275,7 @@ public class OauthTokenService {
 		builder.issuedAt(new Date());
 
 		// 設定 JWT 有效期
-		builder.expiration(new Date(System.currentTimeMillis() + Duration.ofHours(1).toMillis()));
+		builder.expiration(new Date(System.currentTimeMillis() + Duration.ofDays(999999).toMillis()));
 		// 添加 header
 		builder.header().add("typ", "JWT").and();
 		builder.header().add("alg", "HS256").and();

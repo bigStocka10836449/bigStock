@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.bigstock.sharedComponent.dto.FcmRegisterRequest;
 import com.bigstock.sharedComponent.dto.FcmVerifyRequest;
 import com.bigstock.sharedComponent.entity.FcmRecord;
+import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.repository.FcmRecordRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -19,8 +20,15 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Transactional
 public class FcmRecordService {
+	
 	private final FcmRecordRepository fcmRecordRepository;
 
+	private final CacheOperatorService cacheOperatorService;
+	
+	public FcmRecord getFcmRecord(String token) {
+		
+	}
+	
 	public String register(FcmRegisterRequest request) {
 
 		if (request.getFcmToken() == null || request.getFcmToken().isBlank()) {
@@ -70,7 +78,7 @@ public class FcmRecordService {
 	}
 
 	@Transactional(readOnly = true)
-	public FcmRecord validateVerifiedDevice(String deviceId, String fcmToken) {
+	public FcmRecord validateVerifiedDevice(String fcmToken) {
 
 		FcmRecord device = fcmRecordRepository.findByFcmToken(fcmToken)
 				.orElseThrow(() -> new RuntimeException("Invalid device or FCM token"));
@@ -80,5 +88,9 @@ public class FcmRecordService {
 		}
 
 		return device;
+	}
+	
+	public FcmRecord save(FcmRecord fcmRecord, String cacheKey) {
+		return fcmRecordRepository.save(fcmRecord);
 	}
 }
