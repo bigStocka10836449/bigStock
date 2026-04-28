@@ -3,14 +3,21 @@ package com.bigstock.sharedComponent.service;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.bigstock.sharedComponent.dto.FcmRegisterRequest;
 import com.bigstock.sharedComponent.dto.FcmVerifyRequest;
 import com.bigstock.sharedComponent.entity.FcmRecord;
+import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.repository.FcmRecordRepository;
 
@@ -25,8 +32,51 @@ public class FcmRecordService {
 
 	private final CacheOperatorService cacheOperatorService;
 	
+	private final RedissonClient redissonClient;
+	
 	public FcmRecord getFcmRecord(String token) {
+		FcmRecord fcmRecord = cacheOperatorService.getSnapshotData("ultraLongLivedCache", "FcmRecord:Valid:" + token, FcmRecord.class);
 		
+if(ObjectUtils.isEmpty(fcmRecord)) {
+			return fcmRecord;
+		} else {
+			String lockKey = "lock:findByFcmToken:cacheName:ultraLongLivedCache:FcmRecord:getFcmRecord:"
+					+ token;
+
+			RLock lock = redissonClient.getLock(lockKey);
+			boolean lockAcquired = false;
+			try {
+
+				lockAcquired = lock.tryLock(10, TimeUnit.MINUTES);
+
+				if (lockAcquired) {
+					fcmRecord =  cacheOperatorService.getSnapshotData("ultraLongLivedCache", "FcmRecord:Valid:" + token, FcmRecord.class);
+					if(!ObjectUtils.isEmpty(fcmRecord)) {
+						return fcmRecord;
+					}
+					fcmRecord = fcmRecordRepository.findByFcmToken(token);
+							.findMarginTradingAndShortSellingInfoByDateRange(stockCode, firstDate, secondDate);
+					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+							"marginTrading:compressed:" + stockCode, nonCacheMarginTradingAndShortSellingInfos,
+							marginTradingAndShortSellingInfo -> marginTradingAndShortSellingInfo.getTradingDay().getTime(),
+							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+					return nonCacheMarginTradingAndShortSellingInfos;
+				} else {
+					throw new RuntimeException("Could not acquire lock for " + lockKey);
+				}
+
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new RuntimeException("Interrupted while trying to acquire lock", e);
+			} finally {
+
+				if (lockAcquired && lock.isHeldByCurrentThread()) {
+					lock.unlock();
+				}
+
+			}
+
+		}
 	}
 	
 	public String register(FcmRegisterRequest request) {
@@ -91,6 +141,8 @@ public class FcmRecordService {
 	}
 	
 	public FcmRecord save(FcmRecord fcmRecord, String cacheKey) {
+		cacheOperatorService.putSnapshotDataAtomic("ultraLongLivedCache", "FcmRecord:Valid:" + cacheKey, fcmRecord);
+		cacheOperatorService.cleanupOldSnapshots("ultraLongLivedCache", "FcmRecord:Valid:" + cacheKey, 2);
 		return fcmRecordRepository.save(fcmRecord);
 	}
 }

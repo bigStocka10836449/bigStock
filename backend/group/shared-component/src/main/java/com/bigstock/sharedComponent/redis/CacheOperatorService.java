@@ -491,6 +491,38 @@ public class CacheOperatorService {
 	    }
 	}
 	
+	public <T> void putSnapshotDataAtomic(
+			String cacheName, String key,
+	        T data
+	) {
+
+		String redisKey = buildKey(cacheName, key);
+	    try {
+	    	ObjectMapper objectMapper = new ObjectMapper();
+			byte[] jsonByte = objectMapper.writeValueAsBytes(data);
+
+	        String versionKey =
+	        		redisKey + ":v" + System.currentTimeMillis();
+
+	        byte[] versionKeyByte = versionKey.getBytes();
+	        
+	        String activeKey =
+	        		redisKey + ":active";
+
+	     // write snapshot blob
+	        rawRedisTemplate.opsForValue()
+	                .set(versionKey, jsonByte);
+
+	        // atomic pointer swap
+	        rawRedisTemplate.opsForValue()
+	                .set(activeKey, versionKeyByte);
+
+	    } catch (Exception e) {
+
+	        log.error("put snapshot failed redisKey={}", redisKey, e);
+	    }
+	}
+	
 	public <T> void putDataList(String cacheName, String key, List<T> data) {
 
 		String redisKey = buildKey(cacheName, key);
@@ -580,7 +612,39 @@ public class CacheOperatorService {
 	        return List.of();
 	    }
 	}
-	
+	public <T> T getSnapshotData(
+	        String cacheName,
+	        String key,
+	        Class<T> clazz
+	) {
+	    String redisKey = buildKey(cacheName, key);
+
+	    try {
+	        ObjectMapper objectMapper = new ObjectMapper();
+
+	        String activeKey = redisKey + ":active";
+
+	        byte[] activeVersionBytes =
+	                rawRedisTemplate.opsForValue().get(activeKey);
+	        if (activeVersionBytes == null) {
+	            return null;
+	        }
+
+	        String versionKey = new String(activeVersionBytes);
+
+	        byte[] json =
+	                rawRedisTemplate.opsForValue().get(versionKey);
+	        if (json == null) {
+	            return null;
+	        }
+
+	        return objectMapper.readValue(json, clazz);
+
+	    } catch (Exception e) {
+	        log.error("read snapshot failed redisKey={}", redisKey, e);
+	        return null;
+	    }
+	}
 	public <T> void putSnapshotDataListCompressedAtomic(
 			String cacheName, String key,
 	        List<T> data

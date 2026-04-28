@@ -113,23 +113,19 @@ public class OauthTokenService {
 //			throw new HttpException("Rate limit exceeded");
 //		}
 
-		if (guestId == null || !(redissonClient.getBucket("guest:" + guestId)).isExists()) {
-			guestId = UUID.randomUUID().toString();
-			redissonClient.getBucket("guest:" + guestId).set("1", Duration.ofDays(999999));
-		}
 
 		RBucket<String> jwtBucket = redissonClient.getBucket("jwt:" + guestId);
 		String token = jwtBucket.get();
 
 		if (token == null) {
 			token = createTempAccessToken(guestId, "Guest");
-			jwtBucket.set(token, Duration.ofDays(999999));
+			jwtBucket.set(token, Duration.ofHours(2));
 		}
 		Claims claims = parseJwtToken(token);
 		ResponseCookie cookie = ResponseCookie.from("guest_id", guestId).httpOnly(true).secure(true).sameSite("Strict")
 				.path("/").maxAge(Duration.ofHours(1)).build();
 		fcmRecord.setAllowedJwt(token);
-		fcmRecordService.save(fcmRecord);
+		fcmRecordService.save(fcmRecord, token);
 		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
 				.header("X-Refreshed-Token", "Bearer " + token)
 				.body(Map.of("token", token, "exp", claims.getExpiration()));
