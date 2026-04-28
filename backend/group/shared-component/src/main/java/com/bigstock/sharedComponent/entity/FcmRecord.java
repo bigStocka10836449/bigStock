@@ -9,7 +9,7 @@ import jakarta.persistence.Table;
 import lombok.Data;
 
 @Entity
-@Table(name = "device_registry")
+@Table(name = "fcm_record", schema = "bstock")
 @Data
 public class FcmRecord {
 

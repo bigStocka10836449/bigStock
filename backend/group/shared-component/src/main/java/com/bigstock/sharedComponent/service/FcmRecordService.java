@@ -36,7 +36,7 @@ public class FcmRecordService {
 		device.setChallenge(challengeId);
 		device.setChallengeExpiresAt(
 				Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant()));
-		device.setLastSeenAt(Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant()));
+		device.setLastSeenAt(Date.from(LocalDateTime.now().plusMinutes(120).atZone(ZoneId.systemDefault()).toInstant()));
 
 		fcmRecordRepository.save(device);
 		
