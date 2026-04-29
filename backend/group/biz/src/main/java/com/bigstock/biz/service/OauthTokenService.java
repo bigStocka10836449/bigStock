@@ -1,30 +1,24 @@
 package com.bigstock.biz.service;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.apache.http.HttpException;
 import org.redisson.api.RBucket;
-import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
-import org.redisson.client.codec.StringCodec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.DigestUtils;
 
 import com.bigstock.biz.vo.UserInloginInfo;
+import com.bigstock.sharedComponent.dto.TempTokenVo;
 import com.bigstock.sharedComponent.entity.FcmRecord;
 import com.bigstock.sharedComponent.entity.RoleInfo;
 import com.bigstock.sharedComponent.entity.UserAccount;
@@ -87,13 +81,13 @@ public class OauthTokenService {
 				.body(Map.of("accessToken", accessToken, "exp", expiration.getTime()));
 	}
 	
-	public ResponseEntity<?> getTmpToken(HttpServletRequest request, String guestId) throws IOException, HttpException {
+	public ResponseEntity<?> getTmpToken(HttpServletRequest request, String guestId, TempTokenVo tempTokenVo) throws IOException, HttpException {
 
 
 		// 2. 取得 User-Agent，預設為 unknown
 //		String userAgent = Optional.ofNullable(request.getHeader("User-Agent"))
 //		        .orElse("unknown");
-		String fcmToken = request.getHeader("Authorization");
+		String fcmToken = tempTokenVo.getToken();
 		FcmRecord  fcmRecord = fcmRecordService.validateVerifiedDevice(fcmToken);
 //		// 3. 將 IP + User-Agent 做 MD5 hash，作為限流 key
 //		String identifier = fcmRecord.getFcmToken() + ":" + userAgent;
@@ -271,7 +265,7 @@ public class OauthTokenService {
 		builder.issuedAt(new Date());
 
 		// 設定 JWT 有效期
-		builder.expiration(new Date(System.currentTimeMillis() + Duration.ofDays(999999).toMillis()));
+		builder.expiration(new Date(System.currentTimeMillis() + Duration.ofHours(2).toMillis()));
 		// 添加 header
 		builder.header().add("typ", "JWT").and();
 		builder.header().add("alg", "HS256").and();

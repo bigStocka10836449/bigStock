@@ -91,10 +91,12 @@ public class NewsStreamConsumer {
         }
     }
 
-    private void processNews(String title, List<NewsDataInfo> list, String source) throws JsonProcessingException {
+    private void processNews(String title, List<NewsDataInfo> newsDataInfos, String source) throws JsonProcessingException {
         log.info("Processing: " + title);
         ObjectMapper objectMapper = new ObjectMapper();
-        String newsDataInfoStr = objectMapper.writeValueAsString(list);
-        graspTWPMOnTheFly.newsDataBroadCase(newsDataInfoStr);
+        for(NewsDataInfo newsDataInfo: newsDataInfos) {
+        	String newsDataInfoStr = objectMapper.writeValueAsString(newsDataInfo);
+        	graspTWPMOnTheFly.newsDataBroadCase(newsDataInfoStr);
+        }
     }
 }

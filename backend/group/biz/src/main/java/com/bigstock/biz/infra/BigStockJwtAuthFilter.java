@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.bigstock.sharedComponent.entity.FcmRecord;
 import com.bigstock.sharedComponent.service.FcmRecordService;
 
 import io.jsonwebtoken.Claims;
@@ -82,10 +83,17 @@ public class BigStockJwtAuthFilter extends OncePerRequestFilter {
 
         try {
             Claims claims = parseJwtToken(token);
-    		// 3. 將 IP + User-Agent 做 MD5 hash，作為限流 key
-    		String identifier = fcmRecord.getFcmToken() + ":" + userAgent;
-    		String key = "rl:guest-token:tb:" + DigestUtils.md5DigestAsHex(identifier.getBytes(StandardCharsets.UTF_8));
-    		long now = System.currentTimeMillis() / 1000;
+            Date expiration = claims.getExpiration();
+            if (expiration != null && new Date().after(expiration)) {
+            	unauthorized(response);
+            	return;
+            }
+
+			FcmRecord fcmRecord = fcmRecordService.getFcmRecord(token);
+			// 3. 將 IP + User-Agent 做 MD5 hash，作為限流 key
+			String identifier = fcmRecord.getFcmToken() ;
+			String key = "rl:guest-token:tb:" + DigestUtils.md5DigestAsHex(identifier.getBytes(StandardCharsets.UTF_8));
+			long now = System.currentTimeMillis() / 1000;
     		RScript script = redissonClient.getScript(StringCodec.INSTANCE);
     		String scriptText = new String(
     				Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("rate_limit_token_bucket.lua"))
@@ -105,18 +113,15 @@ public class BigStockJwtAuthFilter extends OncePerRequestFilter {
                 return;
             }
 
-            Date expiration = claims.getExpiration();
-            if (expiration != null && new Date().after(expiration)) {
-                unauthorized(response);
-                return;
-            }
 
             // 若之後要放入 SecurityContext，可在這裡處理
             filterChain.doFilter(request, response);
 
         } catch (JwtException e) {
             unauthorized(response);
-        }
+        } catch (HttpException e) {
+        	ratelimitexceeded(response);
+		}
     }
 
     private Claims parseJwtToken(String token) {
@@ -130,5 +135,9 @@ public class BigStockJwtAuthFilter extends OncePerRequestFilter {
     private void unauthorized(HttpServletResponse response) throws IOException {
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.getWriter().write("Unauthorized");
+    }
+    private void ratelimitexceeded(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpStatus.BANDWIDTH_LIMIT_EXCEEDED.value());
+        response.getWriter().write("Rate limit exceeded");
     }
 }

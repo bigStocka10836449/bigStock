@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.bigstock.biz.service.FcmService;
 import com.bigstock.sharedComponent.dto.FcmRegisterRequest;
 import com.bigstock.sharedComponent.dto.FcmVerifyRequest;
+import com.google.firebase.messaging.FirebaseMessagingException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -30,7 +31,7 @@ public class DeviceController {
     }
 
     @PostMapping("/verify")
-    public ResponseEntity<?> verify(@RequestBody FcmVerifyRequest request) {
+    public ResponseEntity<?> verify(@RequestBody FcmVerifyRequest request) throws FirebaseMessagingException {
     	fcmService.verify(request);
         return ResponseEntity.ok(Map.of(
                 "message", "Device verified successfully."

@@ -178,7 +178,7 @@ public class GraspTWPMOnTheFly {
 
             String json = objectMapper.writeValueAsString(snapshot);
 
-            broadcastService.broadcastMarketData(REDIS_NEWS_CHANNEL,json);
+            broadcastService.broadcastMarketData(json);
 
         } catch (Exception e) {
             log.error("Error fetching market data", e);

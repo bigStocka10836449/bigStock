@@ -19,6 +19,7 @@ import com.bigstock.biz.domain.vo.UserRegistryInfo;
 import com.bigstock.biz.service.OauthTokenService;
 import com.bigstock.biz.service.UserRegistryService;
 import com.bigstock.biz.vo.UserInloginInfo;
+import com.bigstock.sharedComponent.dto.TempTokenVo;
 
 //import io.micrometer.tracing.Span;
 //import io.micrometer.tracing.Tracer;
@@ -42,11 +43,11 @@ public class OauthController {
 
 	private final UserRegistryService userRegistryService;
 
-	@GetMapping(value = "tempToken")
+	@PostMapping(value = "tempToken")
 	public ResponseEntity<?> tempToken(HttpServletRequest request,
-            @CookieValue(value = "guest_id", required = false) String guestId)  {
+            @CookieValue(value = "guest_id", required = false) String guestId, @RequestBody TempTokenVo tempTokenVo )  {
 		try {
-				return oauthTokenService.getTmpToken(request, guestId);
+				return oauthTokenService.getTmpToken(request, guestId, tempTokenVo);
 		} catch (HttpException e) {
 			 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("Rate limit exceeded");
 		} catch (IOException e) {
