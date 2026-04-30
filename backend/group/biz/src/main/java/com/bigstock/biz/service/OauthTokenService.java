@@ -6,7 +6,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.http.HttpException;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
@@ -106,9 +108,10 @@ public class OauthTokenService {
 //		if (allowed == null || allowed == 0) {
 //			throw new HttpException("Rate limit exceeded");
 //		}
-
-
-		RBucket<String> jwtBucket = redissonClient.getBucket("jwt:" + fcmToken);
+		String md5Hex = DigestUtils
+			      .md5Hex(fcmToken).toUpperCase();
+		guestId = md5Hex;
+		RBucket<String> jwtBucket = redissonClient.getBucket("jwt:" + guestId);
 		String token = jwtBucket.get();
 
 		if (token == null) {
