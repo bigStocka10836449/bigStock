@@ -108,7 +108,7 @@ public class OauthTokenService {
 //		}
 
 
-		RBucket<String> jwtBucket = redissonClient.getBucket("jwt:" + guestId);
+		RBucket<String> jwtBucket = redissonClient.getBucket("jwt:" + fcmToken);
 		String token = jwtBucket.get();
 
 		if (token == null) {
