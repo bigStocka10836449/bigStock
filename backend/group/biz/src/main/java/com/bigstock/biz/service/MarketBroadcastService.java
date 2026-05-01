@@ -1,6 +1,7 @@
 package com.bigstock.biz.service;
 
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -24,14 +25,14 @@ public class MarketBroadcastService {
         template.convertAndSend(topic, payload);
     }
 
-    public void broadcastMarketData(String newsDataInfoStr) {
+    public void broadcastMarketData(String newsDataInfoStr, String title, String content) {
         try {
 
             Message message = Message.builder()
             	    .setTopic("market-news")
             	    .setNotification(Notification.builder()
-            	        .setTitle("Market News")
-            	        .setBody("New update")
+            	        .setTitle("最新快訊")
+            	        .setBody(StringUtils.isNotBlank(title) ? title : content)
             	        .build())
             	    .putData("type", "NEWS")
             	    .putData("data", newsDataInfoStr)

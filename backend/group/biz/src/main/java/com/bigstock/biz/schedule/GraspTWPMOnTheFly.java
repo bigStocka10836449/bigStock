@@ -169,7 +169,7 @@ public class GraspTWPMOnTheFly {
         }
     }
     
-    public void newsDataBroadCase(String newsDataInfoStr) {
+    public void newsDataBroadCase(String newsDataInfoStr, String title, String content) {
 
         try {
 
@@ -178,7 +178,7 @@ public class GraspTWPMOnTheFly {
 
             String json = objectMapper.writeValueAsString(snapshot);
 
-            broadcastService.broadcastMarketData(json);
+            broadcastService.broadcastMarketData(json,title, content, content);
 
         } catch (Exception e) {
             log.error("Error fetching market data", e);

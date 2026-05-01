@@ -96,7 +96,7 @@ public class NewsStreamConsumer {
         ObjectMapper objectMapper = new ObjectMapper();
         for(NewsDataInfo newsDataInfo: newsDataInfos) {
         	String newsDataInfoStr = objectMapper.writeValueAsString(newsDataInfo);
-        	graspTWPMOnTheFly.newsDataBroadCase(newsDataInfoStr);
+        	graspTWPMOnTheFly.newsDataBroadCase(newsDataInfoStr, newsDataInfo.getData().getTitle(), newsDataInfo.getData().getContent());
         }
     }
 }
