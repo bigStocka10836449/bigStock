@@ -1,10 +1,14 @@
 package com.bigstock.biz.infra;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
+import org.springframework.data.domain.Range;
+import org.springframework.data.redis.connection.Limit;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
@@ -98,5 +102,28 @@ public class NewsStreamConsumer {
         	String newsDataInfoStr = objectMapper.writeValueAsString(newsDataInfo);
         	graspTWPMOnTheFly.newsDataBroadCase(newsDataInfoStr, newsDataInfo.getData().getTitle(), newsDataInfo.getData().getContent());
         }
+    }
+    
+    public List<Map<String, Object>> getAllNews(int limit) {
+
+        List<MapRecord<String, Object, Object>> records =
+                redisTemplate.opsForStream().range(
+                        STREAM_KEY,
+                        Range.unbounded(),
+                        Limit.limit().count(limit)
+                );
+
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (MapRecord<String, Object, Object> record : records) {
+            Map<String, Object> map = new HashMap<>();
+
+            map.put("id", record.getId().getValue());
+            map.put("data", record.getValue());
+
+            result.add(map);
+        }
+
+        return result;
     }
 }

@@ -19,6 +19,7 @@ import org.springframework.web.client.RestClientException;
 
 import com.bigstock.biz.dto.FinancialCalendarImportChunkRequest;
 import com.bigstock.biz.dto.MarginTradingAndShortSellingInfoVO;
+import com.bigstock.biz.infra.NewsStreamConsumer;
 import com.bigstock.biz.service.BizService;
 import com.bigstock.sharedComponent.dto.RankingResponse;
 import com.bigstock.sharedComponent.dto.USHistoryResponse;
@@ -58,6 +59,16 @@ public class BizController {
 	private final StockTagCacheService stockTagCacheService;
 	
 	private final FinancialCalendarService financialCalendarService;
+	
+    private final NewsStreamConsumer service;
+
+	
+	@Operation(summary = "快訊訊息列表", description = "")
+	@GetMapping("allNews")
+	public ResponseEntity<List<Map<String, Object>>> getAllNews() {
+		return ResponseEntity.ok(service.getAllNews(31));
+	}
+	
 	
 	@Operation(summary = "股市分類資訊", description = "")
 	@GetMapping("stockInfo")
