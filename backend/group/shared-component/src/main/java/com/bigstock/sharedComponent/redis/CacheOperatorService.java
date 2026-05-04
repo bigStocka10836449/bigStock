@@ -29,6 +29,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -66,6 +67,12 @@ public class CacheOperatorService {
 
 	private void touch(String redisKey, String cacheName) {
 		Duration sliding = slidingTtlMap.get(cacheName);
+		if (sliding != null) {
+			redisTemplate.expire(redisKey, sliding);
+		}
+	}
+	
+	private void touch(String redisKey, Duration sliding) {
 		if (sliding != null) {
 			redisTemplate.expire(redisKey, sliding);
 		}
@@ -799,6 +806,25 @@ public class CacheOperatorService {
 	    return pipelineDelete(deleteList);
 	}
 	
+	 // ---------- Object----------
+    public <T> void putObject(String cacheName, String cacheKey, T object, Duration ttl) throws JsonProcessingException {
+    	String redisKey = buildKey(cacheName, cacheKey);
+    	ObjectMapper objectMapper = new ObjectMapper();
+		byte[] jsonByte = objectMapper.writeValueAsBytes(object);
+
+		rawRedisTemplate.opsForValue().set(redisKey, jsonByte, ttl);
+    }
+    public <T> T getObject(String cacheName, String cacheKey, Class<T> clazz) throws IOException {
+    	String redisKey = buildKey(cacheName, cacheKey);
+    	ObjectMapper objectMapper = new ObjectMapper();
+        byte[] json =
+                rawRedisTemplate.opsForValue().get(redisKey);
+        if (json == null) {
+            return null;
+        }
+
+        return objectMapper.readValue(json, clazz);
+    }
 	
 	   // ---------- SET ----------
     public void putSet(String cacheName, String cacheKey, Collection<String> values) {

@@ -1,5 +1,7 @@
 package com.bigstock.sharedComponent.service;
 
+import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
@@ -17,6 +19,7 @@ import com.bigstock.sharedComponent.dto.FcmVerifyRequest;
 import com.bigstock.sharedComponent.entity.FcmRecord;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.repository.FcmRecordRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,8 +34,8 @@ public class FcmRecordService {
 
 	private final RedissonClient redissonClient;
 
-	public FcmRecord getFcmRecord(String token) {
-		FcmRecord fcmRecord = cacheOperatorService.getSnapshotData("ultraLongLivedCache", "FcmRecord:Valid:" + token,
+	public FcmRecord getFcmRecord(String token) throws IOException {
+		FcmRecord fcmRecord = cacheOperatorService.getObject("ultraLongLivedCache", "FcmRecord:Valid:" + token,
 				FcmRecord.class);
 
 		if (!ObjectUtils.isEmpty(fcmRecord)) {
@@ -47,15 +50,14 @@ public class FcmRecordService {
 				lockAcquired = lock.tryLock(10, TimeUnit.MINUTES);
 
 				if (lockAcquired) {
-					fcmRecord = cacheOperatorService.getSnapshotData("ultraLongLivedCache", "FcmRecord:Valid:" + token,
+					fcmRecord = cacheOperatorService.getObject("ultraLongLivedCache", "FcmRecord:Valid:" + token,
 							FcmRecord.class);
 					if (!ObjectUtils.isEmpty(fcmRecord)) {
 						return fcmRecord;
 					}
 					fcmRecord = fcmRecordRepository.findByAllowedJwt(token).get();
-					cacheOperatorService.putSnapshotDataAtomic("ultraLongLivedCache", "FcmRecord:Valid:" + token,
+					cacheOperatorService.putObject("ultraLongLivedCache", "FcmRecord:Valid:" + token,
 							fcmRecord);
-					cacheOperatorService.cleanupOldSnapshots("ultraLongLivedCache", "FcmRecord:Valid:" + token, 2);
 					return fcmRecord;
 				} else {
 					throw new RuntimeException("Could not acquire lock for " + lockKey);
@@ -137,9 +139,8 @@ public class FcmRecordService {
 		return device;
 	}
 
-	public FcmRecord save(FcmRecord fcmRecord, String cacheKey) {
-		cacheOperatorService.putSnapshotDataAtomic("ultraLongLivedCache", "FcmRecord:Valid:" + cacheKey, fcmRecord);
-		cacheOperatorService.cleanupOldSnapshots("ultraLongLivedCache", "FcmRecord:Valid:" + cacheKey, 2);
+	public FcmRecord save(FcmRecord fcmRecord, String cacheKey) throws JsonProcessingException {
+		cacheOperatorService.putObject("ultraLongLivedCache", "FcmRecord:Valid:" + cacheKey, fcmRecord, Duration.ofMinutes(125));
 		return fcmRecordRepository.save(fcmRecord);
 	}
 }
