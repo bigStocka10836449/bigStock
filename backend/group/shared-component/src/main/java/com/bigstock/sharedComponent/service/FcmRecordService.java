@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -55,10 +56,16 @@ public class FcmRecordService {
 					if (!ObjectUtils.isEmpty(fcmRecord)) {
 						return fcmRecord;
 					}
-					fcmRecord = fcmRecordRepository.findByAllowedJwt(token).get();
-					cacheOperatorService.putObject("ultraLongLivedCache", "FcmRecord:Valid:" + token,
-							fcmRecord);
-					return fcmRecord;
+					Optional<FcmRecord> fcmRecordOp = fcmRecordRepository.findByAllowedJwt(token);
+					if(fcmRecordOp.isPresent()) {
+						
+						cacheOperatorService.putObject("ultraLongLivedCache", "FcmRecord:Valid:" + token,
+								fcmRecordOp.get(), Duration.ofMinutes(125));
+						fcmRecord = fcmRecordOp.get();
+						return fcmRecord;
+					} else {
+						return null;
+					}
 				} else {
 					throw new RuntimeException("Could not acquire lock for " + lockKey);
 				}

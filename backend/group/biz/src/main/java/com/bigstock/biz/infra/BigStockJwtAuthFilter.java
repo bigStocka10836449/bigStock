@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Objects;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.http.HttpException;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
@@ -90,6 +91,9 @@ public class BigStockJwtAuthFilter extends OncePerRequestFilter {
             }
 
 			FcmRecord fcmRecord = fcmRecordService.getFcmRecord(token);
+			if(ObjectUtils.isEmpty(fcmRecord)) {
+				  unauthorized(response);
+			}
 			// 3. 將 IP + User-Agent 做 MD5 hash，作為限流 key
 			String identifier = fcmRecord.getFcmToken() ;
 			String key = "rl:guest-token:tb:" + DigestUtils.md5DigestAsHex(identifier.getBytes(StandardCharsets.UTF_8));
