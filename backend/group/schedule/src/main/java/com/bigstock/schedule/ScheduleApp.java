@@ -14,7 +14,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.bigstock\\.sharedComponent\\.jaeger\\..*") })
 @EnableAspectJAutoProxy(proxyTargetClass = true, exposeProxy = true)
 @EnableCaching
-@EnableScheduling
 public class ScheduleApp {
     public static void main(String[] args) {
         SpringApplication app = new SpringApplication(ScheduleApp.class);

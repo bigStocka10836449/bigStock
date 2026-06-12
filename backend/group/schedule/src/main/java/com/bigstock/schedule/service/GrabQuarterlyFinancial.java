@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
-@EnableScheduling
+// LOCAL_RANK_TEST_DISABLED: @EnableScheduling
 @RequiredArgsConstructor
 @Slf4j
 public class GrabQuarterlyFinancial {
@@ -28,8 +28,8 @@ public class GrabQuarterlyFinancial {
 	private final TwseQuarterlyFinancialClient twseClient;
 	private final QuarterlyFinancialRedisService quarterlyFinancialRedisService;
 
-	@PostConstruct
-	@Scheduled(cron = "0 30 19 * * ?", zone = "Asia/Taipei")
+	// LOCAL_RANK_TEST_DISABLED: @PostConstruct
+	// LOCAL_RANK_TEST_DISABLED: @Scheduled(cron = "0 30 19 * * ?", zone = "Asia/Taipei")
 	public void syncToDb() throws InterruptedException {
 		List<YearQuarter> yearQuarters = GrabQuarterlyFinancial.resolveLastTwoReportQuarters();
 		for(YearQuarter yearQuarter : yearQuarters) {

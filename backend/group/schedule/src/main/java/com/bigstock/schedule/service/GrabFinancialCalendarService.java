@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
-@EnableScheduling
+// LOCAL_RANK_TEST_DISABLED: @EnableScheduling
 @RequiredArgsConstructor
 @Slf4j
 public class GrabFinancialCalendarService {
@@ -33,7 +33,7 @@ public class GrabFinancialCalendarService {
 	private final RestTemplate restTemplate = new RestTemplate();
 
 //	@PostConstruct
-	@Scheduled(cron = "0 45 21 * * ?", zone = "Asia/Taipei")
+	// LOCAL_RANK_TEST_DISABLED: @Scheduled(cron = "0 45 21 * * ?", zone = "Asia/Taipei")
 	public void grabFinancialCalendar() throws Exception {
 		LocalDate ld = LocalDate.now();
 		int year = ld.getYear();

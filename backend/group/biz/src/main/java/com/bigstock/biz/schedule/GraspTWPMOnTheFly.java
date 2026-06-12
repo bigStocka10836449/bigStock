@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
-@EnableScheduling
+// LOCAL_RANK_TEST_DISABLED: @EnableScheduling
 @RequiredArgsConstructor
 @Slf4j
 public class GraspTWPMOnTheFly {
@@ -61,7 +61,7 @@ public class GraspTWPMOnTheFly {
     		""";
     
     
-    @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:18000}")
+//    LOCAL_RANK_TEST_DISABLED: @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:18000}")
     public void fetchTWPMNightData() {
 
         try {
@@ -79,7 +79,7 @@ public class GraspTWPMOnTheFly {
         }
     }
     
-    @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:18000}")
+//    LOCAL_RANK_TEST_DISABLED: @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:18000}")
     public void fetchTWPMData() {
 
         try {
@@ -97,7 +97,7 @@ public class GraspTWPMOnTheFly {
         }
     }
     
-    @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:18000}")
+//    LOCAL_RANK_TEST_DISABLED: @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:18000}")
     public void fetchNASDAQFData() {
 
         try {
@@ -115,7 +115,7 @@ public class GraspTWPMOnTheFly {
         }
     }
     
-    @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:18000}")
+//    LOCAL_RANK_TEST_DISABLED: @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:18000}")
     public void fetchDOWJONESFData() {
 
         try {
@@ -133,7 +133,7 @@ public class GraspTWPMOnTheFly {
         }
     }    
     
-    @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:18000}")
+//    LOCAL_RANK_TEST_DISABLED: @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:18000}")
     public void fetchSP500FData() {
 
         try {
@@ -151,7 +151,7 @@ public class GraspTWPMOnTheFly {
         }
     }
     
-    @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:18000}")
+//    LOCAL_RANK_TEST_DISABLED: @Scheduled(fixedDelayString = "${bigstock.market.interval-ms:18000}")
     public void fetchPHLXSemiconductorSectorData() {
 
         try {

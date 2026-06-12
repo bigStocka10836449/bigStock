@@ -40,7 +40,7 @@ public class NewsStreamConsumer {
     private static final String GROUP = "news_group";
     private static final String CONSUMER = "consumer_1";
 
-    @PostConstruct
+//    LOCAL_RANK_TEST_DISABLED: @PostConstruct
     public void start() {
         try {
 //            redisTemplate.opsForStream().createGroup(

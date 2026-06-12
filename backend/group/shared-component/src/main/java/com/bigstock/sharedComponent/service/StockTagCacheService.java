@@ -33,7 +33,7 @@ public class StockTagCacheService {
     
     
     
-    @PostConstruct
+//    LOCAL_RANK_TEST_DISABLED: @PostConstruct
     public void init() {
     	List<Map> tagInfos = cache.getDataList("ultraLongLivedCache",
 				"tagsMapping:*", Map.class);

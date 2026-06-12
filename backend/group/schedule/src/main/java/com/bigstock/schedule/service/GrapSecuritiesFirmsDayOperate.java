@@ -30,7 +30,7 @@ public class GrapSecuritiesFirmsDayOperate {
 	private final StockDayPriceService stockDayPriceService;
 
 	private final SecuritiesFirmsDayOperateService securitiesFirmsDayOperateService;
-	@Scheduled(cron = "0 40 17 * * ?", zone = "Asia/Taipei")
+	// LOCAL_RANK_TEST_DISABLED: @Scheduled(cron = "0 40 17 * * ?", zone = "Asia/Taipei")
 	public void callWindowsToExcecute() {
 		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();
 		boolean isfinished = securitiesFirmsDayOperateService.chechIsFinishedWithTradingDate("2330", currentTradeDate);

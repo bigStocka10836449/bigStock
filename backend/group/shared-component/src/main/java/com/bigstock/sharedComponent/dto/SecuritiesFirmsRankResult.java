@@ -21,7 +21,7 @@ public class SecuritiesFirmsRankResult {
     private String rangeType;
 
     /**
-     * 1 / 3 / 5 / 10 / 20 / 60 / 120 / 240
+     * 1 / 3 / 5 / 10 / 20 / 60 / 120
      */
     private Integer rangeDays;
 

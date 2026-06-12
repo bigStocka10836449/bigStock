@@ -25,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
-@EnableScheduling
+// LOCAL_RANK_TEST_DISABLED: @EnableScheduling
 @RequiredArgsConstructor
 @Slf4j
 public class GraspShareholderStructureService {
@@ -61,7 +61,7 @@ public class GraspShareholderStructureService {
 
 //	@PostConstruct
 	// 每天晚上8點更新
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}", zone= "Asia/Taipei")
+	// LOCAL_RANK_TEST_DISABLED: @Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-shareholder-structure}", zone= "Asia/Taipei")
 	public void updateShareholderStructure()
 			throws Exception {
 		// 先抓DB裡面全部的代號資料

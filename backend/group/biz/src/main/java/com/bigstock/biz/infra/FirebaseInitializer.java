@@ -28,7 +28,7 @@ public class FirebaseInitializer {
     @Value("${fcm.config-path:}")
     private String configPath;
 
-    @PostConstruct
+//    LOCAL_RANK_TEST_DISABLED: @PostConstruct
     public void init() throws Exception {
 
         InputStream serviceAccount = null;

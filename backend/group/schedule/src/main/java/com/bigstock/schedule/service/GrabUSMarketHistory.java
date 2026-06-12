@@ -20,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
-@EnableScheduling
+// LOCAL_RANK_TEST_DISABLED: @EnableScheduling
 @RequiredArgsConstructor
 @Slf4j
 public class GrabUSMarketHistory {
@@ -32,7 +32,7 @@ public class GrabUSMarketHistory {
 	private final CacheOperatorService cacheOperatorService;
 	
 //	@PostConstruct
-	@Scheduled(cron = "0 00 13 * * ?", zone = "Asia/Taipei")
+	// LOCAL_RANK_TEST_DISABLED: @Scheduled(cron = "0 00 13 * * ?", zone = "Asia/Taipei")
 	public void grabUSHistory() {
 		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();
 		LocalDate tradeDateLdt = LocalDate.ofInstant(currentTradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
@@ -52,13 +52,13 @@ public class GrabUSMarketHistory {
 		
 	}
 	
-	@Scheduled(cron = "0 00 8 * * ?", zone = "Asia/Taipei")
+	// LOCAL_RANK_TEST_DISABLED: @Scheduled(cron = "0 00 8 * * ?", zone = "Asia/Taipei")
 	public void grabTWPMNHistory() {
 		String json = grabThirdPartyStockDayPrice.grabAndCacheTWPMNMarketHistoryFromYahoo();
 		cacheOperatorService.putCompressedValue("market:raw:history", "WTX&", json);
 	}
 	
-	@Scheduled(cron = "0 20 17 * * ?", zone = "Asia/Taipei")
+	// LOCAL_RANK_TEST_DISABLED: @Scheduled(cron = "0 20 17 * * ?", zone = "Asia/Taipei")
 	public void grabTWPMHistory() {
 		String json = grabThirdPartyStockDayPrice.grabAndCacheTWPMMarketHistoryFromYahoo();
 		cacheOperatorService.putCompressedValue("market:raw:history", "WTX00", json);

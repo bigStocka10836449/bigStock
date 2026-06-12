@@ -13,7 +13,6 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.springframework.data.repository.query.Param;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
@@ -41,6 +40,13 @@ public class SecuritiesFirmsDayOperateService {
 	
 	public List<SecuritiesFirmsDayOperate> insertAll(List<SecuritiesFirmsDayOperate> securitiesFirmsDayOperates) {
 		return securitiesFirmsDayOperateRepository.saveAll(securitiesFirmsDayOperates);
+	}
+
+	public Date findLatestAvailableTradingDate(String stockCode) {
+		if (stockCode == null || stockCode.trim().isEmpty()) {
+			return null;
+		}
+		return securitiesFirmsDayOperateRepository.findLatestAvailableTradingDate(stockCode.trim());
 	}
 
 	public boolean chechIsFinishedWithTradingDate(String stockCode, Date tradingDate) {

@@ -44,7 +44,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
-@EnableScheduling
+// LOCAL_RANK_TEST_DISABLED: @EnableScheduling
 @RequiredArgsConstructor
 @Slf4j
 public class GrabFromThirdParty {
@@ -64,7 +64,7 @@ public class GrabFromThirdParty {
 	private final MarginTradingAndShortSellingInfoService marginTradingAndShortSellingInfoService;
 
 //	@PostConstruct
-	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
+	// LOCAL_RANK_TEST_DISABLED: @Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
@@ -583,7 +583,7 @@ public class GrabFromThirdParty {
 	}
 
 //	@PostConstruct
-	@Scheduled(cron = "0 50 21 * * ?", zone = "Asia/Taipei")
+	// LOCAL_RANK_TEST_DISABLED: @Scheduled(cron = "0 50 21 * * ?", zone = "Asia/Taipei")
 	public void grabMarginTradingAndShortSellingInfo() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");

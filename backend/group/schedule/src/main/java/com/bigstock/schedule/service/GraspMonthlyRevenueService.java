@@ -30,7 +30,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
-@EnableScheduling
+// LOCAL_RANK_TEST_DISABLED: @EnableScheduling
 @RequiredArgsConstructor
 @Slf4j
 public class GraspMonthlyRevenueService {
@@ -39,7 +39,7 @@ public class GraspMonthlyRevenueService {
 	private final MonthlyRevenueQueryService monthlyRevenueQueryService;
 	private final StockRevenueService stockRevenueService;
 
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-monthlyRevenue}", zone = "Asia/Taipei")
+	// LOCAL_RANK_TEST_DISABLED: @Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-monthlyRevenue}", zone = "Asia/Taipei")
 	@Transactional
 //	@PostConstruct
 	public void updateMonthlyRevenue() throws RestClientException, URISyntaxException,

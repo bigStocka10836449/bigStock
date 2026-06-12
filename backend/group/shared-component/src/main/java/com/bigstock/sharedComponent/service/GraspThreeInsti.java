@@ -27,7 +27,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
-@EnableScheduling
+// LOCAL_RANK_TEST_DISABLED: @EnableScheduling
 @RequiredArgsConstructor
 @Slf4j
 public class GraspThreeInsti {
@@ -42,7 +42,7 @@ public class GraspThreeInsti {
 	
 	private final RankStockChangeService rankStockChangeService;
 
-	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-threeInsti}", zone = "Asia/Taipei")
+//	@Scheduled(cron = "${schedule.task.scheduling.cron.expression.update-threeInsti}", zone = "Asia/Taipei")
 	@Transactional
 //	@PostConstruct
 	public void updateThreeInsti() throws Exception {
