@@ -12,7 +12,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.dto.SecuritiesFirmsRankResult;
-import com.bigstock.sharedComponent.entity.StockInfo;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateRankService;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsDayOperateService;
 import com.bigstock.sharedComponent.service.SecuritiesFirmsRankRedisService;
@@ -30,7 +29,19 @@ public class SecuritiesFirmsRankPrecomputeService {
 
     private static final List<Integer> RANGE_DAYS_LIST = Arrays.asList(1, 3, 5, 10, 20, 60, 120);
 
+    /**
+     * 每批股票數。
+     * 100 是目前比較平衡的設定。
+     * 不建議一開始就拉太大，避免單次 SQL 太重。
+     */
     private static final int STOCK_BATCH_SIZE = 100;
+
+    /**
+     * 每批查詢後稍微暫停，避免連續打 DB。
+     * 若你要測純速度，可以先改成 0。
+     * 若正式環境想保守，可以維持 20。
+     */
+    private static final long BATCH_SLEEP_MILLIS = 20L;
 
     private final SecuritiesFirmsDayOperateService securitiesFirmsDayOperateService;
 
@@ -47,17 +58,6 @@ public class SecuritiesFirmsRankPrecomputeService {
         precompute(triggerSource);
     }
 
-    /**
-     * 預先計算買賣日報表券商排行。
-     *
-     * 計算方式：
-     * 1. 直接從買賣日報表資料表取得最新一個已存在資料的日期，不再要求當天資料一定完成。
-     * 2. 撈出所有四碼 stockCode。
-     * 3. 固定計算 1 / 3 / 5 / 10 / 20 / 60 / 120 天。
-     * 4. 每批 100 支股票，用一次 SQL 批量計算該批股票的券商買賣超。
-     * 5. 每支股票每個天數寫入 Redis。
-     * 6. 全部完成後才標記實際計算日期 ready。
-     */
     public void precompute(String triggerSource) {
         java.util.Date latestAvailableTradingDate = null;
         String endDateText = null;
@@ -89,49 +89,77 @@ public class SecuritiesFirmsRankPrecomputeService {
             log.info("Securities firms rank precompute use latest available trading date. triggerSource={}, endDate={}",
                     triggerSource, endDateText);
 
-            List<String> stockCodes = stockInfoService.getAllStockInfo().stream()
-                    .map(StockInfo::getStockCode)
-                    .filter(stockCode -> stockCode != null && stockCode.trim().length() == 4)
-                    .map(String::trim)
-                    .distinct()
-                    .sorted()
-                    .toList();
+            List<String> stockCodes = stockInfoService.getAllFourDigitStockCodes();
 
-            log.info("Securities firms rank precompute start. triggerSource={}, endDate={}, stockCount={}, rangeDays={}",
-                    triggerSource, endDateText, stockCodes.size(), RANGE_DAYS_LIST);
+            if (stockCodes == null || stockCodes.isEmpty()) {
+                log.warn("Securities firms rank precompute skipped, no stock codes found. triggerSource={}, endDate={}",
+                        triggerSource, endDateText);
+                return;
+            }
+
+            List<java.util.Date> maxTradingDates = rankService.findLatestTradingDates(
+                    latestAvailableTradingDate,
+                    120
+            );
+
+            if (maxTradingDates == null || maxTradingDates.isEmpty()) {
+                log.warn("Securities firms rank precompute skipped, no trading dates found. triggerSource={}, endDate={}",
+                        triggerSource, endDateText);
+                return;
+            }
+
+            log.info("Securities firms rank precompute start. triggerSource={}, endDate={}, stockCount={}, rangeDays={}, maxTradingDays={}, batchSize={}, batchSleepMillis={}",
+                    triggerSource,
+                    endDateText,
+                    stockCodes.size(),
+                    RANGE_DAYS_LIST,
+                    maxTradingDates.size(),
+                    STOCK_BATCH_SIZE,
+                    BATCH_SLEEP_MILLIS);
 
             int totalWriteCount = 0;
 
-            for (Integer rangeDays : RANGE_DAYS_LIST) {
-                int rangeWriteCount = 0;
+            for (int start = 0; start < stockCodes.size(); start += STOCK_BATCH_SIZE) {
+                long batchStartMillis = System.currentTimeMillis();
 
-                for (int start = 0; start < stockCodes.size(); start += STOCK_BATCH_SIZE) {
-                    int end = Math.min(start + STOCK_BATCH_SIZE, stockCodes.size());
-                    List<String> batchStockCodes = new ArrayList<>(stockCodes.subList(start, end));
+                int end = Math.min(start + STOCK_BATCH_SIZE, stockCodes.size());
+                List<String> batchStockCodes = new ArrayList<>(stockCodes.subList(start, end));
 
-                    List<SecuritiesFirmsRankResult> results = rankService.calculateFixedRankBatch(
-                            batchStockCodes,
-                            rangeDays,
-                            latestAvailableTradingDate
-                    );
+                List<SecuritiesFirmsRankResult> results = rankService.calculateFixedRankBatchAllRangesByTradingDates(
+                        batchStockCodes,
+                        RANGE_DAYS_LIST,
+                        maxTradingDates
+                );
 
-                    for (SecuritiesFirmsRankResult result : results) {
-                        if ("DONE".equals(result.getStatus())) {
-                            rankRedisService.putFixedRank(
-                                    result.getStockCode(),
-                                    result.getRangeDays(),
-                                    endDateText,
-                                    result
-                            );
-                            rangeWriteCount++;
-                        }
+                int batchWriteCount = 0;
+
+                for (SecuritiesFirmsRankResult result : results) {
+                    if ("DONE".equals(result.getStatus())) {
+                        rankRedisService.putFixedRank(
+                                result.getStockCode(),
+                                result.getRangeDays(),
+                                endDateText,
+                                result
+                        );
+                        batchWriteCount++;
                     }
                 }
 
-                totalWriteCount += rangeWriteCount;
+                totalWriteCount += batchWriteCount;
 
-                log.info("Securities firms rank precompute range finished. triggerSource={}, endDate={}, rangeDays={}, writeCount={}",
-                        triggerSource, endDateText, rangeDays, rangeWriteCount);
+                long batchCostMillis = System.currentTimeMillis() - batchStartMillis;
+
+                log.info("Securities firms rank precompute batch finished. triggerSource={}, endDate={}, batchStart={}, batchEnd={}, batchSize={}, resultCount={}, writeCount={}, costMillis={}",
+                        triggerSource,
+                        endDateText,
+                        start,
+                        end,
+                        batchStockCodes.size(),
+                        results == null ? 0 : results.size(),
+                        batchWriteCount,
+                        batchCostMillis);
+
+                sleepQuietly(BATCH_SLEEP_MILLIS);
             }
 
             rankRedisService.markDailyReady(endDateText);
@@ -146,6 +174,19 @@ public class SecuritiesFirmsRankPrecomputeService {
             if (locked && lock != null && lock.isHeldByCurrentThread()) {
                 lock.unlock();
             }
+        }
+    }
+
+    private void sleepQuietly(long millis) {
+        if (millis <= 0) {
+            return;
+        }
+
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Securities firms rank precompute interrupted", e);
         }
     }
 }
