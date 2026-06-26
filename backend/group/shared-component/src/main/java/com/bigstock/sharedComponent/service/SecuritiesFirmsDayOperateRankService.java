@@ -31,7 +31,9 @@ public class SecuritiesFirmsDayOperateRankService {
     private static final Set<Integer> SUPPORTED_RANGE_DAYS =
             Set.of(1, 3, 5, 10, 20, 60, 120);
 
-    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+    private static final ThreadLocal<SimpleDateFormat> DATE_FORMAT = ThreadLocal.withInitial(
+            () -> new SimpleDateFormat("yyyy-MM-dd")
+    );
 
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
@@ -81,8 +83,8 @@ public class SecuritiesFirmsDayOperateRankService {
         List<java.util.Date> sortedAsc = new ArrayList<>(tradingDates);
         sortedAsc.sort(java.util.Date::compareTo);
 
-        result.setStartDate(DATE_FORMAT.format(sortedAsc.get(0)));
-        result.setEndDate(DATE_FORMAT.format(sortedAsc.get(sortedAsc.size() - 1)));
+        result.setStartDate(formatDate(sortedAsc.get(0)));
+        result.setEndDate(formatDate(sortedAsc.get(sortedAsc.size() - 1)));
 
         result.setBuyTop15(queryTop15(stockCode.trim(), tradingDates, true));
         result.setSellTop15(queryTop15(stockCode.trim(), tradingDates, false));
@@ -173,18 +175,23 @@ public class SecuritiesFirmsDayOperateRankService {
     }
 
     /**
-     * 效能折衷版：
+     * Java range 計算版：
      *
-     * 一批股票只查一次 SQL。
-     * SQL 一次算出 1 / 3 / 5 / 10 / 20 / 60 / 120 七組買賣金額。
-     * Java 端只負責依 rangeDays 拆 Top15。
+     * 一批股票只查一次 SQL，DB 先依「每檔股票自己的最新可用交易日」往前取 120 個交易日，
+     * 並彙總到「股票 + 日期 + 券商」。
      *
-     * Redis 不會存 120 天明細，只存最後 Top15 結果。
+     * 1 / 3 / 5 / 10 / 20 / 60 / 120 天的累加與 Top15 排名交給 Java 計算。
+     *
+     * 重點：
+     * 1. 不把原始價位明細整批拉回 Java。
+     * 2. 不把 120 天直接壓成每個券商一筆，仍保留 trading_date。
+     * 3. 每檔股票各自用自己的最近 120 個交易日，不依賴 2330 的交易日清單。
+     * 4. SQL 端先剔除零股，stock_buy_amount / stock_sell_amount 未滿 1000 股不納入計算。
      */
-    public List<SecuritiesFirmsRankResult> calculateFixedRankBatchAllRangesByTradingDates(
+    public List<SecuritiesFirmsRankResult> calculateFixedRankBatchAllRangesByLatestTradingDate(
             List<String> stockCodes,
             List<Integer> rangeDaysList,
-            List<java.util.Date> maxTradingDates
+            java.util.Date endDate
     ) {
         if (stockCodes == null || stockCodes.isEmpty()) {
             return Collections.emptyList();
@@ -194,7 +201,7 @@ public class SecuritiesFirmsDayOperateRankService {
             return Collections.emptyList();
         }
 
-        if (maxTradingDates == null || maxTradingDates.isEmpty()) {
+        if (endDate == null) {
             return Collections.emptyList();
         }
 
@@ -214,32 +221,91 @@ public class SecuritiesFirmsDayOperateRankService {
             return Collections.emptyList();
         }
 
-        Map<Integer, List<java.util.Date>> tradingDatesByRangeDays = buildTradingDatesByRangeDays(
-                normalizedRangeDaysList,
-                maxTradingDates
-        );
+        int maxRangeDays = normalizedRangeDaysList.stream()
+                .mapToInt(Integer::intValue)
+                .max()
+                .orElse(120);
 
-        List<MultiRangeRankRow> multiRangeRows = queryMultiRangeRankRows(
+        long queryStartMillis = System.currentTimeMillis();
+
+        List<DailyAggRankRow> dailyAggRows = queryDailyAggRankRows(
                 normalizedStockCodes,
-                normalizedRangeDaysList,
-                tradingDatesByRangeDays
+                endDate,
+                maxRangeDays
         );
 
-        Map<String, List<MultiRangeRankRow>> rowsByStockCode = multiRangeRows.stream()
+        long queryCostMillis = System.currentTimeMillis() - queryStartMillis;
+        long calculateStartMillis = System.currentTimeMillis();
+
+        List<TradingDateRow> tradingDateRows = buildTradingDateRowsFromDailyAggRows(dailyAggRows);
+
+        Map<String, List<TradingDateRow>> tradingDatesByStockCode = tradingDateRows.stream()
                 .collect(Collectors.groupingBy(
-                        MultiRangeRankRow::getStockCode,
+                        TradingDateRow::getStockCode,
                         LinkedHashMap::new,
                         Collectors.toList()
                 ));
 
-        Map<Integer, DateRangeInfo> dateRangeInfoByRangeDays = new HashMap<>();
+        Map<String, Map<Integer, DateRangeInfo>> dateRangeInfoByStockCodeAndRange = buildDateRangeInfoByStockCodeAndRange(
+                normalizedStockCodes,
+                normalizedRangeDaysList,
+                tradingDatesByStockCode
+        );
 
-        for (Integer rangeDays : normalizedRangeDaysList) {
-            List<java.util.Date> rangeTradingDates = tradingDatesByRangeDays.getOrDefault(
-                    rangeDays,
-                    Collections.emptyList()
-            );
-            dateRangeInfoByRangeDays.put(rangeDays, buildDateRangeInfo(rangeTradingDates));
+        Map<String, Map<Integer, Integer>> actualTradingDaysByStockCodeAndRange = buildActualTradingDaysByStockCodeAndRange(
+                normalizedStockCodes,
+                normalizedRangeDaysList,
+                tradingDatesByStockCode
+        );
+
+        Map<String, Map<Integer, Map<String, FirmAmountAccumulator>>> accumulatorMap = new HashMap<>();
+
+        for (String stockCode : normalizedStockCodes) {
+            Map<Integer, Map<String, FirmAmountAccumulator>> rangeMap = new HashMap<>();
+
+            for (Integer rangeDays : normalizedRangeDaysList) {
+                rangeMap.put(rangeDays, new HashMap<>());
+            }
+
+            accumulatorMap.put(stockCode, rangeMap);
+        }
+
+        for (DailyAggRankRow row : dailyAggRows) {
+            if (row == null || row.getStockCode() == null || row.getSecuritiesFirms() == null) {
+                continue;
+            }
+
+            int tradingDayIndex = row.getTradingDayIndex();
+
+            if (tradingDayIndex <= 0) {
+                continue;
+            }
+
+            Map<Integer, Map<String, FirmAmountAccumulator>> rangeMap = accumulatorMap.get(row.getStockCode());
+
+            if (rangeMap == null) {
+                continue;
+            }
+
+            for (Integer rangeDays : normalizedRangeDaysList) {
+                if (tradingDayIndex > rangeDays) {
+                    continue;
+                }
+
+                Map<String, FirmAmountAccumulator> firmMap = rangeMap.get(rangeDays);
+
+                if (firmMap == null) {
+                    firmMap = new HashMap<>();
+                    rangeMap.put(rangeDays, firmMap);
+                }
+
+                FirmAmountAccumulator accumulator = firmMap.computeIfAbsent(
+                        row.getSecuritiesFirms(),
+                        ignored -> new FirmAmountAccumulator()
+                );
+
+                accumulator.add(row.getBuyAmount(), row.getSellAmount());
+            }
         }
 
         List<SecuritiesFirmsRankResult> results = new ArrayList<>(
@@ -247,16 +313,43 @@ public class SecuritiesFirmsDayOperateRankService {
         );
 
         for (String stockCode : normalizedStockCodes) {
-            List<MultiRangeRankRow> stockRows = rowsByStockCode.getOrDefault(stockCode, Collections.emptyList());
+            Map<Integer, Map<String, FirmAmountAccumulator>> rangeMap = accumulatorMap.getOrDefault(
+                    stockCode,
+                    Collections.emptyMap()
+            );
+
+            Map<Integer, DateRangeInfo> dateRangeInfoByRange = dateRangeInfoByStockCodeAndRange.getOrDefault(
+                    stockCode,
+                    Collections.emptyMap()
+            );
+
+            Map<Integer, Integer> actualTradingDaysByRange = actualTradingDaysByStockCodeAndRange.getOrDefault(
+                    stockCode,
+                    Collections.emptyMap()
+            );
 
             for (Integer rangeDays : normalizedRangeDaysList) {
-                List<java.util.Date> rangeTradingDates = tradingDatesByRangeDays.getOrDefault(
+                DateRangeInfo dateRangeInfo = dateRangeInfoByRange.get(rangeDays);
+                int actualTradingDays = actualTradingDaysByRange.getOrDefault(rangeDays, 0);
+
+                if (actualTradingDays <= 0) {
+                    results.add(buildNotReadyResult(
+                            stockCode,
+                            rangeDays,
+                            null,
+                            null,
+                            0,
+                            "No trading dates found"
+                    ));
+                    continue;
+                }
+
+                Map<String, FirmAmountAccumulator> firmMap = rangeMap.getOrDefault(
                         rangeDays,
-                        Collections.emptyList()
+                        Collections.emptyMap()
                 );
 
-                DateRangeInfo dateRangeInfo = dateRangeInfoByRangeDays.get(rangeDays);
-                List<RankRow> rangeRows = toRangeRows(stockRows, rangeDays);
+                List<RankRow> rangeRows = toRankRows(stockCode, firmMap);
 
                 SecuritiesFirmsRankResult result = new SecuritiesFirmsRankResult();
                 result.setStatus("DONE");
@@ -265,7 +358,7 @@ public class SecuritiesFirmsDayOperateRankService {
                 result.setRangeDays(rangeDays);
                 result.setStartDate(dateRangeInfo == null ? null : dateRangeInfo.getStartDate());
                 result.setEndDate(dateRangeInfo == null ? null : dateRangeInfo.getEndDate());
-                result.setActualTradingDays(rangeTradingDates.size());
+                result.setActualTradingDays(actualTradingDays);
                 result.setSource("SCHEDULE");
                 result.setBuyTop15(buildTop15(rangeRows, true));
                 result.setSellTop15(buildTop15(rangeRows, false));
@@ -274,7 +367,40 @@ public class SecuritiesFirmsDayOperateRankService {
             }
         }
 
+        long calculateCostMillis = System.currentTimeMillis() - calculateStartMillis;
+        long usedMemoryMb = getUsedMemoryMb();
+
+        log.info("Securities firms rank java range calculation finished. stockCount={}, rangeDays={}, tradingDateRowCount={}, dailyAggRowCount={}, resultCount={}, dailyAggQueryCostMillis={}, calculateCostMillis={}, usedMemoryMb={}",
+                normalizedStockCodes.size(),
+                normalizedRangeDaysList,
+                tradingDateRows.size(),
+                dailyAggRows.size(),
+                results.size(),
+                queryCostMillis,
+                calculateCostMillis,
+                usedMemoryMb);
+
         return results;
+    }
+
+    /**
+     * 保留舊方法名稱，避免其他呼叫點尚未調整時編譯失敗。
+     * 新邏輯只需要 maxTradingDates 的第一天作為 endDate。
+     */
+    public List<SecuritiesFirmsRankResult> calculateFixedRankBatchAllRangesByTradingDates(
+            List<String> stockCodes,
+            List<Integer> rangeDaysList,
+            List<java.util.Date> maxTradingDates
+    ) {
+        if (maxTradingDates == null || maxTradingDates.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return calculateFixedRankBatchAllRangesByLatestTradingDate(
+                stockCodes,
+                rangeDaysList,
+                maxTradingDates.get(0)
+        );
     }
 
     public List<java.util.Date> findLatestTradingDates(java.util.Date endDate, int limit) {
@@ -326,7 +452,7 @@ public class SecuritiesFirmsDayOperateRankService {
                     ) AS net_amount
                 FROM %s
                 WHERE stock_code = :stockCode
-                  AND trading_date IN (:tradingDates)
+                  AND trading_date BETWEEN :startDate AND :endDate
                 GROUP BY securities_firms
                 HAVING (
                     SUM(CASE WHEN stock_buy_amount >= 1000 THEN stock_buy_amount ELSE 0 END)
@@ -337,11 +463,12 @@ public class SecuritiesFirmsDayOperateRankService {
                 LIMIT 15
                 """.formatted(TABLE_NAME, havingOperator, order);
 
-        List<Date> sqlDates = toSqlDates(tradingDates);
+        DateRangeInfo dateRangeInfo = buildDateRangeInfo(tradingDates);
 
         Map<String, Object> params = Map.of(
                 "stockCode", stockCode,
-                "tradingDates", sqlDates
+                "startDate", toSqlDate(dateRangeInfo.getStartDate()),
+                "endDate", toSqlDate(dateRangeInfo.getEndDate())
         );
 
         List<SecuritiesFirmsRankItem> rows = namedParameterJdbcTemplate.query(
@@ -382,7 +509,7 @@ public class SecuritiesFirmsDayOperateRankService {
                     ) AS net_amount
                 FROM %s
                 WHERE stock_code IN (:stockCodes)
-                  AND trading_date IN (:tradingDates)
+                  AND trading_date BETWEEN :startDate AND :endDate
                 GROUP BY stock_code, securities_firms
                 HAVING (
                     SUM(CASE WHEN stock_buy_amount >= 1000 THEN stock_buy_amount ELSE 0 END)
@@ -392,9 +519,12 @@ public class SecuritiesFirmsDayOperateRankService {
                 ORDER BY stock_code ASC, net_amount DESC
                 """.formatted(TABLE_NAME);
 
+        DateRangeInfo dateRangeInfo = buildDateRangeInfo(tradingDates);
+
         Map<String, Object> params = new HashMap<>();
         params.put("stockCodes", stockCodes);
-        params.put("tradingDates", toSqlDates(tradingDates));
+        params.put("startDate", toSqlDate(dateRangeInfo.getStartDate()));
+        params.put("endDate", toSqlDate(dateRangeInfo.getEndDate()));
 
         List<RankRow> rows = namedParameterJdbcTemplate.query(
                 sql,
@@ -409,6 +539,351 @@ public class SecuritiesFirmsDayOperateRankService {
         );
 
         return rows == null ? Collections.emptyList() : rows;
+    }
+
+    private List<TradingDateRow> queryLatestTradingDateRows(
+            List<String> stockCodes,
+            java.util.Date endDate,
+            int maxRangeDays
+    ) {
+        if (stockCodes == null || stockCodes.isEmpty() || endDate == null || maxRangeDays <= 0) {
+            return Collections.emptyList();
+        }
+
+        String sql = """
+                WITH latest_dates AS (
+                    SELECT
+                        stock_code,
+                        MAX(trading_date) AS end_date
+                    FROM %s
+                    WHERE stock_code IN (:stockCodes)
+                      AND trading_date <= :endDate
+                    GROUP BY stock_code
+                ),
+                distinct_trading_dates AS (
+                    SELECT DISTINCT
+                        sfdo.stock_code,
+                        sfdo.trading_date
+                    FROM %s sfdo
+                    JOIN latest_dates ld
+                      ON ld.stock_code = sfdo.stock_code
+                     AND sfdo.trading_date <= ld.end_date
+                ),
+                ranked_trading_dates AS (
+                    SELECT
+                        stock_code,
+                        trading_date,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY stock_code
+                            ORDER BY trading_date DESC
+                        ) AS trading_day_index
+                    FROM distinct_trading_dates
+                )
+                SELECT
+                    stock_code,
+                    trading_date,
+                    trading_day_index
+                FROM ranked_trading_dates
+                WHERE trading_day_index <= :maxRangeDays
+                ORDER BY stock_code ASC, trading_day_index ASC
+                """.formatted(TABLE_NAME, TABLE_NAME);
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("stockCodes", stockCodes);
+        params.put("endDate", new Date(endDate.getTime()));
+        params.put("maxRangeDays", maxRangeDays);
+
+        List<TradingDateRow> rows = namedParameterJdbcTemplate.query(
+                sql,
+                params,
+                (rs, rowNum) -> new TradingDateRow(
+                        rs.getString("stock_code"),
+                        rs.getDate("trading_date"),
+                        rs.getInt("trading_day_index")
+                )
+        );
+
+        return rows == null ? Collections.emptyList() : rows;
+    }
+
+    private List<DailyAggRankRow> queryDailyAggRankRows(
+            List<String> stockCodes,
+            java.util.Date endDate,
+            int maxRangeDays
+    ) {
+        if (stockCodes == null || stockCodes.isEmpty() || endDate == null || maxRangeDays <= 0) {
+            return Collections.emptyList();
+        }
+
+        Map<String, Object> params = new HashMap<>();
+        String targetStockValuesSql = buildTargetStockValuesSql(stockCodes, params);
+
+        String sql = """
+                WITH target_stocks(stock_code) AS (
+                    VALUES
+                    %s
+                ),
+                last_trading_dates AS (
+                    SELECT
+                        s.stock_code,
+                        d.trading_date,
+                        d.trading_day_index
+                    FROM target_stocks s
+                    CROSS JOIN LATERAL (
+                        SELECT
+                            trading_date,
+                            ROW_NUMBER() OVER (ORDER BY trading_date DESC) AS trading_day_index
+                        FROM (
+                            SELECT DISTINCT
+                                sfdo.trading_date
+                            FROM %s sfdo
+                            WHERE sfdo.stock_code = s.stock_code
+                              AND sfdo.trading_date <= :endDate
+                            ORDER BY sfdo.trading_date DESC
+                            LIMIT :maxRangeDays
+                        ) limited_dates
+                    ) d
+                ),
+                daily_agg AS (
+                    SELECT
+                        d.stock_code,
+                        d.trading_date,
+                        d.trading_day_index,
+                        sfdo.securities_firms,
+                        SUM(CASE WHEN sfdo.stock_buy_amount >= 1000 THEN sfdo.stock_buy_amount ELSE 0 END) AS buy_amount,
+                        SUM(CASE WHEN sfdo.stock_sell_amount >= 1000 THEN sfdo.stock_sell_amount ELSE 0 END) AS sell_amount
+                    FROM last_trading_dates d
+                    JOIN %s sfdo
+                      ON sfdo.stock_code = d.stock_code
+                     AND sfdo.trading_date = d.trading_date
+                    WHERE sfdo.trading_date <= :endDate
+                      AND (sfdo.stock_buy_amount >= 1000 OR sfdo.stock_sell_amount >= 1000)
+                    GROUP BY
+                        d.stock_code,
+                        d.trading_date,
+                        d.trading_day_index,
+                        sfdo.securities_firms
+                    HAVING
+                        SUM(CASE WHEN sfdo.stock_buy_amount >= 1000 THEN sfdo.stock_buy_amount ELSE 0 END) > 0
+                        OR
+                        SUM(CASE WHEN sfdo.stock_sell_amount >= 1000 THEN sfdo.stock_sell_amount ELSE 0 END) > 0
+                )
+                SELECT
+                    d.stock_code,
+                    d.trading_date,
+                    d.trading_day_index,
+                    daily_agg.securities_firms,
+                    COALESCE(daily_agg.buy_amount, 0) AS buy_amount,
+                    COALESCE(daily_agg.sell_amount, 0) AS sell_amount
+                FROM last_trading_dates d
+                LEFT JOIN daily_agg
+                  ON daily_agg.stock_code = d.stock_code
+                 AND daily_agg.trading_date = d.trading_date
+                 AND daily_agg.trading_day_index = d.trading_day_index
+                ORDER BY
+                    d.stock_code ASC,
+                    d.trading_day_index ASC,
+                    daily_agg.securities_firms ASC
+                """.formatted(targetStockValuesSql, TABLE_NAME, TABLE_NAME);
+
+        params.put("endDate", new Date(endDate.getTime()));
+        params.put("maxRangeDays", maxRangeDays);
+
+        List<DailyAggRankRow> rows = namedParameterJdbcTemplate.query(
+                sql,
+                params,
+                (rs, rowNum) -> {
+                    java.util.Date tradingDate = rs.getDate("trading_date");
+
+                    return new DailyAggRankRow(
+                            rs.getString("stock_code"),
+                            tradingDate,
+                            tradingDate == null ? null : formatDate(tradingDate),
+                            rs.getInt("trading_day_index"),
+                            rs.getString("securities_firms"),
+                            rs.getLong("buy_amount"),
+                            rs.getLong("sell_amount")
+                    );
+                }
+        );
+
+        return rows == null ? Collections.emptyList() : rows;
+    }
+
+    private String buildTargetStockValuesSql(List<String> stockCodes, Map<String, Object> params) {
+        List<String> values = new ArrayList<>(stockCodes.size());
+
+        for (int i = 0; i < stockCodes.size(); i++) {
+            String paramName = "targetStockCode" + i;
+            params.put(paramName, stockCodes.get(i));
+            values.add("(CAST(:" + paramName + " AS text))");
+        }
+
+        return String.join(",\n", values);
+    }
+
+    private List<TradingDateRow> buildTradingDateRowsFromDailyAggRows(List<DailyAggRankRow> dailyAggRows) {
+        if (dailyAggRows == null || dailyAggRows.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<String, TradingDateRow> tradingDateRowMap = new LinkedHashMap<>();
+
+        for (DailyAggRankRow row : dailyAggRows) {
+            if (row == null || row.getStockCode() == null || row.getTradingDate() == null || row.getTradingDayIndex() <= 0) {
+                continue;
+            }
+
+            String key = row.getStockCode() + "|" + formatDate(row.getTradingDate()) + "|" + row.getTradingDayIndex();
+            tradingDateRowMap.putIfAbsent(
+                    key,
+                    new TradingDateRow(
+                            row.getStockCode(),
+                            row.getTradingDate(),
+                            row.getTradingDayIndex()
+                    )
+            );
+        }
+
+        return new ArrayList<>(tradingDateRowMap.values());
+    }
+
+    private Map<String, Map<Integer, DateRangeInfo>> buildDateRangeInfoByStockCodeAndRange(
+            List<String> stockCodes,
+            List<Integer> rangeDaysList,
+            Map<String, List<TradingDateRow>> tradingDatesByStockCode
+    ) {
+        if (stockCodes == null || stockCodes.isEmpty() || rangeDaysList == null || rangeDaysList.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Map<Integer, DateRangeInfo>> result = new HashMap<>();
+
+        for (String stockCode : stockCodes) {
+            List<TradingDateRow> tradingDateRows = tradingDatesByStockCode.getOrDefault(
+                    stockCode,
+                    Collections.emptyList()
+            );
+
+            Map<Integer, DateRangeInfo> dateRangeInfoByRange = new HashMap<>();
+
+            for (Integer rangeDays : rangeDaysList) {
+                List<java.util.Date> dates = tradingDateRows.stream()
+                        .filter(row -> row.getTradingDayIndex() <= rangeDays)
+                        .map(TradingDateRow::getTradingDate)
+                        .filter(date -> date != null)
+                        .toList();
+
+                dateRangeInfoByRange.put(rangeDays, buildDateRangeInfo(dates));
+            }
+
+            result.put(stockCode, dateRangeInfoByRange);
+        }
+
+        return result;
+    }
+
+    private Map<String, Map<Integer, Integer>> buildActualTradingDaysByStockCodeAndRange(
+            List<String> stockCodes,
+            List<Integer> rangeDaysList,
+            Map<String, List<TradingDateRow>> tradingDatesByStockCode
+    ) {
+        if (stockCodes == null || stockCodes.isEmpty() || rangeDaysList == null || rangeDaysList.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Map<Integer, Integer>> result = new HashMap<>();
+
+        for (String stockCode : stockCodes) {
+            List<TradingDateRow> tradingDateRows = tradingDatesByStockCode.getOrDefault(
+                    stockCode,
+                    Collections.emptyList()
+            );
+
+            Map<Integer, Integer> actualTradingDaysByRange = new HashMap<>();
+
+            for (Integer rangeDays : rangeDaysList) {
+                long count = tradingDateRows.stream()
+                        .filter(row -> row.getTradingDayIndex() <= rangeDays)
+                        .count();
+
+                actualTradingDaysByRange.put(rangeDays, Math.toIntExact(count));
+            }
+
+            result.put(stockCode, actualTradingDaysByRange);
+        }
+
+        return result;
+    }
+
+    private Map<String, Integer> buildTradingDayIndexByDateText(List<java.util.Date> maxTradingDates) {
+        if (maxTradingDates == null || maxTradingDates.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Integer> result = new HashMap<>();
+
+        for (int i = 0; i < maxTradingDates.size(); i++) {
+            java.util.Date tradingDate = maxTradingDates.get(i);
+
+            if (tradingDate == null) {
+                continue;
+            }
+
+            result.put(formatDate(tradingDate), i + 1);
+        }
+
+        return result;
+    }
+
+    private List<RankRow> toRankRows(
+            String stockCode,
+            Map<String, FirmAmountAccumulator> firmMap
+    ) {
+        if (firmMap == null || firmMap.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<RankRow> rows = new ArrayList<>(firmMap.size());
+
+        for (Map.Entry<String, FirmAmountAccumulator> entry : firmMap.entrySet()) {
+            FirmAmountAccumulator accumulator = entry.getValue();
+
+            if (accumulator == null) {
+                continue;
+            }
+
+            long buyAmount = accumulator.getBuyAmount();
+            long sellAmount = accumulator.getSellAmount();
+            long netAmount = buyAmount - sellAmount;
+
+            if (netAmount == 0) {
+                continue;
+            }
+
+            rows.add(new RankRow(
+                    stockCode,
+                    entry.getKey(),
+                    buyAmount,
+                    sellAmount,
+                    netAmount
+            ));
+        }
+
+        return rows;
+    }
+
+    private String formatDate(java.util.Date date) {
+        if (date == null) {
+            return null;
+        }
+
+        return DATE_FORMAT.get().format(date);
+    }
+
+    private long getUsedMemoryMb() {
+        Runtime runtime = Runtime.getRuntime();
+        return (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
     }
 
     private List<MultiRangeRankRow> queryMultiRangeRankRows(
@@ -437,16 +912,48 @@ public class SecuritiesFirmsDayOperateRankService {
             return Collections.emptyList();
         }
 
+        DateRangeInfo maxDateRangeInfo = buildDateRangeInfo(maxTradingDates);
+
+        if (maxDateRangeInfo.getStartDate() == null || maxDateRangeInfo.getEndDate() == null) {
+            return Collections.emptyList();
+        }
+
         StringBuilder selectBuilder = new StringBuilder();
+        Map<String, Object> params = new HashMap<>();
+
+        params.put("stockCodes", stockCodes);
+        params.put("maxStartDate", toSqlDate(maxDateRangeInfo.getStartDate()));
+        params.put("maxEndDate", toSqlDate(maxDateRangeInfo.getEndDate()));
 
         for (Integer rangeDays : rangeDaysList) {
-            String dateParam = "tradingDates" + rangeDays;
+            List<java.util.Date> dates = tradingDatesByRangeDays.getOrDefault(
+                    rangeDays,
+                    Collections.emptyList()
+            );
+            DateRangeInfo dateRangeInfo = buildDateRangeInfo(dates);
+
+            if (dateRangeInfo.getStartDate() == null || dateRangeInfo.getEndDate() == null) {
+                continue;
+            }
+
+            String startDateParam = "startDate" + rangeDays;
+            String endDateParam = "endDate" + rangeDays;
+
+            params.put(startDateParam, toSqlDate(dateRangeInfo.getStartDate()));
+            params.put(endDateParam, toSqlDate(dateRangeInfo.getEndDate()));
 
             selectBuilder.append("""
                     ,
-                    SUM(CASE WHEN trading_date IN (:%s) AND stock_buy_amount >= 1000 THEN stock_buy_amount ELSE 0 END) AS buy_amount_%s,
-                    SUM(CASE WHEN trading_date IN (:%s) AND stock_sell_amount >= 1000 THEN stock_sell_amount ELSE 0 END) AS sell_amount_%s
-                    """.formatted(dateParam, rangeDays, dateParam, rangeDays));
+                    SUM(CASE WHEN trading_date BETWEEN :%s AND :%s AND stock_buy_amount >= 1000 THEN stock_buy_amount ELSE 0 END) AS buy_amount_%s,
+                    SUM(CASE WHEN trading_date BETWEEN :%s AND :%s AND stock_sell_amount >= 1000 THEN stock_sell_amount ELSE 0 END) AS sell_amount_%s
+                    """.formatted(
+                    startDateParam,
+                    endDateParam,
+                    rangeDays,
+                    startDateParam,
+                    endDateParam,
+                    rangeDays
+            ));
         }
 
         String sql = """
@@ -456,26 +963,14 @@ public class SecuritiesFirmsDayOperateRankService {
                     %s
                 FROM %s
                 WHERE stock_code IN (:stockCodes)
-                  AND trading_date IN (:maxTradingDates)
+                  AND trading_date BETWEEN :maxStartDate AND :maxEndDate
+                  AND (stock_buy_amount >= 1000 OR stock_sell_amount >= 1000)
                 GROUP BY stock_code, securities_firms
                 HAVING
                     SUM(CASE WHEN stock_buy_amount >= 1000 THEN stock_buy_amount ELSE 0 END) <> 0
                     OR
                     SUM(CASE WHEN stock_sell_amount >= 1000 THEN stock_sell_amount ELSE 0 END) <> 0
-                ORDER BY stock_code ASC
                 """.formatted(selectBuilder, TABLE_NAME);
-
-        Map<String, Object> params = new HashMap<>();
-        params.put("stockCodes", stockCodes);
-        params.put("maxTradingDates", toSqlDates(maxTradingDates));
-
-        for (Integer rangeDays : rangeDaysList) {
-            List<java.util.Date> dates = tradingDatesByRangeDays.getOrDefault(
-                    rangeDays,
-                    Collections.emptyList()
-            );
-            params.put("tradingDates" + rangeDays, toSqlDates(dates));
-        }
 
         List<MultiRangeRankRow> rows = namedParameterJdbcTemplate.query(
                 sql,
@@ -618,8 +1113,8 @@ public class SecuritiesFirmsDayOperateRankService {
         sortedAsc.sort(java.util.Date::compareTo);
 
         return new DateRangeInfo(
-                DATE_FORMAT.format(sortedAsc.get(0)),
-                DATE_FORMAT.format(sortedAsc.get(sortedAsc.size() - 1))
+                formatDate(sortedAsc.get(0)),
+                formatDate(sortedAsc.get(sortedAsc.size() - 1))
         );
     }
 
@@ -631,6 +1126,14 @@ public class SecuritiesFirmsDayOperateRankService {
         return tradingDates.stream()
                 .map(d -> new Date(d.getTime()))
                 .toList();
+    }
+
+    private Date toSqlDate(String dateText) {
+        if (dateText == null || dateText.trim().isEmpty()) {
+            return null;
+        }
+
+        return Date.valueOf(dateText.trim());
     }
 
     private SecuritiesFirmsRankResult buildFailedResult(
@@ -713,6 +1216,110 @@ public class SecuritiesFirmsDayOperateRankService {
 
         private long getNetAmount() {
             return netAmount;
+        }
+    }
+
+    private static class DailyAggRankRow {
+        private final String stockCode;
+        private final java.util.Date tradingDate;
+        private final String tradingDateText;
+        private final int tradingDayIndex;
+        private final String securitiesFirms;
+        private final long buyAmount;
+        private final long sellAmount;
+
+        private DailyAggRankRow(
+                String stockCode,
+                java.util.Date tradingDate,
+                String tradingDateText,
+                int tradingDayIndex,
+                String securitiesFirms,
+                long buyAmount,
+                long sellAmount
+        ) {
+            this.stockCode = stockCode;
+            this.tradingDate = tradingDate;
+            this.tradingDateText = tradingDateText;
+            this.tradingDayIndex = tradingDayIndex;
+            this.securitiesFirms = securitiesFirms;
+            this.buyAmount = buyAmount;
+            this.sellAmount = sellAmount;
+        }
+
+        private String getStockCode() {
+            return stockCode;
+        }
+
+        @SuppressWarnings("unused")
+        private java.util.Date getTradingDate() {
+            return tradingDate;
+        }
+
+        @SuppressWarnings("unused")
+        private String getTradingDateText() {
+            return tradingDateText;
+        }
+
+        private int getTradingDayIndex() {
+            return tradingDayIndex;
+        }
+
+        private String getSecuritiesFirms() {
+            return securitiesFirms;
+        }
+
+        private long getBuyAmount() {
+            return buyAmount;
+        }
+
+        private long getSellAmount() {
+            return sellAmount;
+        }
+    }
+
+    private static class TradingDateRow {
+        private final String stockCode;
+        private final java.util.Date tradingDate;
+        private final int tradingDayIndex;
+
+        private TradingDateRow(
+                String stockCode,
+                java.util.Date tradingDate,
+                int tradingDayIndex
+        ) {
+            this.stockCode = stockCode;
+            this.tradingDate = tradingDate;
+            this.tradingDayIndex = tradingDayIndex;
+        }
+
+        private String getStockCode() {
+            return stockCode;
+        }
+
+        private java.util.Date getTradingDate() {
+            return tradingDate;
+        }
+
+        private int getTradingDayIndex() {
+            return tradingDayIndex;
+        }
+    }
+
+    private static class FirmAmountAccumulator {
+        private long buyAmount;
+        private long sellAmount;
+
+        private void add(long buyAmount, long sellAmount) {
+            this.buyAmount += buyAmount;
+            this.sellAmount += sellAmount;
+        }
+
+        private long getBuyAmount() {
+            return buyAmount;
+        }
+
+        private long getSellAmount() {
+            return sellAmount;
         }
     }
 

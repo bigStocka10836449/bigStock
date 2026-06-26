@@ -78,16 +78,16 @@ public class StockInfoService {
 		}
 
 	}
-	
+
 	public List<String> getAllFourDigitStockCodes() {
-	    return getAllStockInfo().stream()
-	            .map(StockInfo::getStockCode)
-	            .filter(stockCode -> stockCode != null && !stockCode.isBlank())
-	            .map(String::trim)
-	            .filter(stockCode -> stockCode.length() == 4)
-	            .distinct()
-	            .sorted()
-	            .toList();
+		return getAllStockInfo().stream()
+				.map(StockInfo::getStockCode)
+				.filter(stockCode -> stockCode != null && !stockCode.isBlank())
+				.map(String::trim)
+				.filter(stockCode -> stockCode.length() == 4)
+				.distinct()
+				.sorted()
+				.toList();
 	}
 	
 	public List<StockInfo> insertAll(List<StockInfo> stockInfos){
