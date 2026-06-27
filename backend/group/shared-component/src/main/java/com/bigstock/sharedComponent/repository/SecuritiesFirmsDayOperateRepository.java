@@ -9,7 +9,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.bigstock.sharedComponent.entity.SecuritiesFirmsDayOperate;
-import com.bigstock.sharedComponent.entity.StockDayPrice;
 
 public interface SecuritiesFirmsDayOperateRepository
 		extends JpaRepository<SecuritiesFirmsDayOperate, SecuritiesFirmsDayOperate.SecuritiesFirmsDayOperateId> {
@@ -20,6 +19,14 @@ public interface SecuritiesFirmsDayOperateRepository
 	
 	List<SecuritiesFirmsDayOperate> findByStockCodeAndTradingDate(String stockCode, Date tradingDate);
 	
+
+
+	@Query(value = """
+			SELECT MAX(sfdo.trading_date)
+			FROM bstock.securities_firms_day_operate sfdo
+			WHERE sfdo.stock_code = :stockCode
+			""", nativeQuery = true)
+	Date findLatestAvailableTradingDate(@Param("stockCode") String stockCode);
 
 	@Query(value = """
 			SELECT CASE
