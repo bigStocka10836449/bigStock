@@ -21,7 +21,7 @@ public class SecuritiesFirmsRankReadySchedule {
      * 實際計算基準日不是系統當日，而是 securities_firms_day_operate 中最近可用交易日。
      * 例如週末或假日執行時，會沿用最近一個有買賣日報表資料的交易日。
      */
-    @Scheduled(cron = "0 30 21 * * ?", zone = "Asia/Taipei")
+    @Scheduled(cron = "0 15 22 * * ?", zone = "Asia/Taipei")
     public void precomputeSecuritiesFirmsRank() {
         log.info("Securities firms rank scheduled trigger fired. triggerSource=SCHEDULE_2130");
         try {
