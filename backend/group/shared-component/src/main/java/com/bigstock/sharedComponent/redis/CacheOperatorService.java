@@ -52,7 +52,7 @@ public class CacheOperatorService {
 	@Qualifier("rawRedisTemplate")
 	private RedisTemplate<String, byte[]> rawRedisTemplate;
 
-	public static final int DEFAULT_SERIES_MAX_SIZE = 600;
+	public static final int DEFAULT_SERIES_MAX_SIZE = 720;
 
 	private final Map<String, Duration> slidingTtlMap = Map.of("shortLivedCache", Duration.ofMinutes(120),
 			"middleLivedCache", Duration.ofDays(1), "longLivedCache", Duration.ofDays(7), "ultraLongLivedCache",
@@ -826,7 +826,7 @@ public class CacheOperatorService {
         return objectMapper.readValue(json, clazz);
     }
 	
-	   // ---------- SET ----------
+	// ---------- SET ----------
     public void putSet(String cacheName, String cacheKey, Collection<String> values) {
         if (values == null || values.isEmpty()) return;
         String redisKey = buildKey(cacheName, cacheKey);
@@ -855,6 +855,19 @@ public class CacheOperatorService {
     public void putHash(String key, Map<String, String> map) {
     	stringRedisTemplate.opsForHash().putAll(key, map);
     }
+    
+	public void putHashPipelined(Map<String, String> map) {
+
+		redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+
+			map.forEach((key, value) -> {
+				connection.stringCommands().set(key.getBytes(StandardCharsets.UTF_8),
+						value.getBytes(StandardCharsets.UTF_8));
+			});
+
+			return null;
+		});
+	}
 
     public Map<Object, Object> getHash(String key) {
         return stringRedisTemplate.opsForHash().entries(key);

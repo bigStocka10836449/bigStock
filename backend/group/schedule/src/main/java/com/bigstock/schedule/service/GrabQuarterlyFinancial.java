@@ -28,7 +28,7 @@ public class GrabQuarterlyFinancial {
 	private final TwseQuarterlyFinancialClient twseClient;
 	private final QuarterlyFinancialRedisService quarterlyFinancialRedisService;
 
-	@PostConstruct
+//	@PostConstruct
 	@Scheduled(cron = "0 30 19 * * ?", zone = "Asia/Taipei")
 	public void syncToDb() throws InterruptedException {
 		List<YearQuarter> yearQuarters = GrabQuarterlyFinancial.resolveLastTwoReportQuarters();

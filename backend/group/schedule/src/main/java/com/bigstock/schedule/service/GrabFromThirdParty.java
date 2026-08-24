@@ -62,6 +62,8 @@ public class GrabFromThirdParty {
 	private final CacheOperatorService cacheOperatorService;
 
 	private final MarginTradingAndShortSellingInfoService marginTradingAndShortSellingInfoService;
+	
+	private final CalculateCosineSimilarityVectorService calculateCosineSimilarityVectorService;
 
 //	@PostConstruct
 	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
@@ -384,6 +386,7 @@ public class GrabFromThirdParty {
 				log.warn("stock_info missing : {}", stockCode);
 			}
 		});
+		calculateCosineSimilarityVectorService.calculateAsDailyAspect();
 	}
 
 	public void calculateRSVValueAndLimitDownUp(StockDayPrice stockTwseDayPrice,

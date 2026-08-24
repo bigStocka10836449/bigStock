@@ -64,6 +64,7 @@ schedule:
           update-margin-trading:  "0 */30 * * * *"
           update-threeInsti: "0 30 18 * * *"
           update-monthlyRevenue: "0 0 8 * * SUN"
+      similiar-search-reload: https://bigstock-similiarearch.zeabur.app/cache/reload
   chromeDriverPath:
     windows: 
       active: true	

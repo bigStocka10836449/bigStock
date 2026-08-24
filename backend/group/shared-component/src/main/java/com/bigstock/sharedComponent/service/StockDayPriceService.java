@@ -7,6 +7,9 @@ import java.sql.Statement;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -14,7 +17,9 @@ import java.util.Optional;
 
 import javax.sql.DataSource;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
@@ -24,19 +29,23 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.data.repository.query.Param;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.bigstock.sharedComponent.annotation.BigStockCacheableWithLock;
+import com.bigstock.sharedComponent.dto.StockTrendCache;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
+import com.bigstock.sharedComponent.enums.TrendRegime;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.repository.StockDayPriceRankRepository;
 import com.bigstock.sharedComponent.repository.StockDayPriceRepository;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StockDayPriceService {
 	
 	@Autowired
@@ -101,8 +110,14 @@ public class StockDayPriceService {
 	}
 	
 	@BigStockCacheableWithLock(value = "ultraLongLivedCache", key = "#p0")
+	@Transactional(readOnly = true, timeout = 30)
 	public List<StockDayPrice> findLastest600StockDayPriceByStockCode(String stockCode){
-		List<StockDayPrice> stockDayPrices = stockDayPriceRepository.findLastest600StockDayPriceByStockCode(stockCode);
+		log.info("findLastest600StockDayPriceByStockCode , {}", stockCode);
+		List<StockDayPrice> stockDayPrices =
+		        stockDayPriceRankRepository.findByIdStockCode(stockCode)
+		                .stream()
+		                .map(this::buildStockDayPrice)
+		                .toList();
 		cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
 				"stock:compressed:" + stockCode,
 				stockDayPrices, stockDayPrice -> stockDayPrice.getTradingDay().getTime(),
@@ -494,6 +509,249 @@ public class StockDayPriceService {
 	        return date == null ? null : new java.sql.Date(date.getTime());
 	    }
 	
+	    
+	    public StockTrendCache calculationVectors(
+	            List<StockDayPrice> list) {
+
+	        if (CollectionUtils.isEmpty(list)) {
+	            return null;
+	        }
+
+	        list.sort(
+	                Comparator.comparing(
+	                        StockDayPrice::getTradingDay
+	                )
+	        );
+	        log.info("calculateOneStock stockCode={}", list.get(0).getStockCode());
+	        List<LocalDate> dates = new ArrayList<>();
+
+	        List<Double> returns = new ArrayList<>();
+	        List<Double> dailyReturns = new ArrayList<>();
+	        List<Double> volumeRatio = new ArrayList<>();
+
+	        List<Double> k = new ArrayList<>();
+	        List<Double> d = new ArrayList<>();
+	        List<Double> rsv = new ArrayList<>();
+
+	        List<Double> bias10 = new ArrayList<>();
+	        List<Double> bias20 = new ArrayList<>();
+	        List<Double> bias60 = new ArrayList<>();
+	        List<Double> bias120 = new ArrayList<>();
+	        List<Double> bias240 = new ArrayList<>();
+
+	        List<Double> gap10_20 = new ArrayList<>();
+	        List<Double> gap20_60 = new ArrayList<>();
+	        List<Double> gap60_120 = new ArrayList<>();
+	        List<Double> gap120_240 = new ArrayList<>();
+
+	        double firstClose =
+	                safeDouble(
+	                        list.get(0).getClosingPrice()
+	                );
+
+	        double previousClose = firstClose;
+
+	        final int VOLUME_WINDOW = 20;
+
+	        for (int i = 0; i < list.size(); i++) {
+
+	            StockDayPrice item = list.get(i);
+
+	            double close =
+	                    safeDouble(
+	                            item.getClosingPrice()
+	                    );
+
+	            LocalDate tradingDate =
+	                    item.getTradingDay()
+	                            .toInstant()
+	                            .atZone(ZoneId.systemDefault())
+	                            .toLocalDate();
+
+	            dates.add(tradingDate);
+
+	            /*
+	             * cumulative return
+	             */
+	            returns.add(
+	                    firstClose == 0
+	                            ? 0D
+	                            : (close / firstClose) - 1
+	            );
+
+	            /*
+	             * daily return
+	             */
+	            if (i == 0) {
+
+	                dailyReturns.add(0D);
+
+	            } else {
+
+	                dailyReturns.add(
+	                        previousClose == 0
+	                                ? 0D
+	                                : (close / previousClose) - 1
+	                );
+	            }
+
+	            previousClose = close;
+
+	            /*
+	             * KD RSV
+	             */
+	            k.add(
+	                    safeDouble(
+	                            item.getLineKvalue()
+	                    )
+	            );
+
+	            d.add(
+	                    safeDouble(
+	                            item.getLineDvalue()
+	                    )
+	            );
+
+	            rsv.add(
+	                    safeDouble(
+	                            item.getLineRSVvalue()
+	                    )
+	            );
+
+	            /*
+	             * volume ratio
+	             */
+	            if (i < VOLUME_WINDOW) {
+
+	                volumeRatio.add(1D);
+
+	            } else {
+
+	                double avgVolume = 0;
+
+	                for (int j = i - VOLUME_WINDOW;
+	                     j < i;
+	                     j++) {
+
+	                    avgVolume +=
+	                            safeDouble(
+	                                    list.get(j)
+	                                            .getTradingVolume()
+	                            );
+	                }
+
+	                avgVolume /= VOLUME_WINDOW;
+
+	                double currentVolume =
+	                        safeDouble(
+	                                item.getTradingVolume()
+	                        );
+
+	                volumeRatio.add(
+	                        avgVolume == 0
+	                                ? 1D
+	                                : currentVolume / avgVolume
+	                );
+	            }
+
+	            /*
+	             * MA
+	             */
+	            double ma10 =
+	                    safeDouble(item.getTenDaysMa());
+
+	            double ma20 =
+	                    safeDouble(item.getTwentyDaysMa());
+
+	            double ma60 =
+	                    safeDouble(item.getSixtyDaysMa());
+
+	            double ma120 =
+	                    safeDouble(item.getOneTwentyDaysMa());
+
+	            double ma240 =
+	                    safeDouble(item.getTwentyDaysMa());
+
+	            /*
+	             * bias
+	             */
+	            bias10.add(
+	                    bias(close, ma10)
+	            );
+
+	            bias20.add(
+	                    bias(close, ma20)
+	            );
+
+	            bias60.add(
+	                    bias(close, ma60)
+	            );
+
+	            bias120.add(
+	                    bias(close, ma120)
+	            );
+
+	            bias240.add(
+	                    bias(close, ma240)
+	            );
+
+	            /*
+	             * MA hierarchy
+	             */
+	            gap10_20.add(
+	                    gap(ma10, ma20)
+	            );
+
+	            gap20_60.add(
+	                    gap(ma20, ma60)
+	            );
+
+	            gap60_120.add(
+	                    gap(ma60, ma120)
+	            );
+
+	            gap120_240.add(
+	                    gap(ma120, ma240)
+	            );
+	        }
+
+	        StockDayPrice latest =
+	                list.get(list.size() - 1);
+
+	       TrendRegime  trendRegime =
+	                calculateTrendRegime(latest
+	                );
+
+	        return StockTrendCache.builder()
+	                .stockCode(
+	                        latest.getStockCode()
+	                )
+	                .lastDay(
+	                        dates.get(
+	                                dates.size() - 1
+	                        )
+	                )
+	                .trendRegime(
+	                        trendRegime
+	                )
+	                .dates(dates)
+	                .returns(returns)
+	                .dailyReturns(dailyReturns)
+	                .volumeRatio(volumeRatio)
+	                .k(k)
+	                .d(d)
+	                .rsv(rsv)
+	                .bias10(bias10)
+	                .bias20(bias20)
+	                .bias60(bias60)
+	                .bias120(bias120)
+	                .bias240(bias240)
+	                .gap10_20(gap10_20)
+	                .gap20_60(gap20_60)
+	                .gap60_120(gap60_120)
+	                .gap120_240(gap120_240)
+	                .build();
+	    }
 
 	public StockDayPriceRank buildRanks(String stockCode, StockDayPrice stockDayPrice) {
 
@@ -552,5 +810,102 @@ public class StockDayPriceService {
 
 
 		return r;
+	}
+	
+	public StockDayPrice buildStockDayPrice(StockDayPriceRank source) {
+		if (source == null) {
+			return null;
+		}
+
+		StockDayPrice target = new StockDayPrice();
+
+		target.setStockCode(source.getStockCode());
+		target.setTradingDay(source.getTradingDay());
+		target.setMonthOfYear(source.getMonthOfYear());
+
+		target.setOpeningPrice(source.getOpeningPrice());
+		target.setClosingPrice(source.getClosingPrice());
+		target.setHighPrice(source.getHighPrice());
+		target.setLowPrice(source.getLowPrice());
+
+		target.setStartOfWeekDate(source.getStartOfWeekDate());
+		target.setEndOfWeekDate(source.getEndOfWeekDate());
+
+		target.setChange(source.getChange());
+		target.setChangeRate(source.getChangeRate());
+		target.setWeekOfYear(source.getWeekOfYear());
+
+		target.setTradingVolume(source.getTradingVolume());
+
+		target.setLimitUp(source.getLimitUp());
+		target.setLimitDown(source.getLimitDown());
+
+		target.setLineKvalue(source.getLineKvalue());
+		target.setLineDvalue(source.getLineDvalue());
+		target.setLineRSVvalue(source.getLineRSVvalue());
+
+		target.setFiveDaysMa(source.getFiveDaysMa());
+		target.setTenDaysMa(source.getTenDaysMa());
+		target.setTwentyDaysMa(source.getTwentyDaysMa());
+		target.setSixtyDaysMa(source.getSixtyDaysMa());
+		target.setOneTwentyDaysMa(source.getOneTwentyDaysMa());
+		target.setTwoFourtyDaysMa(source.getTwoFourtyDaysMa());
+
+		return target;
+	}
+
+	private double safeDouble(String value) {
+
+	    if (StringUtils.isBlank(value)) {
+	        return 0D;
+	    }
+
+	    try {
+
+	        return Double.parseDouble(
+	                value.replace(",", "")
+	        );
+
+	    } catch (Exception e) {
+
+	        return 0D;
+	    }
+	}
+
+	private TrendRegime calculateTrendRegime(StockDayPrice item) {
+
+	    double close = safeDouble(item.getClosingPrice());
+
+	    double ma120 = safeDouble(item.getOneTwentyDaysMa());
+	    double ma240 = safeDouble(item.getTwoFourtyDaysMa());
+
+	    if (close == 0 || ma120 == 0 || ma240 == 0) {
+	    	return TrendRegime.SIDEWAY;  // sideway / unknown
+	    }
+
+	    if (close > ma120 && ma120 > ma240) {
+	        return TrendRegime.BULL; // bull
+	    }
+
+	    if (close < ma120 && ma120 < ma240) {
+	        return TrendRegime.BEAR; // bear
+	    }
+
+	    return TrendRegime.SIDEWAY; // sideway
+	}
+	private double gap(double shortMa, double longMa) {
+	    if (longMa == 0) {
+	        return 0D;
+	    }
+
+	    return (shortMa - longMa) / longMa;
+	}
+	
+	private double bias(double close, double ma) {
+	    if (ma == 0) {
+	        return 0D;
+	    }
+
+	    return (close - ma) / ma;
 	}
 }

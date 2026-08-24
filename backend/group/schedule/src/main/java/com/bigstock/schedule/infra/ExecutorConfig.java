@@ -1,5 +1,6 @@
 package com.bigstock.schedule.infra;
 
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
@@ -8,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
 public class ExecutorConfig {
@@ -31,5 +33,27 @@ public class ExecutorConfig {
 	            factory,
 	            new ThreadPoolExecutor.DiscardPolicy() // do NOT block refresh
 	    );
+	}
+	
+	@Bean("stockVectorExecutor")
+	public Executor stockVectorExecutor() {
+
+		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+
+		executor.setCorePoolSize(5);
+
+		executor.setMaxPoolSize(5);
+
+		executor.setQueueCapacity(2000);
+
+		executor.setThreadNamePrefix("stock-vector-");
+
+		executor.setWaitForTasksToCompleteOnShutdown(true);
+
+		executor.setAwaitTerminationSeconds(600);
+
+		executor.initialize();
+
+		return executor;
 	}
 }
