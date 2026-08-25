@@ -2,6 +2,7 @@ package com.bigstock.schedule.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -65,15 +66,15 @@ public class GrabFromThirdParty {
 	
 	private final CalculateCosineSimilarityVectorService calculateCosineSimilarityVectorService;
 
-//	@PostConstruct
+	@PostConstruct
 	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
-		}).toList();
+		}).filter(data -> "554789".equals(data)).toList();
 		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
-		}).toList();
+		}).filter(data -> "2330".equals(data)).toList();
 		List<String> allStockCodes = Lists.newArrayList();
 		List<StockInfo> allStockInfos = stockInfoService.getAllStockInfo().stream().filter(data -> {
 			return !data.getStockCode().matches(".*[a-zA-Z].*");
@@ -82,22 +83,24 @@ public class GrabFromThirdParty {
 				.collect(Collectors.groupingBy(StockInfo::getStockCode));
 		allStockCodes.addAll(tpexStockCodes);
 		allStockCodes.addAll(twseStockCodes);
-		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
-		allStockCodes.forEach(stockCode -> {
-			allStockDayPrices.addAll(grabThirdPartyStockDayPrice.grabFromYahoo(stockCode));
-			try {
-				Thread.sleep(2000);
-			} catch (InterruptedException e) {
-				log.warn(stockCode + e.getMessage(), e);
-			}
-		});
-		stockDayPriceService.upsertBatch(allStockDayPrices);
-		Date tradeDate = allStockDayPrices.stream().findFirst().get().getTradingDay();
+		SimpleDateFormat st = new SimpleDateFormat("yyyy-MM-dd");
+		Date tradeDate = st.parse("2026-08-24");
 		LocalDate tradeDateLdt = LocalDate.ofInstant(tradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
 		Integer years = tradeDateLdt.getYear();
-		LocalDate tradeDateMinus365 = tradeDateLdt.minusDays(500);
+		LocalDate tradeDateMinus365 = tradeDateLdt.minusDays(100);
 		Instant instant = tradeDateMinus365.atStartOfDay(ZoneId.of("Asia/Taipei")).toInstant();
 		Date tradeDateBefore365Days = Date.from(instant);
+		List<StockDayPrice> allStockDayPrices = stockDayPriceService.findByStartDateAndEndDate(tradeDate, tradeDate);
+//				Lists.newArrayList();
+//		allStockCodes.forEach(stockCode -> {
+//			allStockDayPrices.addAll(grabThirdPartyStockDayPrice.grabFromYahoo(stockCode));
+//			try {
+//				Thread.sleep(2000);
+//			} catch (InterruptedException e) {
+//				log.warn(stockCode + e.getMessage(), e);
+//			}
+//		});
+		stockDayPriceService.upsertBatch(allStockDayPrices);
 		List<StockDayPrice> stockDayPricesFor365Ds = stockDayPriceService
 				.findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, tradeDate);
 		Map<String, List<StockDayPrice>> groupedStockDayPrices = stockDayPricesFor365Ds.stream().filter(data -> {
@@ -110,8 +113,8 @@ public class GrabFromThirdParty {
 
 		stockDayPriceService.upsertBatch(allStockDayPrices);
 		allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
-			if ("2454".equals(stockTwseDayPrice.getStockCode())) {
-				log.info("2454");
+			if ("1516".equals(stockTwseDayPrice.getStockCode())) {
+				log.info("1516");
 			}
 			List<StockDayPrice> allThisStockCodeDayPrices = Lists.newArrayList();
 			allThisStockCodeDayPrices.add(stockTwseDayPrice);
@@ -402,8 +405,29 @@ public class GrabFromThirdParty {
 		Double upperLimitPrice = null;
 		Double lowerLimitPrice = null;
 		Double standarPrice = null;
+		if(stockTwseDayPrice.getChange().contains("除")) {
+			log.info("除");
+		}
 		standarPrice = Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""))
 				- new BigDecimal(stockTwseDayPrice.getChange()).doubleValue();
+		stockTwseDayPrice.setOpeningPrice(
+				(stockTwseDayPrice.getOpeningPrice() == null || stockTwseDayPrice.getOpeningPrice().isBlank()
+						|| "-".equals(stockTwseDayPrice.getOpeningPrice().trim())) ? standarPrice.toString()
+								: stockTwseDayPrice.getOpeningPrice());
+		twoFourtyStockDayPrices.get(0).setOpeningPrice(stockTwseDayPrice.getOpeningPrice());
+		stockTwseDayPrice.setLowPrice(
+				(stockTwseDayPrice.getLowPrice() == null || stockTwseDayPrice.getLowPrice().isBlank()
+						|| "-".equals(stockTwseDayPrice.getLowPrice().trim())) ? stockTwseDayPrice.getClosingPrice().toString()
+								: stockTwseDayPrice.getLowPrice());
+		twoFourtyStockDayPrices.get(0).setLowPrice(stockTwseDayPrice.getLowPrice());
+		
+		stockTwseDayPrice.setHighPrice(
+				(stockTwseDayPrice.getHighPrice() == null || stockTwseDayPrice.getHighPrice().isBlank()
+						|| "-".equals(stockTwseDayPrice.getHighPrice().trim())) ? stockTwseDayPrice.getClosingPrice().toString()
+								: stockTwseDayPrice.getHighPrice());
+		twoFourtyStockDayPrices.get(0).setHighPrice(stockTwseDayPrice.getHighPrice());
+		
+		
 		upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true);
 		lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false);
 		stockTwseDayPrice.setLimitDown(lowerLimitPrice.toString());
@@ -418,10 +442,23 @@ public class GrabFromThirdParty {
 		int period = 9;
 		List<Double> closingPrices = twoFourtyStockDayPrices.stream().map(innerTwelfthStockDayPrice -> Double
 				.valueOf(innerTwelfthStockDayPrice.getClosingPrice().replaceAll(",", ""))).toList();
-		List<Double> highPrices = twoFourtyStockDayPrices.stream().map(innerTwelfthStockDayPrice -> Double
-				.valueOf(innerTwelfthStockDayPrice.getHighPrice().replaceAll(",", ""))).toList();
-		List<Double> lowPrices = twoFourtyStockDayPrices.stream().map(innerTwelfthStockDayPrice -> Double
-				.valueOf(innerTwelfthStockDayPrice.getLowPrice().replaceAll(",", ""))).toList();
+		List<Double> highPrices = twoFourtyStockDayPrices.stream().map(stockDayPrice -> {
+			String highPrice = stockDayPrice.getHighPrice();
+			if (highPrice == null || highPrice.isBlank() || "-".equals(highPrice.trim())) {
+				return Double.valueOf(stockDayPrice.getClosingPrice().replace(",", ""));
+			}
+			return Double.valueOf(highPrice.replace(",", ""));
+		}).toList();
+
+	
+		
+		List<Double> lowPrices = twoFourtyStockDayPrices.stream().map(stockDayPrice -> {
+			String lowPrice = stockDayPrice.getLowPrice();
+			if (lowPrice == null || lowPrice.isBlank() || "-".equals(lowPrice.trim())) {
+				return Double.valueOf(stockDayPrice.getClosingPrice().replace(",", ""));
+			}
+			return Double.valueOf(lowPrice.replace(",", ""));
+		}).toList();
 
 		double highestHigh = Double.MIN_VALUE;
 		double lowestLow = Double.MAX_VALUE;

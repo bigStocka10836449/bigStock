@@ -45,6 +45,7 @@ public class StockTrendCache {
     /**
      * price vs moving average
      */
+    private List<Double> bias5;
     private List<Double> bias10;
     private List<Double> bias20;
     private List<Double> bias60;
@@ -54,6 +55,7 @@ public class StockTrendCache {
     /**
      * moving average structure
      */
+    private List<Double> gap5_10;
     private List<Double> gap10_20;
     private List<Double> gap20_60;
     private List<Double> gap60_120;

@@ -533,12 +533,14 @@ public class StockDayPriceService {
 	        List<Double> d = new ArrayList<>();
 	        List<Double> rsv = new ArrayList<>();
 
+	        List<Double> bias5 = new ArrayList<>();
 	        List<Double> bias10 = new ArrayList<>();
 	        List<Double> bias20 = new ArrayList<>();
 	        List<Double> bias60 = new ArrayList<>();
 	        List<Double> bias120 = new ArrayList<>();
 	        List<Double> bias240 = new ArrayList<>();
 
+	        List<Double> gap5_10 = new ArrayList<>();
 	        List<Double> gap10_20 = new ArrayList<>();
 	        List<Double> gap20_60 = new ArrayList<>();
 	        List<Double> gap60_120 = new ArrayList<>();
@@ -657,6 +659,10 @@ public class StockDayPriceService {
 	            /*
 	             * MA
 	             */
+	            
+	            double ma5 =
+	                    safeDouble(item.getFiveDaysMa());
+	            
 	            double ma10 =
 	                    safeDouble(item.getTenDaysMa());
 
@@ -675,6 +681,10 @@ public class StockDayPriceService {
 	            /*
 	             * bias
 	             */
+	            bias5.add(
+	                    bias(close, ma5)
+	            );
+	            
 	            bias10.add(
 	                    bias(close, ma10)
 	            );
@@ -698,6 +708,10 @@ public class StockDayPriceService {
 	            /*
 	             * MA hierarchy
 	             */
+	            gap5_10.add(
+	                    gap(ma5, ma10)
+	            );
+	            
 	            gap10_20.add(
 	                    gap(ma10, ma20)
 	            );
@@ -741,11 +755,13 @@ public class StockDayPriceService {
 	                .k(k)
 	                .d(d)
 	                .rsv(rsv)
+	                .bias5(bias5)
 	                .bias10(bias10)
 	                .bias20(bias20)
 	                .bias60(bias60)
 	                .bias120(bias120)
 	                .bias240(bias240)
+	                .gap5_10(gap5_10)
 	                .gap10_20(gap10_20)
 	                .gap20_60(gap20_60)
 	                .gap60_120(gap60_120)

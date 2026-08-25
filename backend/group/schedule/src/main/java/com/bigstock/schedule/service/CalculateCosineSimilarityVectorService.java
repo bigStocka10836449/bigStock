@@ -17,6 +17,7 @@ import com.bigstock.sharedComponent.redis.StockTrendRedisService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockInfoService;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 @Service
@@ -32,6 +33,7 @@ public class CalculateCosineSimilarityVectorService {
     @Value("${schedule.task.scheduling.similiar-search-reload}")
     private String similiarSearchReloadUrl;
 
+    @PostConstruct
     @Async("stockVectorExecutor")
     public void calculateAsDailyAspect() {
 
