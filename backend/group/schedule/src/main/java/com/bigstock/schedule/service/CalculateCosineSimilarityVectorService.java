@@ -1,8 +1,13 @@
 package com.bigstock.schedule.service;
 
+
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,7 +38,7 @@ public class CalculateCosineSimilarityVectorService {
     @Value("${schedule.task.scheduling.similiar-search-reload}")
     private String similiarSearchReloadUrl;
 
-    @PostConstruct
+//    @PostConstruct
     @Async("stockVectorExecutor")
     public void calculateAsDailyAspect() {
 
@@ -155,6 +160,67 @@ public class CalculateCosineSimilarityVectorService {
 
                 return null;
             }
+
+            /*
+             * DEBUG duplicate trading dates BEFORE calculationVectors()
+             */
+            Map<LocalDate, List<StockDayPrice>> groupedByDate =
+                    prices.stream()
+                            .collect(
+                                    Collectors.groupingBy(
+                                            item ->
+                                                    item.getTradingDay()
+                                                            .toInstant()
+                                                            .atZone(
+                                                                    ZoneId.systemDefault()
+                                                            )
+                                                            .toLocalDate()
+                                    )
+                            );
+
+            groupedByDate.forEach(
+                    (tradingDate, records) -> {
+
+                        if (records.size() <= 1) {
+                            return;
+                        }
+
+                        log.error(
+                                "SOURCE DUPLICATE FOUND "
+                                        + "stockCode={}, tradingDate={}, count={}",
+                                stockCode,
+                                tradingDate,
+                                records.size()
+                        );
+
+                        for (int i = 0; i < records.size(); i++) {
+
+                            StockDayPrice record =
+                                    records.get(i);
+
+                            log.error(
+                                    "duplicate[{}] "
+                                            + "rawTradingDay={}, "
+                                            + "close={}, "
+                                            + "volume={}, "
+                                            + "ma5={}, "
+                                            + "ma10={}, "
+                                            + "ma20={}, "
+                                            + "ma60={}, "
+                                            + "entity={}",
+                                    i,
+                                    record.getTradingDay(),
+                                    record.getClosingPrice(),
+                                    record.getTradingVolume(),
+                                    record.getFiveDaysMa(),
+                                    record.getTenDaysMa(),
+                                    record.getTwentyDaysMa(),
+                                    record.getSixtyDaysMa(),
+                                    record
+                            );
+                        }
+                    }
+            );
 
 
             return stockDayPriceService
