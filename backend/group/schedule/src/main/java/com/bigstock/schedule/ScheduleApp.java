@@ -1,5 +1,7 @@
 package com.bigstock.schedule;
 
+import java.util.TimeZone;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
@@ -15,6 +17,7 @@ import org.springframework.context.annotation.FilterType;
 @EnableCaching
 public class ScheduleApp {
 	public static void main(String[] args) {
+		TimeZone.setDefault(TimeZone.getTimeZone("GMT+08:00"));
 		SpringApplication app = new SpringApplication(ScheduleApp.class);
 		app.run(args);
 	}
