@@ -92,7 +92,7 @@ public class BizService {
 	public List<ShareholderStructure> getStockShareholderStructure(String stockCode, int limit) {
 		List<ShareholderStructure> shareholderStructures = shareholderStructureService
 				.getShareholderStructureByStockCodeDesc(stockCode);
-		if (shareholderStructures.size() > 52) {
+		if (shareholderStructures.size() > limit) {
 			return shareholderStructures.subList(0, limit);
 		} else {
 			return shareholderStructures;
