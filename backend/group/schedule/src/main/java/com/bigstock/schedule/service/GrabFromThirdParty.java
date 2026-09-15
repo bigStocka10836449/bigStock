@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -11,8 +12,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-import javax.annotation.PostConstruct;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.compress.utils.Lists;
@@ -26,6 +25,7 @@ import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
 import com.bigstock.sharedComponent.entity.StockInfo;
+import com.bigstock.sharedComponent.entity.StockIntradayPrice;
 import com.bigstock.sharedComponent.entity.StockMonthPrice;
 import com.bigstock.sharedComponent.entity.StockMonthPriceRank;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
@@ -36,6 +36,7 @@ import com.bigstock.sharedComponent.service.MarginTradingAndShortSellingInfoServ
 import com.bigstock.sharedComponent.service.RankStockChangeService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockInfoService;
+import com.bigstock.sharedComponent.service.StockIntradayPriceService;
 import com.bigstock.sharedComponent.service.StockMonthPriceService;
 import com.bigstock.sharedComponent.service.StockWeekPriceService;
 import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
@@ -64,7 +65,14 @@ public class GrabFromThirdParty {
 	private final MarginTradingAndShortSellingInfoService marginTradingAndShortSellingInfoService;
 	
 	private final CalculateCosineSimilarityVectorService calculateCosineSimilarityVectorService;
+	
+	private final StockIntradayPriceService stockIntradayPriceService;
 
+	@Scheduled(cron = "0 30 18 * * ?", zone = "Asia/Taipei")
+	public void updateStockIntradayPriceByThirdParty() throws Exception {
+		
+	}
+	
 //	@PostConstruct
 	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
@@ -83,15 +91,48 @@ public class GrabFromThirdParty {
 		allStockCodes.addAll(tpexStockCodes);
 		allStockCodes.addAll(twseStockCodes);
 		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
+		List<StockIntradayPrice> allStockFiveIntradayPrices = Lists.newArrayList();
+		List<StockIntradayPrice> allStockSixtyIntradayPrices = Lists.newArrayList();
 		allStockCodes.forEach(stockCode -> {
 			allStockDayPrices.addAll(grabThirdPartyStockDayPrice.grabFromYahoo(stockCode));
 			try {
 				Thread.sleep(2000);
+				allStockFiveIntradayPrices.addAll(grabThirdPartyStockDayPrice.grabIntradayFromYahoo(stockCode, "5"));
+				Thread.sleep(1000);
+				allStockSixtyIntradayPrices.addAll(grabThirdPartyStockDayPrice.grabIntradayFromYahoo(stockCode, "60"));
 			} catch (InterruptedException e) {
 				log.warn(stockCode + e.getMessage(), e);
 			}
 		});
 		stockDayPriceService.upsertBatch(allStockDayPrices);
+		Map<String, List<StockIntradayPrice>> fiveIntradayPriceYahooInfoGroup = allStockFiveIntradayPrices.stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
+		Map<String, List<StockIntradayPrice>> sixtyIntradayPriceYahooInfoGroup = allStockSixtyIntradayPrices.stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
+		Map<String, List<StockIntradayPrice>> sixtyIntradayPriceDbInfoGroup = stockIntradayPriceService.getTop60ByPeriod("60").stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
+		Map<String, List<StockIntradayPrice>> fiveIntradayPriceDbInfoGroup = stockIntradayPriceService.getTop60ByPeriod("5").stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
+		
+		List<StockIntradayPrice> adjustMentedStockIntradayPrices = Lists.newArrayList();
+		fiveIntradayPriceYahooInfoGroup.entrySet().forEach(entry -> {
+			String stockCode = entry.getKey();
+			if(StringUtils.isBlank(stockCode)) {
+				return;
+			}
+			List<StockIntradayPrice> fiveIntradayPriceYahooInfos = entry.getValue();
+			
+			List<StockIntradayPrice> fiveIntradayPriceDbInfos = fiveIntradayPriceDbInfoGroup.get(stockCode);
+			LocalDateTime lastTradingDateTime =
+			        fiveIntradayPriceDbInfos.stream()
+			                .map(StockIntradayPrice::getTradingTime)
+			                .max(LocalDateTime::compareTo)
+			                .orElse(LocalDateTime.now());
+			List<StockIntradayPrice> avaliableStockIntradayPrices = fiveIntradayPriceYahooInfos.stream()
+					.filter(iveIntradayPriceYahooInfo -> iveIntradayPriceYahooInfo.getTradingTime()
+							.isAfter(lastTradingDateTime))
+					.toList();
+			List<StockIntradayPrice> halfCompletedfiveIntradayPriceDbInfos = Lists.newArrayList();
+			halfCompletedfiveIntradayPriceDbInfos.addAll(fiveIntradayPriceDbInfos);
+			halfCompletedfiveIntradayPriceDbInfos.addAll(avaliableStockIntradayPrices);
+		});
+		
 		Date tradeDate = allStockDayPrices.stream().findFirst().get().getTradingDay();
 		LocalDate tradeDateLdt = LocalDate.ofInstant(tradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
 		Integer years = tradeDateLdt.getYear();
@@ -387,6 +428,54 @@ public class GrabFromThirdParty {
 			}
 		});
 		calculateCosineSimilarityVectorService.calculateAsDailyAspect();
+	}
+
+	public void calculateMissingIndicators(List<StockIntradayPrice> prices) {
+
+		if (prices == null || prices.isEmpty()) {
+			return;
+		}
+
+		// Must be oldest -> newest
+		prices.sort(Comparator.comparing(StockIntradayPrice::getTradingTime));
+
+		for (int i = 0; i < prices.size(); i++) {
+
+			StockIntradayPrice current = prices.get(i);
+
+			boolean needMa = current.getFiveMa() == null || current.getTenMa() == null || current.getTwentyMa() == null
+					|| current.getSixtyMa() == null;
+
+			boolean needKd = current.getLineRsvValue() == null || current.getLineKValue() == null
+					|| current.getLineDValue() == null;
+
+			if (needMa) {
+				calculateMa(current, prices, i);
+			}
+
+			if (needKd) {
+				calculateKd(current, prices, i);
+			}
+		}
+	}
+	
+	private void calculateMa(StockIntradayPrice current, List<StockIntradayPrice> prices, int currentIndex) {
+
+		if (current.getFiveMa() == null) {
+			current.setFiveMa(calculateAverage(prices, currentIndex, 5));
+		}
+
+		if (current.getTenMa() == null) {
+			current.setTenMa(calculateAverage(prices, currentIndex, 10));
+		}
+
+		if (current.getTwentyMa() == null) {
+			current.setTwentyMa(calculateAverage(prices, currentIndex, 20));
+		}
+
+		if (current.getSixtyMa() == null) {
+			current.setSixtyMa(calculateAverage(prices, currentIndex, 60));
+		}
 	}
 
 	public void calculateRSVValueAndLimitDownUp(StockDayPrice stockTwseDayPrice,
