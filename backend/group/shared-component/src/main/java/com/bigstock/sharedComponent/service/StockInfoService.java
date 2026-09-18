@@ -37,7 +37,7 @@ public class StockInfoService {
 	
 	private final RedissonClient redissonClient;
 	
-	public List<StockInfo> getAllStockInfo() {
+	public List<StockInfo> getAllStockInfo() { 
 		List<StockInfo> stockInfos = cacheOperatorService.getSnapshotDataListDeCompressed("ultraLongLivedCache",
 				"stockInfo:compressed", StockInfo.class);
 		if (!stockInfos.isEmpty()) {

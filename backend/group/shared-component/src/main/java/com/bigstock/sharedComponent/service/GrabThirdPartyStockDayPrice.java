@@ -16,10 +16,14 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.IsoFields;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -883,5 +887,149 @@ public class GrabThirdPartyStockDayPrice {
 		}
 
 		return value.asLong();
+	}
+	
+	public List<StockIntradayPrice> aggregateToHourly(
+	        List<StockIntradayPrice> fiveMinutes) {
+
+	    if (fiveMinutes == null || fiveMinutes.isEmpty()) {
+	        return Collections.emptyList();
+	    }
+
+	    fiveMinutes.sort(
+	            Comparator.comparing(
+	                    StockIntradayPrice::getTradingTime
+	            )
+	    );
+
+	    Map<LocalDateTime, List<StockIntradayPrice>> grouped =
+	            fiveMinutes.stream()
+	                    .collect(
+	                            Collectors.groupingBy(
+	                                    this::resolveHourlyBucket,
+	                                    LinkedHashMap::new,
+	                                    Collectors.toList()
+	                            )
+	                    );
+
+	    List<StockIntradayPrice> result =
+	            new ArrayList<>();
+	    LocalDateTime latestYahooTime =
+	    		fiveMinutes.stream()
+	    		.map(StockIntradayPrice::getTradingTime)
+	    		.max(LocalDateTime::compareTo)
+	    		.orElse(null);
+
+	    for (Map.Entry<LocalDateTime, List<StockIntradayPrice>> entry
+	            : grouped.entrySet()) {
+
+	        LocalDateTime bucketTime =
+	                entry.getKey();
+	        List<StockIntradayPrice> bucket =
+	                entry.getValue();
+
+	        if (bucket.isEmpty()) {
+	            continue;
+	        }
+
+	        if (!isCompletedHourlyBucket(
+	                bucketTime,
+	                latestYahooTime
+	        )) {
+	            continue;
+	        }
+
+
+	        StockIntradayPrice first =
+	                bucket.get(0);
+
+	        StockIntradayPrice last =
+	                bucket.get(
+	                        bucket.size() - 1
+	                );
+
+	        Double high =
+	                bucket.stream()
+	                        .map(
+	                                StockIntradayPrice::getHighPrice
+	                        )
+	                        .filter(Objects::nonNull)
+	                        .max(Double::compareTo)
+	                        .orElse(null);
+
+	        Double low =
+	                bucket.stream()
+	                        .map(
+	                                StockIntradayPrice::getLowPrice
+	                        )
+	                        .filter(Objects::nonNull)
+	                        .min(Double::compareTo)
+	                        .orElse(null);
+
+	        long volume = 0L;
+
+	        for (StockIntradayPrice item : bucket) {
+
+	            if (item.getTradingVolume() != null) {
+	                volume += item.getTradingVolume();
+	            }
+	        }
+
+	        StockIntradayPrice hourly =
+	                StockIntradayPrice.builder()
+	                        .stockCode(
+	                                first.getStockCode()
+	                        )
+	                        .period("60m")
+	                        .tradingTime(
+	                                bucketTime
+	                        )
+	                        .openingPrice(
+	                                first.getOpeningPrice()
+	                        )
+	                        .closingPrice(
+	                                last.getClosingPrice()
+	                        )
+	                        .highPrice(
+	                                high
+	                        )
+	                        .lowPrice(
+	                                low
+	                        )
+	                        .tradingVolume(
+	                                volume
+	                        )
+	                        .build();
+
+	        result.add(hourly);
+	    }
+
+	    return result;
+	}
+	
+	private LocalDateTime resolveHourlyBucket(
+	        StockIntradayPrice price) {
+
+	    LocalDateTime time =
+	            price.getTradingTime();
+
+	    return time
+	            .withMinute(0)
+	            .withSecond(0)
+	            .withNano(0);
+	}
+	
+	private boolean isCompletedHourlyBucket(
+	        LocalDateTime bucketTime,
+	        LocalDateTime latestYahooTime) {
+
+	    if (bucketTime == null || latestYahooTime == null) {
+	        return false;
+	    }
+
+	    LocalDateTime bucketEnd =
+	            bucketTime.plusHours(1);
+
+	    return !latestYahooTime.isBefore(bucketEnd);
 	}
 }
