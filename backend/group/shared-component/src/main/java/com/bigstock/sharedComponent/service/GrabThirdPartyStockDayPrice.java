@@ -281,7 +281,7 @@ public class GrabThirdPartyStockDayPrice {
 
 		HttpEntity<Void> entity = new HttpEntity<Void>(headers);
 
-		String symbol = stockCode + ".TW";
+		String symbol = stockCode ;
 
 		String encodedSymbols;
 
@@ -982,7 +982,7 @@ public class GrabThirdPartyStockDayPrice {
 	                        )
 	                        .period("60m")
 	                        .tradingTime(
-	                                bucketTime
+	                        		bucketTime.plusHours(1)
 	                        )
 	                        .openingPrice(
 	                                first.getOpeningPrice()

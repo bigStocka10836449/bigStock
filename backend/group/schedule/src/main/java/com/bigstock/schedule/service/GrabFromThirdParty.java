@@ -41,6 +41,7 @@ import com.bigstock.sharedComponent.service.StockMonthPriceService;
 import com.bigstock.sharedComponent.service.StockWeekPriceService;
 import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -68,14 +69,15 @@ public class GrabFromThirdParty {
 
 	private final StockIntradayPriceService stockIntradayPriceService;
 
+	@Scheduled(cron = "0 50 17 * * ?", zone = "Asia/Taipei")
+	public void updateOESStockDayPriceByThirdParty() throws Exception {
+		doStockDayPriceByThirdParty("2");
+		calculateCosineSimilarityVectorService.calculateAsDailyAspect();
+	}
+	
+	@PostConstruct
 	@Scheduled(cron = "0 30 18 * * ?", zone = "Asia/Taipei")
 	public void updateStockIntradayPriceByThirdParty() throws Exception {
-
-	}
-
-//	@PostConstruct
-	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
-	public void updateStockDayPriceByThirdParty() throws Exception {
 		Date perviouslyTradingDate = stockDayPriceService.getCurrentTradeDate();
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
@@ -83,38 +85,34 @@ public class GrabFromThirdParty {
 		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
 		}).toList();
-		List<String> allStockCodes = Lists.newArrayList();
-		List<StockInfo> allStockInfos = stockInfoService.getAllStockInfo().stream().filter(data -> {
-			return !data.getStockCode().matches(".*[a-zA-Z].*");
+		List<String> oesStockCodes = stockInfoService.getStockCodeByStockType("2").stream().filter(data -> {
+			return !data.matches(".*[a-zA-Z].*");
 		}).toList();
-		Map<String, List<StockInfo>> allStockInfoMap = allStockInfos.stream()
-				.collect(Collectors.groupingBy(StockInfo::getStockCode));
-		allStockCodes.addAll(tpexStockCodes);
-		allStockCodes.addAll(twseStockCodes);
-		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
+		List<String> allStockCodes = Lists.newArrayList();
 		List<StockIntradayPrice> allStockFiveIntradayPrices = Lists.newArrayList();
 		List<StockIntradayPrice> allStockSixtyIntradayPrices = Lists.newArrayList();
+		allStockCodes.addAll(tpexStockCodes);
+		allStockCodes.addAll(twseStockCodes);
+		allStockCodes.addAll(oesStockCodes);
 		allStockCodes.forEach(stockCode -> {
-			allStockDayPrices.addAll(grabThirdPartyStockDayPrice.grabFromYahoo(stockCode));
 			// 額外執行抓取5分K 與60分K內容
 			try {
-				Thread.sleep(2000);
 				List<StockIntradayPrice> fiveMinutes = grabThirdPartyStockDayPrice.grabIntradayFromYahoo(stockCode,
-						"5");
+						"5m");
 				allStockFiveIntradayPrices.addAll(fiveMinutes);
-				Thread.sleep(1000);
+				Thread.sleep(2000);
 				// -- accumulate to each trade from fiveMinutes
 				allStockSixtyIntradayPrices.addAll(grabThirdPartyStockDayPrice.aggregateToHourly(fiveMinutes));
 			} catch (InterruptedException e) {
 				log.warn(stockCode + e.getMessage(), e);
 			}
 		});
-		stockDayPriceService.upsertBatch(allStockDayPrices);
 		// 整理從yahoo抓來的5分K 與60分K內容
 		Map<String, List<StockIntradayPrice>> fiveIntradayPriceYahooInfoGroup = allStockFiveIntradayPrices.stream()
 				.collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
 		Map<String, List<StockIntradayPrice>> sixtyIntradayPriceYahooInfoGroup = allStockSixtyIntradayPrices.stream()
 				.collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
+		
 		// 抓取目前DB 5分K 60分K 最新60筆資料庫內容
 		Map<String, List<StockIntradayPrice>> sixtyIntradayPriceDbInfoGroup = stockIntradayPriceService
 				.getTop60ByPeriod("60").stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
@@ -180,304 +178,17 @@ public class GrabFromThirdParty {
 			);
 			cacheOperatorService.cleanupOldSnapshots("ultraLongLivedCache",  "stock-intraday:60m:" + stockCode, 2);
 		});
+
 		
 		stockIntradayPriceService.bulkUpsertIntradayPrices(adjustmentedStockIntradayPrices);
-		
-		Date tradeDate = allStockDayPrices.stream().findFirst().get().getTradingDay();
-		LocalDate tradeDateLdt = LocalDate.ofInstant(tradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
-		Integer years = tradeDateLdt.getYear();
-		LocalDate tradeDateMinus365 = tradeDateLdt.minusDays(500);
-		Instant instant = tradeDateMinus365.atStartOfDay(ZoneId.of("Asia/Taipei")).toInstant();
-		Date tradeDateBefore365Days = Date.from(instant);
-		List<StockDayPrice> stockDayPricesFor365Ds = stockDayPriceService
-				.findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, tradeDate);
-		Map<String, List<StockDayPrice>> groupedStockDayPrices = stockDayPricesFor365Ds.stream().filter(data -> {
-			java.util.Date tradingDay = data.getTradingDay();
-			LocalDate dataTradeDateLdt = ((java.sql.Date) tradingDay).toLocalDate();
-			return dataTradeDateLdt.compareTo(tradeDateLdt) < 0;
-		}
+	}
 
-		).collect(Collectors.groupingBy(StockDayPrice::getStockCode));
 
-		stockDayPriceService.upsertBatch(allStockDayPrices);
-		allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
-			if ("2454".equals(stockTwseDayPrice.getStockCode())) {
-				log.info("2454");
-			}
-			List<StockDayPrice> allThisStockCodeDayPrices = Lists.newArrayList();
-			allThisStockCodeDayPrices.add(stockTwseDayPrice);
-			if (groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
-				List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTwseDayPrice.getStockCode());
-				allThisStockCodeDayPrices.addAll(stockDayPrices);
-			}
-			calculateRSVValueAndLimitDownUp(stockTwseDayPrice, allThisStockCodeDayPrices);
-			stockTwseDayPrice.setMonthOfYear((stockTwseDayPrice.getTradingDay().getYear() + 1900) + "W"
-					+ (stockTwseDayPrice.getTradingDay().getMonth() + 1));
-			groupedStockDayPrices.put(stockTwseDayPrice.getStockCode(), allThisStockCodeDayPrices);
-		});
-		stockDayPriceService.upsertBatch(allStockDayPrices);
-		List<StockDayPriceRank> allStockDayPriceRanks = Lists.newArrayList();
-		allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
-			if (groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
-				if ("2454".equals(stockTwseDayPrice.getStockCode())) {
-					log.info("2454");
-				}
-				StockDayPriceRank lastStockMonthPriceRank = stockDayPriceService
-						.buildRanks(stockTwseDayPrice.getStockCode(), stockTwseDayPrice);
-				allStockDayPriceRanks.add(lastStockMonthPriceRank);
-			}
-		});
-		stockDayPriceService.bulkUpsertDayRankPrices(allStockDayPriceRanks, tradeDate);
-		stockDayPriceService.updateRankNo();
-		stockDayPriceService.deleteRankNoByStockCode();
-		String targetWeek = allStockDayPriceRanks.get(0).getWeekOfYear();
-
-		List<StockWeekPrice> stockWeekPriceForYears = stockWeekPriceService
-				.findByYearBeforEqualLimitTwoFourty(String.valueOf(years - 6), String.valueOf(years));
-		Map<String, List<StockWeekPrice>> groupedStockWeekPrice = stockWeekPriceForYears.stream()
-				.collect(Collectors.groupingBy(StockWeekPrice::getStockCode));
-
-		List<StockDayPrice> weekDayPrices = stockDayPriceService.findByWeekOfYear(targetWeek);
-
-		Map<String, List<StockDayPrice>> stockWeekGroupMap = weekDayPrices.stream()
-				.collect(Collectors.groupingBy(StockDayPrice::getStockCode));
-
-		List<StockWeekPrice> allStockWeekPrices = new ArrayList<>();
-
-		stockWeekGroupMap.forEach((stockCode, stockDayList) -> {
-
-			// 過濾無效資料
-			List<StockDayPrice> validDayPrices = stockDayList.stream()
-					.filter(p -> StringUtils.isNotBlank(p.getOpeningPrice()) && !p.getOpeningPrice().contains("--"))
-					.toList();
-
-			if (validDayPrices.isEmpty()) {
-				return;
-			}
-
-			// 依交易日排序（只做一次）
-			List<StockDayPrice> sortedDays = validDayPrices.stream()
-					.sorted(Comparator.comparing(StockDayPrice::getTradingDay)).toList();
-
-			StockDayPrice firstDay = sortedDays.get(0);
-			StockDayPrice lastDay = sortedDays.get(sortedDays.size() - 1);
-
-			// 計算 high / low / volume
-			BigDecimal high = null;
-			BigDecimal low = null;
-			int totalTradingVolume = 0;
-
-			for (StockDayPrice d : sortedDays) {
-				BigDecimal h = new BigDecimal(d.getHighPrice().replace(",", ""));
-				BigDecimal l = new BigDecimal(d.getLowPrice().replace(",", ""));
-
-				high = (high == null || h.compareTo(high) > 0) ? h : high;
-				low = (low == null || l.compareTo(low) < 0) ? l : low;
-
-				if (d.getTradingVolume() != null) {
-					totalTradingVolume += Integer.parseInt(d.getTradingVolume());
-				}
-			}
-
-			// 組裝唯一一筆 StockWeekPrice
-			StockWeekPrice stockWeekPrice = new StockWeekPrice();
-			stockWeekPrice.setStockCode(stockCode);
-			stockWeekPrice.setWeekOfYear(firstDay.getWeekOfYear());
-			stockWeekPrice.setOpeningPrice(new BigDecimal(firstDay.getOpeningPrice().replace(",", "")));
-			stockWeekPrice.setClosingPrice(new BigDecimal(lastDay.getClosingPrice().replace(",", "")));
-			stockWeekPrice.setHighPrice(high);
-			stockWeekPrice.setLowPrice(low);
-			stockWeekPrice.setTradingVolume(totalTradingVolume);
-			stockWeekPrice.setFirstTradingDay(firstDay.getTradingDay());
-			stockWeekPrice.setMonth(firstDay.getTradingDay().getMonth() + 1);
-			stockWeekPrice.setYear(String.valueOf(firstDay.getTradingDay().getYear() + 1900));
-			List<StockWeekPrice> stockWeekPrices = Lists.newArrayList();
-			stockWeekPrices.add(stockWeekPrice);
-			if (groupedStockWeekPrice.containsKey(stockCode)) {
-				stockWeekPrices.addAll(groupedStockWeekPrice.get(stockCode));
-			}
-			calculateRSVValueAndLimitDownUp(stockWeekPrice, stockWeekPrices);
-			allStockWeekPrices.add(stockWeekPrice);
-			groupedStockWeekPrice.put(stockCode, stockWeekPrices);
-		});
-		stockWeekPriceService.batchInsertWeekPrices(allStockWeekPrices);
-
-		List<StockWeekPriceRank> allStockWeekPriceRanks = Lists.newArrayList();
-		allStockWeekPrices.stream().forEach(allStockWeekPrice -> {
-			if (groupedStockWeekPrice.containsKey(allStockWeekPrice.getStockCode())) {
-				StockWeekPriceRank stockMonthPriceRanks = stockWeekPriceService
-						.buildRanks(allStockWeekPrice.getStockCode(), allStockWeekPrice);
-				allStockWeekPriceRanks.add(stockMonthPriceRanks);
-			}
-		});
-//		
-		stockWeekPriceService.batchInsertWeekRankPrices(allStockWeekPriceRanks);
-		stockWeekPriceService.updateRankNo();
-		stockWeekPriceService.deleteByRankNoLessThanZero();
-
-		// 取得欲處理的月份
-		String targetMonth = allStockDayPrices.get(0).getMonthOfYear();
-		List<StockMonthPrice> twoFourtyStockMonthPrices = stockMonthPriceService.findByMmonthOfYearAndDesc(targetMonth);
-		Map<String, List<StockMonthPrice>> groupedStockMonthPrice = twoFourtyStockMonthPrices.stream()
-				.collect(Collectors.groupingBy(StockMonthPrice::getStockCode));
-		// 取得該月份所有日成交資料
-		List<StockDayPrice> monthDayPrices = stockDayPriceService.findByMonthOfYear(targetMonth);
-
-		// 依 stockCode 分組
-		Map<String, List<StockDayPrice>> stockMonthGroupMap = monthDayPrices.stream()
-				.collect(Collectors.groupingBy(StockDayPrice::getStockCode));
-
-		// 用來 batch insert 的集合
-		List<StockMonthPrice> allStockMonthPrices = new ArrayList<>();
-
-		stockMonthGroupMap.forEach((stockCode, stockDayList) -> {
-			if (groupedStockMonthPrice.containsKey(stockCode)) {
-				// 過濾無效的開盤價資料
-				List<StockDayPrice> validDayPrices = stockDayList.stream()
-						.filter(p -> StringUtils.isNotBlank(p.getOpeningPrice()) && !p.getOpeningPrice().contains("--"))
-						.toList();
-
-				if (validDayPrices.isEmpty()) {
-					return; // 該股票該月無有效資料
-				}
-
-				// 依交易日排序（只做一次）
-				List<StockDayPrice> sortedDays = validDayPrices.stream()
-						.sorted(Comparator.comparing(StockDayPrice::getTradingDay)).toList();
-
-				StockDayPrice firstDay = sortedDays.get(0);
-				StockDayPrice lastDay = sortedDays.get(sortedDays.size() - 1);
-
-				// 計算最高、最低、成交量
-				BigDecimal high = null;
-				BigDecimal low = null;
-				int totalTradingVolume = 0;
-
-				for (StockDayPrice d : sortedDays) {
-					BigDecimal h = new BigDecimal(d.getHighPrice().replace(",", ""));
-					BigDecimal l = new BigDecimal(d.getLowPrice().replace(",", ""));
-
-					high = (high == null || h.compareTo(high) > 0) ? h : high;
-					low = (low == null || l.compareTo(low) < 0) ? l : low;
-
-					if (d.getTradingVolume() != null) {
-						totalTradingVolume += Integer.parseInt(d.getTradingVolume());
-					}
-				}
-
-				// 組裝唯一一筆 StockMonthPrice
-				StockMonthPrice stockMonthPrice = new StockMonthPrice();
-				stockMonthPrice.setStockCode(stockCode);
-				stockMonthPrice.setOpeningPrice(new BigDecimal(firstDay.getOpeningPrice().replace(",", "")));
-				stockMonthPrice.setClosingPrice(new BigDecimal(lastDay.getClosingPrice().replace(",", "")));
-				stockMonthPrice.setHighPrice(high);
-				stockMonthPrice.setLowPrice(low);
-				stockMonthPrice.setTradingVolume(totalTradingVolume);
-				stockMonthPrice.setFirstTradingDay(firstDay.getTradingDay());
-
-				int year = firstDay.getTradingDay().getYear() + 1900;
-				int month = firstDay.getTradingDay().getMonth() + 1;
-
-				stockMonthPrice.setYear(String.valueOf(year));
-				stockMonthPrice.setMonth(month);
-				stockMonthPrice.setMonthOfYear(year + "M" + month);
-				List<StockMonthPrice> stockMonthPrices = Lists.newArrayList();
-				stockMonthPrices.add(stockMonthPrice);
-				if (groupedStockMonthPrice.containsKey(stockCode)) {
-					stockMonthPrices.addAll(groupedStockMonthPrice.get(stockCode));
-				}
-				calculateRSVValueAndLimitDownUp(stockMonthPrice, stockMonthPrices);
-				allStockMonthPrices.add(stockMonthPrice);
-				groupedStockMonthPrice.put(stockCode, stockMonthPrices);
-			}
-
-		});
-
-		// 真正合理的 batch insert
-		stockMonthPriceService.batchInsertMonthPrices(allStockMonthPrices);
-
-		List<StockMonthPriceRank> allStockMonthPriceRank = Lists.newArrayList();
-		allStockMonthPrices.stream().forEach(stockMonthPrice -> {
-			if (groupedStockMonthPrice.containsKey(stockMonthPrice.getStockCode())) {
-
-				List<StockMonthPrice> singleStockStockMonthPrices = groupedStockMonthPrice
-						.get(stockMonthPrice.getStockCode());
-				List<StockMonthPrice> oriStockMonthPrices = Lists.newArrayList();
-				oriStockMonthPrices.add(stockMonthPrice);
-				oriStockMonthPrices.addAll(singleStockStockMonthPrices);
-				StockMonthPriceRank stockMonthPriceRanks = stockMonthPriceService
-						.buildRanks(stockMonthPrice.getStockCode(), oriStockMonthPrices);
-				allStockMonthPriceRank.add(stockMonthPriceRanks);
-			}
-		});
-		stockMonthPriceService.updateRankNo();
-		stockMonthPriceService.batchInsertMonthRankPrices(allStockMonthPriceRank);
-		stockMonthPriceService.deleteByRankNoLessThanZero();
-
-		// 計算漲跌幅排名
-		List<StockDayPrice> needRankTPEXs = allStockDayPrices.stream()
-				.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
-						&& tpexStockCodes.contains(data.getStockCode())
-						&& ObjectUtils.isNotEmpty(data.getChangeRate())))
-				.toList();
-		List<StockDayPrice> needRankTWSEs = allStockDayPrices.stream()
-				.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
-						&& twseStockCodes.contains(data.getStockCode())
-						&& ObjectUtils.isNotEmpty(data.getChangeRate())))
-				.toList();
-		rankStockChangeService.writeStockListToRedis(needRankTPEXs, allStockInfoMap, "TPEX");
-		rankStockChangeService.writeStockListToRedis(needRankTWSEs, allStockInfoMap, "TWSE");
-		// 成交量排名
-		rankStockChangeService.writeStockListTradingQuantityRankToRedis(
-				allStockDayPrices.stream().filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
-						&& ObjectUtils.isNotEmpty(data.getChangeRate()))).toList(),
-				allStockInfoMap);
-		groupedStockDayPrices.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
-				.forEach(entry -> {
-					String stockCode = entry.getKey();
-					List<StockDayPrice> stockDayPrices = entry.getValue();
-					if (allStockInfoMap.containsKey(stockCode)) {
-						List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getCompressedZSetAllScore(
-								"ultraLongLivedCache", "stock:compressed:" + stockCode, StockDayPrice.class);
-						if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
-
-							cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
-									"stock:compressed:" + stockCode, stockDayPrices.stream().findFirst().get(),
-									stockDayPrices.stream().findFirst().get().getTradingDay().getTime(),
-									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
-						} else {
-							cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
-									"stock:compressed:" + stockCode, stockDayPrices,
-									stockDayPrice -> stockDayPrice.getTradingDay().getTime(),
-									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
-						}
-					} else {
-						log.warn("stock_info missing : {}", stockCode);
-					}
-				});
-		groupedStockWeekPrice.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
-				.forEach(entry -> {
-					String stockCode = entry.getKey();
-					List<StockWeekPrice> stockWeekPrices = entry.getValue();
-					if (allStockInfoMap.containsKey(stockCode)) {
-						List<StockWeekPrice> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
-								"ultraLongLivedCache", "stock-weekly:compressed:" + stockCode, StockWeekPrice.class);
-						if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
-
-							cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
-									"stock-weekly:compressed:" + stockCode, stockWeekPrices.stream().findFirst().get(),
-									stockWeekPrices.stream().findFirst().get().getFirstTradingDay().getTime(),
-									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
-						} else {
-							cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
-									"stock-weekly:compressed:" + stockCode, stockWeekPrices,
-									stockWeekPrice -> stockWeekPrice.getFirstTradingDay().getTime(),
-									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
-						}
-					} else {
-						log.warn("stock_info missing : {}", stockCode);
-					}
-				});
+//	@PostConstruct
+	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
+	public void updateStockDayPriceByThirdParty() throws Exception {
+		doStockDayPriceByThirdParty("0");
+		doStockDayPriceByThirdParty("1");
 		calculateCosineSimilarityVectorService.calculateAsDailyAspect();
 	}
 
@@ -884,6 +595,335 @@ public class GrabFromThirdParty {
 		});
 	}
 
+	
+	private void doStockDayPriceByThirdParty(String stockType) throws Exception {
+		List<String> stockCodes = stockInfoService.getStockCodeByStockType(stockType).stream().filter(data -> {
+			return !data.matches(".*[a-zA-Z].*");
+		}).toList();
+	
+		List<String> allStockCodes = Lists.newArrayList();
+		List<StockInfo> allStockInfos = stockInfoService.getAllStockInfo().stream().filter(data -> {
+			return !data.getStockCode().matches(".*[a-zA-Z].*");
+		}).toList();
+		Map<String, List<StockInfo>> allStockInfoMap = allStockInfos.stream()
+				.collect(Collectors.groupingBy(StockInfo::getStockCode));
+		allStockCodes.addAll(stockCodes);
+		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
+		allStockCodes.forEach(stockCode -> {
+			allStockDayPrices.addAll(grabThirdPartyStockDayPrice.grabFromYahoo(stockCode));
+			try {
+				Thread.sleep(2000);
+			} catch (InterruptedException e) {
+				log.warn(stockCode + e.getMessage(), e);
+			}
+		});
+		stockDayPriceService.upsertBatch(allStockDayPrices);
+
+
+		
+		Date tradeDate = allStockDayPrices.stream().findFirst().get().getTradingDay();
+		LocalDate tradeDateLdt = LocalDate.ofInstant(tradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
+		Integer years = tradeDateLdt.getYear();
+		LocalDate tradeDateMinus365 = tradeDateLdt.minusDays(500);
+		Instant instant = tradeDateMinus365.atStartOfDay(ZoneId.of("Asia/Taipei")).toInstant();
+		Date tradeDateBefore365Days = Date.from(instant);
+		List<StockDayPrice> stockDayPricesFor365Ds = stockDayPriceService
+				.findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, tradeDate, stockType);
+		Map<String, List<StockDayPrice>> groupedStockDayPrices = stockDayPricesFor365Ds.stream().filter(data -> {
+			java.util.Date tradingDay = data.getTradingDay();
+			LocalDate dataTradeDateLdt = ((java.sql.Date) tradingDay).toLocalDate();
+			return dataTradeDateLdt.compareTo(tradeDateLdt) < 0;
+		}
+
+		).collect(Collectors.groupingBy(StockDayPrice::getStockCode));
+
+		stockDayPriceService.upsertBatch(allStockDayPrices);
+		allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
+			if ("2454".equals(stockTwseDayPrice.getStockCode())) {
+				log.info("2454");
+			}
+			List<StockDayPrice> allThisStockCodeDayPrices = Lists.newArrayList();
+			allThisStockCodeDayPrices.add(stockTwseDayPrice);
+			if (groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
+				List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTwseDayPrice.getStockCode());
+				allThisStockCodeDayPrices.addAll(stockDayPrices);
+			}
+			calculateRSVValueAndLimitDownUp(stockTwseDayPrice, allThisStockCodeDayPrices);
+			stockTwseDayPrice.setMonthOfYear((stockTwseDayPrice.getTradingDay().getYear() + 1900) + "W"
+					+ (stockTwseDayPrice.getTradingDay().getMonth() + 1));
+			groupedStockDayPrices.put(stockTwseDayPrice.getStockCode(), allThisStockCodeDayPrices);
+		});
+		stockDayPriceService.upsertBatch(allStockDayPrices);
+		List<StockDayPriceRank> allStockDayPriceRanks = Lists.newArrayList();
+		allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
+			if (groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
+				if ("2454".equals(stockTwseDayPrice.getStockCode())) {
+					log.info("2454");
+				}
+				StockDayPriceRank lastStockMonthPriceRank = stockDayPriceService
+						.buildRanks(stockTwseDayPrice.getStockCode(), stockTwseDayPrice);
+				allStockDayPriceRanks.add(lastStockMonthPriceRank);
+			}
+		});
+		stockDayPriceService.bulkUpsertDayRankPrices(allStockDayPriceRanks, tradeDate);
+		stockDayPriceService.updateRankNo();
+		stockDayPriceService.deleteRankNoByStockCode();
+		String targetWeek = allStockDayPriceRanks.get(0).getWeekOfYear();
+
+		List<StockWeekPrice> stockWeekPriceForYears = stockWeekPriceService
+				.findByYearBeforEqualLimitTwoFourty(String.valueOf(years - 6), String.valueOf(years));
+		Map<String, List<StockWeekPrice>> groupedStockWeekPrice = stockWeekPriceForYears.stream()
+				.collect(Collectors.groupingBy(StockWeekPrice::getStockCode));
+
+		List<StockDayPrice> weekDayPrices = stockDayPriceService.findByWeekOfYear(targetWeek);
+
+		Map<String, List<StockDayPrice>> stockWeekGroupMap = weekDayPrices.stream()
+				.collect(Collectors.groupingBy(StockDayPrice::getStockCode));
+
+		List<StockWeekPrice> allStockWeekPrices = new ArrayList<>();
+
+		stockWeekGroupMap.forEach((stockCode, stockDayList) -> {
+
+			// 過濾無效資料
+			List<StockDayPrice> validDayPrices = stockDayList.stream()
+					.filter(p -> StringUtils.isNotBlank(p.getOpeningPrice()) && !p.getOpeningPrice().contains("--"))
+					.toList();
+
+			if (validDayPrices.isEmpty()) {
+				return;
+			}
+
+			// 依交易日排序（只做一次）
+			List<StockDayPrice> sortedDays = validDayPrices.stream()
+					.sorted(Comparator.comparing(StockDayPrice::getTradingDay)).toList();
+
+			StockDayPrice firstDay = sortedDays.get(0);
+			StockDayPrice lastDay = sortedDays.get(sortedDays.size() - 1);
+
+			// 計算 high / low / volume
+			BigDecimal high = null;
+			BigDecimal low = null;
+			int totalTradingVolume = 0;
+
+			for (StockDayPrice d : sortedDays) {
+				BigDecimal h = new BigDecimal(d.getHighPrice().replace(",", ""));
+				BigDecimal l = new BigDecimal(d.getLowPrice().replace(",", ""));
+
+				high = (high == null || h.compareTo(high) > 0) ? h : high;
+				low = (low == null || l.compareTo(low) < 0) ? l : low;
+
+				if (d.getTradingVolume() != null) {
+					totalTradingVolume += Integer.parseInt(d.getTradingVolume());
+				}
+			}
+
+			// 組裝唯一一筆 StockWeekPrice
+			StockWeekPrice stockWeekPrice = new StockWeekPrice();
+			stockWeekPrice.setStockCode(stockCode);
+			stockWeekPrice.setWeekOfYear(firstDay.getWeekOfYear());
+			stockWeekPrice.setOpeningPrice(new BigDecimal(firstDay.getOpeningPrice().replace(",", "")));
+			stockWeekPrice.setClosingPrice(new BigDecimal(lastDay.getClosingPrice().replace(",", "")));
+			stockWeekPrice.setHighPrice(high);
+			stockWeekPrice.setLowPrice(low);
+			stockWeekPrice.setTradingVolume(totalTradingVolume);
+			stockWeekPrice.setFirstTradingDay(firstDay.getTradingDay());
+			stockWeekPrice.setMonth(firstDay.getTradingDay().getMonth() + 1);
+			stockWeekPrice.setYear(String.valueOf(firstDay.getTradingDay().getYear() + 1900));
+			List<StockWeekPrice> stockWeekPrices = Lists.newArrayList();
+			stockWeekPrices.add(stockWeekPrice);
+			if (groupedStockWeekPrice.containsKey(stockCode)) {
+				stockWeekPrices.addAll(groupedStockWeekPrice.get(stockCode));
+			}
+			calculateRSVValueAndLimitDownUp(stockWeekPrice, stockWeekPrices);
+			allStockWeekPrices.add(stockWeekPrice);
+			groupedStockWeekPrice.put(stockCode, stockWeekPrices);
+		});
+		stockWeekPriceService.batchInsertWeekPrices(allStockWeekPrices);
+
+		List<StockWeekPriceRank> allStockWeekPriceRanks = Lists.newArrayList();
+		allStockWeekPrices.stream().forEach(allStockWeekPrice -> {
+			if (groupedStockWeekPrice.containsKey(allStockWeekPrice.getStockCode())) {
+				StockWeekPriceRank stockMonthPriceRanks = stockWeekPriceService
+						.buildRanks(allStockWeekPrice.getStockCode(), allStockWeekPrice);
+				allStockWeekPriceRanks.add(stockMonthPriceRanks);
+			}
+		});
+//		
+		stockWeekPriceService.batchInsertWeekRankPrices(allStockWeekPriceRanks);
+		stockWeekPriceService.updateRankNo();
+		stockWeekPriceService.deleteByRankNoLessThanZero();
+
+		// 取得欲處理的月份
+		String targetMonth = allStockDayPrices.get(0).getMonthOfYear();
+		List<StockMonthPrice> twoFourtyStockMonthPrices = stockMonthPriceService.findByMmonthOfYearAndDesc(targetMonth);
+		Map<String, List<StockMonthPrice>> groupedStockMonthPrice = twoFourtyStockMonthPrices.stream()
+				.collect(Collectors.groupingBy(StockMonthPrice::getStockCode));
+		// 取得該月份所有日成交資料
+		List<StockDayPrice> monthDayPrices = stockDayPriceService.findByMonthOfYear(targetMonth);
+
+		// 依 stockCode 分組
+		Map<String, List<StockDayPrice>> stockMonthGroupMap = monthDayPrices.stream()
+				.collect(Collectors.groupingBy(StockDayPrice::getStockCode));
+
+		// 用來 batch insert 的集合
+		List<StockMonthPrice> allStockMonthPrices = new ArrayList<>();
+
+		stockMonthGroupMap.forEach((stockCode, stockDayList) -> {
+			if (groupedStockMonthPrice.containsKey(stockCode)) {
+				// 過濾無效的開盤價資料
+				List<StockDayPrice> validDayPrices = stockDayList.stream()
+						.filter(p -> StringUtils.isNotBlank(p.getOpeningPrice()) && !p.getOpeningPrice().contains("--"))
+						.toList();
+
+				if (validDayPrices.isEmpty()) {
+					return; // 該股票該月無有效資料
+				}
+
+				// 依交易日排序（只做一次）
+				List<StockDayPrice> sortedDays = validDayPrices.stream()
+						.sorted(Comparator.comparing(StockDayPrice::getTradingDay)).toList();
+
+				StockDayPrice firstDay = sortedDays.get(0);
+				StockDayPrice lastDay = sortedDays.get(sortedDays.size() - 1);
+
+				// 計算最高、最低、成交量
+				BigDecimal high = null;
+				BigDecimal low = null;
+				int totalTradingVolume = 0;
+
+				for (StockDayPrice d : sortedDays) {
+					BigDecimal h = new BigDecimal(d.getHighPrice().replace(",", ""));
+					BigDecimal l = new BigDecimal(d.getLowPrice().replace(",", ""));
+
+					high = (high == null || h.compareTo(high) > 0) ? h : high;
+					low = (low == null || l.compareTo(low) < 0) ? l : low;
+
+					if (d.getTradingVolume() != null) {
+						totalTradingVolume += Integer.parseInt(d.getTradingVolume());
+					}
+				}
+
+				// 組裝唯一一筆 StockMonthPrice
+				StockMonthPrice stockMonthPrice = new StockMonthPrice();
+				stockMonthPrice.setStockCode(stockCode);
+				stockMonthPrice.setOpeningPrice(new BigDecimal(firstDay.getOpeningPrice().replace(",", "")));
+				stockMonthPrice.setClosingPrice(new BigDecimal(lastDay.getClosingPrice().replace(",", "")));
+				stockMonthPrice.setHighPrice(high);
+				stockMonthPrice.setLowPrice(low);
+				stockMonthPrice.setTradingVolume(totalTradingVolume);
+				stockMonthPrice.setFirstTradingDay(firstDay.getTradingDay());
+
+				int year = firstDay.getTradingDay().getYear() + 1900;
+				int month = firstDay.getTradingDay().getMonth() + 1;
+
+				stockMonthPrice.setYear(String.valueOf(year));
+				stockMonthPrice.setMonth(month);
+				stockMonthPrice.setMonthOfYear(year + "M" + month);
+				List<StockMonthPrice> stockMonthPrices = Lists.newArrayList();
+				stockMonthPrices.add(stockMonthPrice);
+				if (groupedStockMonthPrice.containsKey(stockCode)) {
+					stockMonthPrices.addAll(groupedStockMonthPrice.get(stockCode));
+				}
+				calculateRSVValueAndLimitDownUp(stockMonthPrice, stockMonthPrices);
+				allStockMonthPrices.add(stockMonthPrice);
+				groupedStockMonthPrice.put(stockCode, stockMonthPrices);
+			}
+
+		});
+
+		// 真正合理的 batch insert
+		stockMonthPriceService.batchInsertMonthPrices(allStockMonthPrices);
+
+		List<StockMonthPriceRank> allStockMonthPriceRank = Lists.newArrayList();
+		allStockMonthPrices.stream().forEach(stockMonthPrice -> {
+			if (groupedStockMonthPrice.containsKey(stockMonthPrice.getStockCode())) {
+
+				List<StockMonthPrice> singleStockStockMonthPrices = groupedStockMonthPrice
+						.get(stockMonthPrice.getStockCode());
+				List<StockMonthPrice> oriStockMonthPrices = Lists.newArrayList();
+				oriStockMonthPrices.add(stockMonthPrice);
+				oriStockMonthPrices.addAll(singleStockStockMonthPrices);
+				StockMonthPriceRank stockMonthPriceRanks = stockMonthPriceService
+						.buildRanks(stockMonthPrice.getStockCode(), oriStockMonthPrices);
+				allStockMonthPriceRank.add(stockMonthPriceRanks);
+			}
+		});
+		stockMonthPriceService.updateRankNo();
+		stockMonthPriceService.batchInsertMonthRankPrices(allStockMonthPriceRank);
+		stockMonthPriceService.deleteByRankNoLessThanZero();
+
+		// 計算漲跌幅排名
+		List<StockDayPrice> needRankStocks = allStockDayPrices.stream()
+				.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
+						&& stockCodes.contains(data.getStockCode())
+						&& ObjectUtils.isNotEmpty(data.getChangeRate())))
+				.toList();
+		
+		if(stockType.equals("0")) {
+			//上櫃
+			rankStockChangeService.writeStockListToRedis(needRankStocks, allStockInfoMap, "TPEX");
+		} else if(stockType.equals("1")){
+			//上市
+			rankStockChangeService.writeStockListToRedis(needRankStocks, allStockInfoMap, "TWSE");
+		} else {
+			//興櫃
+			rankStockChangeService.writeStockListToRedis(needRankStocks, allStockInfoMap, "OES");
+		}
+		
+		// 成交量排名
+		rankStockChangeService.writeStockListTradingQuantityRankToRedis(
+				allStockDayPrices.stream().filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
+						&& ObjectUtils.isNotEmpty(data.getChangeRate()))).toList(),
+				allStockInfoMap);
+		groupedStockDayPrices.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
+				.forEach(entry -> {
+					String stockCode = entry.getKey();
+					List<StockDayPrice> stockDayPrices = entry.getValue();
+					if (allStockInfoMap.containsKey(stockCode)) {
+						List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getCompressedZSetAllScore(
+								"ultraLongLivedCache", "stock:compressed:" + stockCode, StockDayPrice.class);
+						if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
+
+							cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
+									"stock:compressed:" + stockCode, stockDayPrices.stream().findFirst().get(),
+									stockDayPrices.stream().findFirst().get().getTradingDay().getTime(),
+									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+						} else {
+							cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+									"stock:compressed:" + stockCode, stockDayPrices,
+									stockDayPrice -> stockDayPrice.getTradingDay().getTime(),
+									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+						}
+					} else {
+						log.warn("stock_info missing : {}", stockCode);
+					}
+				});
+		groupedStockWeekPrice.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
+				.forEach(entry -> {
+					String stockCode = entry.getKey();
+					List<StockWeekPrice> stockWeekPrices = entry.getValue();
+					if (allStockInfoMap.containsKey(stockCode)) {
+						List<StockWeekPrice> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
+								"ultraLongLivedCache", "stock-weekly:compressed:" + stockCode, StockWeekPrice.class);
+						if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
+
+							cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
+									"stock-weekly:compressed:" + stockCode, stockWeekPrices.stream().findFirst().get(),
+									stockWeekPrices.stream().findFirst().get().getFirstTradingDay().getTime(),
+									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+						} else {
+							cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+									"stock-weekly:compressed:" + stockCode, stockWeekPrices,
+									stockWeekPrice -> stockWeekPrice.getFirstTradingDay().getTime(),
+									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+						}
+					} else {
+						log.warn("stock_info missing : {}", stockCode);
+					}
+				});
+	}
+	
+	
 	public void calculateRSVValueAndLimitDownUp(StockWeekPrice stockWeekPrice,
 			List<StockWeekPrice> twoFourtyStockWeekPrices) {
 		if (twoFourtyStockWeekPrices.size() < 9) {

@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import com.bigstock.sharedComponent.entity.StockIntradayPrice.StockIntradayPriceId;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
@@ -17,6 +18,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Entity
 @Table(name = "stock_intraday_price", schema = "bstock")
 @IdClass(StockIntradayPriceId.class)
 public class StockIntradayPrice {
