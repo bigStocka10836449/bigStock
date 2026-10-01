@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -11,8 +12,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-import javax.annotation.PostConstruct;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.compress.utils.Lists;
@@ -26,6 +25,7 @@ import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
 import com.bigstock.sharedComponent.entity.StockInfo;
+import com.bigstock.sharedComponent.entity.StockIntradayPrice;
 import com.bigstock.sharedComponent.entity.StockMonthPrice;
 import com.bigstock.sharedComponent.entity.StockMonthPriceRank;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
@@ -36,10 +36,12 @@ import com.bigstock.sharedComponent.service.MarginTradingAndShortSellingInfoServ
 import com.bigstock.sharedComponent.service.RankStockChangeService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockInfoService;
+import com.bigstock.sharedComponent.service.StockIntradayPriceService;
 import com.bigstock.sharedComponent.service.StockMonthPriceService;
 import com.bigstock.sharedComponent.service.StockWeekPriceService;
 import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -62,16 +64,29 @@ public class GrabFromThirdParty {
 	private final CacheOperatorService cacheOperatorService;
 
 	private final MarginTradingAndShortSellingInfoService marginTradingAndShortSellingInfoService;
-	
+
 	private final CalculateCosineSimilarityVectorService calculateCosineSimilarityVectorService;
 
-	@PostConstruct
+	private final StockIntradayPriceService stockIntradayPriceService;
+
+	
+	@Scheduled(cron = "0 50 18 * * ?", zone = "Asia/Taipei")
+	public void updateStockIntradayPriceByThirdParty() throws Exception {
+		doCalculateIntradayPrices("0");
+		doCalculateIntradayPrices("1");
+		doCalculateIntradayPrices("2");
+	}
+
+
 	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
 		}).toList();
 		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
+			return !data.matches(".*[a-zA-Z].*");
+		}).toList();
+		List<String> oesStockCodes = stockInfoService.getStockCodeByStockType("2").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
 		}).toList();
 		List<String> allStockCodes = Lists.newArrayList();
@@ -82,6 +97,7 @@ public class GrabFromThirdParty {
 				.collect(Collectors.groupingBy(StockInfo::getStockCode));
 		allStockCodes.addAll(tpexStockCodes);
 		allStockCodes.addAll(twseStockCodes);
+		allStockCodes.addAll(oesStockCodes);
 		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
 		allStockCodes.forEach(stockCode -> {
 			allStockDayPrices.addAll(grabThirdPartyStockDayPrice.grabFromYahoo(stockCode));
@@ -119,7 +135,7 @@ public class GrabFromThirdParty {
 				List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTwseDayPrice.getStockCode());
 				allThisStockCodeDayPrices.addAll(stockDayPrices);
 			}
-			calculateRSVValueAndLimitDownUp(stockTwseDayPrice, allThisStockCodeDayPrices);
+			calculateRSVValueAndLimitDownUp(stockTwseDayPrice, allThisStockCodeDayPrices, allStockInfoMap.get(stockTwseDayPrice.getStockCode()).stream().findFirst().get().getStockType());
 			stockTwseDayPrice.setMonthOfYear((stockTwseDayPrice.getTradingDay().getYear() + 1900) + "W"
 					+ (stockTwseDayPrice.getTradingDay().getMonth() + 1));
 			groupedStockDayPrices.put(stockTwseDayPrice.getStockCode(), allThisStockCodeDayPrices);
@@ -334,8 +350,14 @@ public class GrabFromThirdParty {
 						&& twseStockCodes.contains(data.getStockCode())
 						&& ObjectUtils.isNotEmpty(data.getChangeRate())))
 				.toList();
+		List<StockDayPrice> needRankOESs = allStockDayPrices.stream()
+				.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
+						&& oesStockCodes.contains(data.getStockCode())
+						&& ObjectUtils.isNotEmpty(data.getChangeRate())))
+				.toList();
 		rankStockChangeService.writeStockListToRedis(needRankTPEXs, allStockInfoMap, "TPEX");
 		rankStockChangeService.writeStockListToRedis(needRankTWSEs, allStockInfoMap, "TWSE");
+		rankStockChangeService.writeStockListToRedis(needRankOESs, allStockInfoMap, "OES");
 		//成交量排名
 		rankStockChangeService.writeStockListTradingQuantityRankToRedis(allStockDayPrices.stream()
 				.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
@@ -389,8 +411,162 @@ public class GrabFromThirdParty {
 		calculateCosineSimilarityVectorService.calculateAsDailyAspect();
 	}
 
+	private void calculateMissingIndicators(List<StockIntradayPrice> prices) {
+
+		if (prices == null || prices.isEmpty()) {
+			return;
+		}
+
+		// Must be oldest -> newest
+		prices.sort(Comparator.comparing(StockIntradayPrice::getTradingTime));
+
+		for (int i = 0; i < prices.size(); i++) {
+
+			StockIntradayPrice current = prices.get(i);
+
+			boolean needMa = current.getFiveMa() == null || current.getTenMa() == null || current.getTwentyMa() == null
+					|| current.getSixtyMa() == null;
+
+			boolean needKd = current.getLineRsvValue() == null || current.getLineKValue() == null
+					|| current.getLineDValue() == null;
+
+			if (needMa) {
+				calculateMa(current, prices, i);
+			}
+
+			if (needKd) {
+				calculateKd(current, prices, i);
+			}
+		}
+	}
+
+	private void calculateMa(StockIntradayPrice current, List<StockIntradayPrice> prices, int currentIndex) {
+
+		if (current.getFiveMa() == null) {
+			current.setFiveMa(calculateAverage(prices, currentIndex, 5));
+		}
+
+		if (current.getTenMa() == null) {
+			current.setTenMa(calculateAverage(prices, currentIndex, 10));
+		}
+
+		if (current.getTwentyMa() == null) {
+			current.setTwentyMa(calculateAverage(prices, currentIndex, 20));
+		}
+
+		if (current.getSixtyMa() == null) {
+			current.setSixtyMa(calculateAverage(prices, currentIndex, 60));
+		}
+	}
+
+	private Double calculateAverage(List<StockIntradayPrice> prices, int currentIndex, int period) {
+
+		if (currentIndex + 1 < period) {
+			return null;
+		}
+
+		double sum = 0D;
+
+		for (int i = currentIndex - period + 1; i <= currentIndex; i++) {
+
+			Double close = prices.get(i).getClosingPrice();
+
+			if (close == null) {
+				return null;
+			}
+
+			sum += close;
+		}
+
+		return roundToThreeDecimalPlaces(sum / period);
+	}
+
+	private void calculateKd(StockIntradayPrice current, List<StockIntradayPrice> prices, int currentIndex) {
+
+		int period = 9;
+
+		if (currentIndex + 1 < period) {
+			return;
+		}
+
+		double highestHigh = Double.NEGATIVE_INFINITY;
+
+		double lowestLow = Double.POSITIVE_INFINITY;
+
+		for (int i = currentIndex - period + 1; i <= currentIndex; i++) {
+
+			StockIntradayPrice item = prices.get(i);
+
+			if (item.getHighPrice() == null || item.getLowPrice() == null) {
+
+				return;
+			}
+
+			highestHigh = Math.max(highestHigh, item.getHighPrice());
+
+			lowestLow = Math.min(lowestLow, item.getLowPrice());
+		}
+
+		Double close = current.getClosingPrice();
+
+		if (close == null) {
+			return;
+		}
+
+		double rsv;
+
+		if (Double.compare(highestHigh, lowestLow) == 0) {
+
+			rsv = 50D;
+
+		} else {
+
+			rsv = (close - lowestLow) / (highestHigh - lowestLow) * 100D;
+		}
+
+		rsv = roundToThreeDecimalPlaces(rsv);
+
+		double previousK = 50D;
+		double previousD = 50D;
+
+		if (currentIndex > 0) {
+
+			StockIntradayPrice previous = prices.get(currentIndex - 1);
+
+			if (previous.getLineKValue() != null) {
+				previousK = previous.getLineKValue();
+			}
+
+			if (previous.getLineDValue() != null) {
+				previousD = previous.getLineDValue();
+			}
+		}
+
+		double smoothingFactor = 1D / 3D;
+
+		double k = previousK * (1D - smoothingFactor) + rsv * smoothingFactor;
+
+		k = roundToThreeDecimalPlaces(k);
+
+		double d = previousD * (1D - smoothingFactor) + k * smoothingFactor;
+
+		d = roundToThreeDecimalPlaces(d);
+
+		if (current.getLineRsvValue() == null) {
+			current.setLineRsvValue(rsv);
+		}
+
+		if (current.getLineKValue() == null) {
+			current.setLineKValue(k);
+		}
+
+		if (current.getLineDValue() == null) {
+			current.setLineDValue(d);
+		}
+	}
+
 	public void calculateRSVValueAndLimitDownUp(StockDayPrice stockTwseDayPrice,
-			List<StockDayPrice> twoFourtyStockDayPrices) {
+			List<StockDayPrice> twoFourtyStockDayPrices, String stockType) {
 		if (stockTwseDayPrice.getClosingPrice().equals("---") || stockTwseDayPrice.getClosingPrice().equals("----")
 				|| stockTwseDayPrice.getClosingPrice().equals("--") || stockTwseDayPrice.getClosingPrice().equals("-")
 				|| stockTwseDayPrice.getLowPrice().equals("--") || stockTwseDayPrice.getLowPrice().equals("---")
@@ -402,10 +578,39 @@ public class GrabFromThirdParty {
 		Double upperLimitPrice = null;
 		Double lowerLimitPrice = null;
 		Double standarPrice = null;
-		standarPrice = Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""))
-				- new BigDecimal(stockTwseDayPrice.getChange()).doubleValue();
-		upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true);
-		lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false);
+		BigDecimal change;
+
+		try {
+		    change = new BigDecimal(stockTwseDayPrice.getChange());
+		    standarPrice = Double.valueOf(
+		    		stockTwseDayPrice.getClosingPrice()
+		    		.replace("+", "")
+		    		.replaceAll(",", "")
+		    		) - change.doubleValue();
+		    upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true, stockType);
+		    lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false, stockType);
+		} catch (Exception e) {
+			//登櫃情況直接漲跌幅特殊計算
+		    log.error(
+		        "Invalid change value, change={}, stockTwseDayPrice={}",
+		        stockTwseDayPrice.getChange(),
+		        stockTwseDayPrice,
+		        e
+		    );
+
+			change = new BigDecimal(
+					(Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", "")) - Double
+							.valueOf(stockTwseDayPrice.getOpeningPrice().replace("+", "").replaceAll(",", ""))));
+		    standarPrice = Double.valueOf(
+		    		stockTwseDayPrice.getClosingPrice()
+		    		.replace("+", "")
+		    		.replaceAll(",", "")
+		    		) - change.doubleValue();
+		    //上下限值例外處理
+		    upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true, stockType) * 3;
+		    lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false, stockType) * 3;
+		}
+
 		stockTwseDayPrice.setLimitDown(lowerLimitPrice.toString());
 		twoFourtyStockDayPrices.get(0).setLimitDown(lowerLimitPrice.toString());
 		stockTwseDayPrice.setLimitUp(upperLimitPrice.toString());
@@ -617,7 +822,8 @@ public class GrabFromThirdParty {
 //		Date tradeDateBefore365Days = Date.from(instant);
 //		List<MarginTradingAndShortSellingInfo> stockDayPricesFor365Ds = marginTradingAndShortSellingInfoService
 //				.findByTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, currentTradeDate);
-		Map<String, List<MarginTradingAndShortSellingInfo>> groupedMarginTradingAndShortSellingInfos = allMarginTradingAndShortSellingInfos.stream()
+		Map<String, List<MarginTradingAndShortSellingInfo>> groupedMarginTradingAndShortSellingInfos = allMarginTradingAndShortSellingInfos
+				.stream()
 //				.filter(data -> {
 //			java.util.Date tradingDay = data.getTradingDay();
 //			LocalDate dataTradeDateLdt = ((java.sql.Date) tradingDay).toLocalDate();
@@ -626,9 +832,9 @@ public class GrabFromThirdParty {
 				.collect(Collectors.groupingBy(MarginTradingAndShortSellingInfo::getStockCode));
 		marginTradingAndShortSellingInfoService
 				.bulkUpsertMarginTradingAndShortSellingInfo(allMarginTradingAndShortSellingInfos);
-		groupedMarginTradingAndShortSellingInfos.entrySet().forEach(entry ->{
+		groupedMarginTradingAndShortSellingInfos.entrySet().forEach(entry -> {
 			List<MarginTradingAndShortSellingInfo> singleMarginTradingAndShortSellingInfos = entry.getValue();
-			if( CollectionUtils.isNotEmpty(singleMarginTradingAndShortSellingInfos)) {
+			if (CollectionUtils.isNotEmpty(singleMarginTradingAndShortSellingInfos)) {
 				cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
 						"marginTrading:compressed:" + entry.getKey(), singleMarginTradingAndShortSellingInfos,
 						marginTradingAndShortSellingInfo -> marginTradingAndShortSellingInfo.getTradingDay().getTime(),
@@ -637,6 +843,9 @@ public class GrabFromThirdParty {
 		});
 	}
 
+
+	
+	
 	public void calculateRSVValueAndLimitDownUp(StockWeekPrice stockWeekPrice,
 			List<StockWeekPrice> twoFourtyStockWeekPrices) {
 		if (twoFourtyStockWeekPrices.size() < 9) {
@@ -736,5 +945,105 @@ public class GrabFromThirdParty {
 
 		// 計算平均值並保留小數點第 4 位（四捨五入）
 		return total.divide(new BigDecimal(period), 4, RoundingMode.HALF_UP);
+	}
+	
+	private void doCalculateIntradayPrices(String stockType) throws Exception {
+
+		Date perviouslyTradingDate = stockDayPriceService.getCurrentTradeDate();
+		List<String> stockCodes = stockInfoService.getStockCodeByStockType(stockType).stream().filter(data -> {
+			return !data.matches(".*[a-zA-Z].*");
+		}).toList();
+		List<String> allStockCodes = Lists.newArrayList();
+		List<StockIntradayPrice> allStockFiveIntradayPrices = Lists.newArrayList();
+		List<StockIntradayPrice> allStockSixtyIntradayPrices = Lists.newArrayList();
+		allStockCodes.addAll(stockCodes);
+		allStockCodes.forEach(stockCode -> {
+			// 額外執行抓取5分K 與60分K內容
+			try {
+				List<StockIntradayPrice> fiveMinutes = grabThirdPartyStockDayPrice.grabIntradayFromYahoo(stockCode,
+						"5m");
+				allStockFiveIntradayPrices.addAll(fiveMinutes);
+				Thread.sleep(2000);
+				// -- accumulate to each trade from fiveMinutes
+				allStockSixtyIntradayPrices.addAll(grabThirdPartyStockDayPrice.aggregateToHourly(fiveMinutes));
+			} catch (InterruptedException e) {
+				log.warn(stockCode + e.getMessage(), e);
+			}
+		});
+		// 整理從yahoo抓來的5分K 與60分K內容
+		Map<String, List<StockIntradayPrice>> fiveIntradayPriceYahooInfoGroup = allStockFiveIntradayPrices.stream()
+				.collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
+		Map<String, List<StockIntradayPrice>> sixtyIntradayPriceYahooInfoGroup = allStockSixtyIntradayPrices.stream()
+				.collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
+		
+		// 抓取目前DB 5分K 60分K 最新60筆資料庫內容
+		Map<String, List<StockIntradayPrice>> sixtyIntradayPriceDbInfoGroup = stockIntradayPriceService
+				.getTop60ByPeriod("60").stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
+		Map<String, List<StockIntradayPrice>> fiveIntradayPriceDbInfoGroup = stockIntradayPriceService
+				.getTop60ByPeriod("5").stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
+
+		// 存放整理完後的 5分K 與 60分K內容
+		List<StockIntradayPrice> adjustmentedStockIntradayPrices = Lists.newArrayList();
+
+		// 5分K整理
+		fiveIntradayPriceYahooInfoGroup.entrySet().forEach(entry -> {
+			String stockCode = entry.getKey();
+			if (StringUtils.isBlank(stockCode)) {
+				return;
+			}
+			List<StockIntradayPrice> fiveIntradayPriceYahooInfos = entry.getValue();
+
+			List<StockIntradayPrice> fiveIntradayPriceDbInfos = fiveIntradayPriceDbInfoGroup.getOrDefault(stockCode, Lists.newArrayList());
+			LocalDateTime lastTradingDateTime = fiveIntradayPriceDbInfos.stream()
+					.map(StockIntradayPrice::getTradingTime).max(LocalDateTime::compareTo)
+					.orElse(perviouslyTradingDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
+			List<StockIntradayPrice> avaliableStockIntradayPrices = fiveIntradayPriceYahooInfos.stream()
+					.filter(iveIntradayPriceYahooInfo -> iveIntradayPriceYahooInfo.getTradingTime()
+							.isAfter(lastTradingDateTime))
+					.toList();
+			List<StockIntradayPrice> halfCompletedfiveIntradayPriceDbInfos = Lists.newArrayList();
+			halfCompletedfiveIntradayPriceDbInfos.addAll(fiveIntradayPriceDbInfos);
+			halfCompletedfiveIntradayPriceDbInfos.addAll(avaliableStockIntradayPrices);
+			calculateMissingIndicators(halfCompletedfiveIntradayPriceDbInfos);
+			adjustmentedStockIntradayPrices.addAll(avaliableStockIntradayPrices);
+			cacheOperatorService.putSnapshotDataListAtomic(
+			        "ultraLongLivedCache",
+			        "stock-intraday:5m:" + stockCode,
+			        avaliableStockIntradayPrices
+			);
+			cacheOperatorService.cleanupOldSnapshots("ultraLongLivedCache",  "stock-intraday:5m:" + stockCode, 2);
+		});
+		// 整理60分K
+		sixtyIntradayPriceYahooInfoGroup.entrySet().forEach(entry -> {
+			String stockCode = entry.getKey();
+			if (StringUtils.isBlank(stockCode)) {
+				return;
+			}
+			List<StockIntradayPrice> sixtyIntradayPriceYahooInfos = entry.getValue();
+
+			List<StockIntradayPrice> fiveIntradayPriceDbInfos = sixtyIntradayPriceDbInfoGroup.getOrDefault(stockCode, Lists.newArrayList());
+			LocalDateTime lastTradingDateTime = fiveIntradayPriceDbInfos.stream()
+					.map(StockIntradayPrice::getTradingTime).max(LocalDateTime::compareTo)
+					.orElse(perviouslyTradingDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
+			List<StockIntradayPrice> avaliableStockIntradayPrices = sixtyIntradayPriceYahooInfos.stream()
+					.filter(iveIntradayPriceYahooInfo -> iveIntradayPriceYahooInfo.getTradingTime()
+							.isAfter(lastTradingDateTime))
+					.toList();
+			List<StockIntradayPrice> halfCompletedfiveIntradayPriceDbInfos = Lists.newArrayList();
+			halfCompletedfiveIntradayPriceDbInfos.addAll(fiveIntradayPriceDbInfos);
+			halfCompletedfiveIntradayPriceDbInfos.addAll(avaliableStockIntradayPrices);
+			calculateMissingIndicators(halfCompletedfiveIntradayPriceDbInfos);
+			adjustmentedStockIntradayPrices.addAll(avaliableStockIntradayPrices);
+			cacheOperatorService.putSnapshotDataListAtomic(
+			        "ultraLongLivedCache",
+			        "stock-intraday:60m:" + stockCode,
+			        avaliableStockIntradayPrices
+			);
+			cacheOperatorService.cleanupOldSnapshots("ultraLongLivedCache",  "stock-intraday:60m:" + stockCode, 2);
+		});
+
+		
+		stockIntradayPriceService.bulkUpsertIntradayPrices(adjustmentedStockIntradayPrices);
+	
 	}
 }

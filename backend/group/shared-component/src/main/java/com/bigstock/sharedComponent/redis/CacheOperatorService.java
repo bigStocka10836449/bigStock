@@ -967,4 +967,5 @@ public class CacheOperatorService {
 	            && data[0] == (byte) 0x1f
 	            && data[1] == (byte) 0x8b;
 	}
+	
 }

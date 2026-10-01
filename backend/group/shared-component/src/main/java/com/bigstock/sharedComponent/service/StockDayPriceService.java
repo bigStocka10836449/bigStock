@@ -153,15 +153,16 @@ public class StockDayPriceService {
 	public List<StockDayPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(Date startDateMinus360,
 			 Date endDate){
 		String sql = """
-		        select stock_code, trading_day,change, change_rate, opening_price,
-		         closing_price, high_price, low_price,
-		         start_of_week_date,end_of_week_date,week_of_year,
-		         trading_volume,limit_up,limit_down, line_k_value, line_d_value,five_ma,twenty_ma,ten_ma
-		         ,sixty_ma,one_twenty_ma,two_fourty_ma
-		        from bstock.stock_day_price_rank
-		        where trading_day between ? and ?
-		          and closing_price not in ('--','----','')
-		        order by stock_code, trading_day desc
+		        select sdpr.stock_code, sdpr.trading_day,sdpr.change, sdpr.change_rate, sdpr.opening_price,
+		         sdpr.closing_price, sdpr.high_price, sdpr.low_price,
+		         sdpr.start_of_week_date,sdpr.end_of_week_date,sdpr.week_of_year,
+		         sdpr.trading_volume,sdpr.limit_up,sdpr.limit_down, sdpr.line_k_value, sdpr.line_d_value,sdpr.five_ma,sdpr.twenty_ma,sdpr.ten_ma
+		         ,sdpr.sixty_ma,sdpr.one_twenty_ma,sdpr.two_fourty_ma
+		        from bstock.stock_day_price_rank sdpr, bstock.stock_info si
+		        where sdpr.trading_day between ? and ?
+		          and sdpr.stock_code = si.stock_code
+		          and sdpr.closing_price not in ('--','----','')
+		        order by sdpr.stock_code, sdpr.trading_day desc
 		    """;
 		    return jdbcTemplate.query(sql,
 		            ps -> {
