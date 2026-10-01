@@ -1108,9 +1108,9 @@ public class ChromeDriverUtils {
 
 	
 	// 計算漲停或跌停價
-	public static Double calculateLimitPrice(double closingPrice, boolean isUpper) {
+	public static Double calculateLimitPrice(double closingPrice, boolean isUpper, String stockType) {
 	    // 計算理論價格
-	    double limitPrice = closingPrice * (isUpper ? 1.10 : 0.90);
+	    double limitPrice = closingPrice * (isUpper ? ("02".equals(stockType) ? 1.5 : 1.10) : ("02".equals(stockType) ? 0.5 : 0.90) );
 	    // 根據 tick 單位調整
 	    double tickSize = getTickSize(limitPrice);
 

@@ -1,5 +1,6 @@
 package com.bigstock.sharedComponent.service;
 
+import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -7,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -14,10 +16,14 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.IsoFields;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -34,6 +40,7 @@ import org.springframework.web.client.RestTemplate;
 import com.bigstock.sharedComponent.entity.FinancialCalendar;
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
+import com.bigstock.sharedComponent.entity.StockIntradayPrice;
 import com.esotericsoftware.minlog.Log;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -42,9 +49,6 @@ import com.google.common.collect.Lists;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 
 @Service
 @RequiredArgsConstructor
@@ -263,6 +267,138 @@ public class GrabThirdPartyStockDayPrice {
 		    }
 			return Collections.emptyList();
 
+	}
+	
+	public List<StockIntradayPrice> grabIntradayFromYahoo(String stockCode, String period) {
+
+		HttpHeaders headers = new HttpHeaders();
+
+		headers.set("User-Agent", "Mozilla/5.0");
+		headers.set("Accept", "application/json, text/plain, */*");
+		headers.set("Referer", "https://tw.stock.yahoo.com/");
+		headers.set("Origin", "https://tw.stock.yahoo.com");
+		headers.set("Accept-Language", "zh-TW,zh;q=0.9,en;q=0.8");
+
+		HttpEntity<Void> entity = new HttpEntity<Void>(headers);
+
+		String symbol = stockCode ;
+
+		String encodedSymbols;
+
+		try {
+
+			encodedSymbols = URLEncoder.encode("[\"" + symbol + "\"]", "UTF-8");
+
+		} catch (UnsupportedEncodingException e) {
+
+			throw new RuntimeException(e);
+		}
+
+		String url = "https://tw.stock.yahoo.com/" + "_td-stock/api/resource/" + "FinanceChartService.ApacLibraCharts"
+				+ ";period=" + period + ";symbols=" + encodedSymbols + "?" + "device=desktop" + "&ecma=modern"
+				+ "&intl=tw" + "&lang=zh-Hant-TW" + "&partner=none" + "&region=TW" + "&site=finance"
+				+ "&tz=Asia%2FTaipei" + "&returnMeta=true";
+
+		int maxRetries = 5;
+		long delayMillis = 30_000L;
+
+		for (int attempt = 1; attempt <= maxRetries; attempt++) {
+
+			try {
+
+				ResponseEntity<String> response = restTemplate.exchange(URI.create(url), HttpMethod.GET, entity,
+						String.class);
+
+				JsonNode root = mapper.readTree(response.getBody());
+
+				JsonNode dataNode = root.path("data");
+
+				if (!dataNode.isArray() || dataNode.size() == 0) {
+
+					return Collections.emptyList();
+				}
+
+				JsonNode chartNode = dataNode.get(0).path("chart");
+
+				JsonNode timestampNode = chartNode.path("timestamp");
+
+				JsonNode quoteNode = chartNode.path("indicators").path("quote").get(0);
+
+				JsonNode openNode = quoteNode.path("open");
+
+				JsonNode highNode = quoteNode.path("high");
+
+				JsonNode lowNode = quoteNode.path("low");
+
+				JsonNode closeNode = quoteNode.path("close");
+
+				JsonNode volumeNode = quoteNode.path("volume");
+
+				List<StockIntradayPrice> result = new ArrayList<StockIntradayPrice>();
+
+				ZoneId taipeiZone = ZoneId.of("Asia/Taipei");
+
+				int size = timestampNode.size();
+
+				for (int i = 0; i < size; i++) {
+
+					if (timestampNode.get(i) == null || timestampNode.get(i).isNull()) {
+
+						continue;
+					}
+
+					long timestamp = timestampNode.get(i).asLong();
+
+					LocalDateTime tradingTime = Instant.ofEpochSecond(timestamp).atZone(taipeiZone).toLocalDateTime();
+
+					StockIntradayPrice price = StockIntradayPrice.builder().stockCode(stockCode).period(period)
+							.tradingTime(tradingTime)
+
+							.openingPrice(getDoubleValue(openNode, i))
+
+							.highPrice(getDoubleValue(highNode, i))
+
+							.lowPrice(getDoubleValue(lowNode, i))
+
+							.closingPrice(getDoubleValue(closeNode, i))
+
+							.tradingVolume(getLongValue(volumeNode, i))
+
+							.build();
+
+					result.add(price);
+				}
+
+				return result;
+
+			} catch (Exception e) {
+
+				if (attempt < maxRetries) {
+
+					try {
+
+						log.info("Yahoo intraday error, " + "stockCode={}, period={}, " + "attempt={}, error={}",
+								stockCode, period, attempt, e.getMessage());
+
+						Thread.sleep(delayMillis);
+
+					} catch (InterruptedException ie) {
+
+						Thread.currentThread().interrupt();
+
+						return Collections.emptyList();
+					}
+
+				} else {
+
+					log.warn("{} - Yahoo {} error: {}", stockCode, period, e.getMessage());
+
+					return Collections.emptyList();
+				}
+			}
+		}
+
+		return Collections.emptyList();
 	}
 
 	public List<MarginTradingAndShortSellingInfo> grabMarginTradingAndShortSellingInfoFromYahoo(String stockCode) {
@@ -717,5 +853,183 @@ public class GrabThirdPartyStockDayPrice {
 	    }
 
 	    return result;
+	}
+	
+	private Double getDoubleValue(JsonNode arrayNode, int index) {
+
+		if (arrayNode == null || !arrayNode.isArray() || index >= arrayNode.size()) {
+
+			return null;
+		}
+
+		JsonNode value = arrayNode.get(index);
+
+		if (value == null || value.isNull()) {
+
+			return null;
+		}
+
+		return value.asDouble();
+	}
+
+	private Long getLongValue(JsonNode arrayNode, int index) {
+
+		if (arrayNode == null || !arrayNode.isArray() || index >= arrayNode.size()) {
+
+			return null;
+		}
+
+		JsonNode value = arrayNode.get(index);
+
+		if (value == null || value.isNull()) {
+
+			return null;
+		}
+
+		return value.asLong();
+	}
+	
+	public List<StockIntradayPrice> aggregateToHourly(
+	        List<StockIntradayPrice> fiveMinutes) {
+
+	    if (fiveMinutes == null || fiveMinutes.isEmpty()) {
+	        return Collections.emptyList();
+	    }
+
+	    fiveMinutes.sort(
+	            Comparator.comparing(
+	                    StockIntradayPrice::getTradingTime
+	            )
+	    );
+
+	    Map<LocalDateTime, List<StockIntradayPrice>> grouped =
+	            fiveMinutes.stream()
+	                    .collect(
+	                            Collectors.groupingBy(
+	                                    this::resolveHourlyBucket,
+	                                    LinkedHashMap::new,
+	                                    Collectors.toList()
+	                            )
+	                    );
+
+	    List<StockIntradayPrice> result =
+	            new ArrayList<>();
+	    LocalDateTime latestYahooTime =
+	    		fiveMinutes.stream()
+	    		.map(StockIntradayPrice::getTradingTime)
+	    		.max(LocalDateTime::compareTo)
+	    		.orElse(null);
+
+	    for (Map.Entry<LocalDateTime, List<StockIntradayPrice>> entry
+	            : grouped.entrySet()) {
+
+	        LocalDateTime bucketTime =
+	                entry.getKey();
+	        List<StockIntradayPrice> bucket =
+	                entry.getValue();
+
+	        if (bucket.isEmpty()) {
+	            continue;
+	        }
+
+	        if (!isCompletedHourlyBucket(
+	                bucketTime,
+	                latestYahooTime
+	        )) {
+	            continue;
+	        }
+
+
+	        StockIntradayPrice first =
+	                bucket.get(0);
+
+	        StockIntradayPrice last =
+	                bucket.get(
+	                        bucket.size() - 1
+	                );
+
+	        Double high =
+	                bucket.stream()
+	                        .map(
+	                                StockIntradayPrice::getHighPrice
+	                        )
+	                        .filter(Objects::nonNull)
+	                        .max(Double::compareTo)
+	                        .orElse(null);
+
+	        Double low =
+	                bucket.stream()
+	                        .map(
+	                                StockIntradayPrice::getLowPrice
+	                        )
+	                        .filter(Objects::nonNull)
+	                        .min(Double::compareTo)
+	                        .orElse(null);
+
+	        long volume = 0L;
+
+	        for (StockIntradayPrice item : bucket) {
+
+	            if (item.getTradingVolume() != null) {
+	                volume += item.getTradingVolume();
+	            }
+	        }
+
+	        StockIntradayPrice hourly =
+	                StockIntradayPrice.builder()
+	                        .stockCode(
+	                                first.getStockCode()
+	                        )
+	                        .period("60m")
+	                        .tradingTime(
+	                        		bucketTime.plusHours(1)
+	                        )
+	                        .openingPrice(
+	                                first.getOpeningPrice()
+	                        )
+	                        .closingPrice(
+	                                last.getClosingPrice()
+	                        )
+	                        .highPrice(
+	                                high
+	                        )
+	                        .lowPrice(
+	                                low
+	                        )
+	                        .tradingVolume(
+	                                volume
+	                        )
+	                        .build();
+
+	        result.add(hourly);
+	    }
+
+	    return result;
+	}
+	
+	private LocalDateTime resolveHourlyBucket(
+	        StockIntradayPrice price) {
+
+	    LocalDateTime time =
+	            price.getTradingTime();
+
+	    return time
+	            .withMinute(0)
+	            .withSecond(0)
+	            .withNano(0);
+	}
+	
+	private boolean isCompletedHourlyBucket(
+	        LocalDateTime bucketTime,
+	        LocalDateTime latestYahooTime) {
+
+	    if (bucketTime == null || latestYahooTime == null) {
+	        return false;
+	    }
+
+	    LocalDateTime bucketEnd =
+	            bucketTime.plusHours(1);
+
+	    return !latestYahooTime.isBefore(bucketEnd);
 	}
 }
