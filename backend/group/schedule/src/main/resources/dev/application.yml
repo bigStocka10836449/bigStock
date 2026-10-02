@@ -26,15 +26,16 @@ spring:
       hibernate:
         show-sql: true   
   redis:
-    host: ${SPRING_REDIS_HOST}
-    password: ${SPRING_REDIS_PASSWORD}
-    lettuce:
-      pool:
-        max-active: 200
-        max-idle: 500
-        min-idle: 10
-        max-wait: 100000
-    port: ${SPRING_REDIS_PORT}   
+    data: 
+      host: ${SPRING_REDIS_HOST}
+      password: ${SPRING_REDIS_PASSWORD}
+      lettuce:
+        pool:
+          max-active: 200
+          max-idle: 500
+          min-idle: 10
+          max-wait: 100000
+      port: ${SPRING_REDIS_PORT}   
             
 logging:
   config: classpath:logback.xml
