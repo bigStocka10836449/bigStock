@@ -14,21 +14,24 @@ import com.bigstock.sharedComponent.utils.ByteArrayRedisSerializer;
 @Configuration
 public class BstockCacheConfig {
 
-    @Value("${spring.redis.host}")
-    private String host;
+	@Value("${spring.data.redis.host}")
+	private String host;
 
-    @Value("${spring.redis.port}")
-    private int port;
+	@Value("${spring.data.redis.port}")
+	private Integer port;
+	
+	@Value("${spring.data.redis.password}")
+	private String password;
 
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
 
         LettuceConnectionFactory factory =
-                new LettuceConnectionFactory(host, port);
+                new LettuceConnectionFactory(host,  port);
 
         factory.setValidateConnection(true);
         factory.setShareNativeConnection(false);
-
+        factory.setPassword(password);
         return factory;
     }
 
