@@ -15,11 +15,14 @@ public class BstockRedissonConfiguration {
 
 	@Value("${spring.redis.port}")
 	private String port;
+	
+	@Value("${spring.redis.password}")
+	private String password;
 	@Bean
 	public RedissonClient redissonClient() {
 		// Redis 连接配置，可以根据实际情况进行修改
 		Config config = new Config();
-		config.useSingleServer().setAddress("redis://" + host + ":" + port);
+		config.useSingleServer().setAddress("redis://" + host + ":" + port) .setPassword(password);
 		// 初始化 RedissonClient
 		return Redisson.create(config);
 	}
