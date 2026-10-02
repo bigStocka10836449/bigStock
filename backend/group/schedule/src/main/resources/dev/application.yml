@@ -27,6 +27,7 @@ spring:
         show-sql: true   
   redis:
     host: ${SPRING_REDIS_HOST}
+    password: ${SPRING_REDIS_PASSWORD}
     lettuce:
       pool:
         max-active: 200
