@@ -32,6 +32,7 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -474,6 +475,7 @@ public class CacheOperatorService {
 		String redisKey = buildKey(cacheName, key);
 	    try {
 	    	ObjectMapper objectMapper = new ObjectMapper();
+	    	objectMapper.registerModule(new JavaTimeModule());
 			byte[] jsonByte = objectMapper.writeValueAsBytes(data);
 
 	        String versionKey =
@@ -550,6 +552,7 @@ public class CacheOperatorService {
 
 	    List<T> result = new ArrayList<>();
 	    ObjectMapper objectMapper = new ObjectMapper();
+	    objectMapper.registerModule(new JavaTimeModule());
 
 	    RedisConnection connection = null;
 	    Cursor<byte[]> cursor = null;

@@ -78,7 +78,7 @@ public class GrabFromThirdParty {
 	}
 
 
-	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
+	@Scheduled(cron = "0 45 15 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
 			return !data.matches(".*[a-zA-Z].*");
