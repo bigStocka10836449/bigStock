@@ -1,12 +1,15 @@
 package com.bigstock.schedule.service;
 
 
+
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -22,7 +25,6 @@ import com.bigstock.sharedComponent.redis.StockTrendRedisService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockInfoService;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 @Service
@@ -143,13 +145,11 @@ public class CalculateCosineSimilarityVectorService {
                     stockCode
             );
 
-
             List<StockDayPrice> prices =
                     stockDayPriceService
                             .findLastest600StockDayPriceByStockCodeCache(
                                     stockCode
                             );
-
 
             if (CollectionUtils.isEmpty(prices)) {
 
@@ -162,70 +162,112 @@ public class CalculateCosineSimilarityVectorService {
             }
 
             /*
-             * DEBUG duplicate trading dates BEFORE calculationVectors()
+             * Deduplicate by trading date.
+             *
+             * If multiple records exist on the same trading date,
+             * keep the record with the latest tradingDay time.
+             *
+             * Example:
+             *
+             * 2026-09-30 00:00:00
+             * 2026-09-30 14:59:43  <- keep this one
              */
-            Map<LocalDate, List<StockDayPrice>> groupedByDate =
+            Map<LocalDate, StockDayPrice> latestPriceByDate =
                     prices.stream()
                             .collect(
-                                    Collectors.groupingBy(
+                                    Collectors.toMap(
+
+                                            // Key: trading date
                                             item ->
                                                     item.getTradingDay()
                                                             .toInstant()
                                                             .atZone(
                                                                     ZoneId.systemDefault()
                                                             )
-                                                            .toLocalDate()
+                                                            .toLocalDate(),
+
+                                            // Value: StockDayPrice itself
+                                            Function.identity(),
+
+                                            // Duplicate trading date
+                                            (existing, incoming) -> {
+
+                                                StockDayPrice keep;
+                                                StockDayPrice discard;
+
+                                                if (incoming.getTradingDay()
+                                                        .after(existing.getTradingDay())) {
+
+                                                    keep = incoming;
+                                                    discard = existing;
+
+                                                } else {
+
+                                                    keep = existing;
+                                                    discard = incoming;
+                                                }
+
+                                                log.warn(
+                                                        "Duplicate trading date found, "
+                                                                + "stockCode={}, "
+                                                                + "tradingDate={}, "
+                                                                + "keepTradingDay={}, "
+                                                                + "discardTradingDay={}, "
+                                                                + "keepClose={}, "
+                                                                + "discardClose={}",
+                                                        stockCode,
+                                                        keep.getTradingDay()
+                                                                .toInstant()
+                                                                .atZone(
+                                                                        ZoneId.systemDefault()
+                                                                )
+                                                                .toLocalDate(),
+                                                        keep.getTradingDay(),
+                                                        discard.getTradingDay(),
+                                                        keep.getClosingPrice(),
+                                                        discard.getClosingPrice()
+                                                );
+
+                                                return keep;
+                                            }
                                     )
                             );
 
-            groupedByDate.forEach(
-                    (tradingDate, records) -> {
+            /*
+             * Convert back to List and restore chronological order.
+             *
+             * Do not rely on Map iteration order because
+             * calculationVectors() works with time-series data.
+             */
+            List<StockDayPrice> deduplicatedPrices =
+                    latestPriceByDate.values()
+                            .stream()
+                            .sorted(
+                                    Comparator.comparing(
+                                            StockDayPrice::getTradingDay
+                                    )
+                            )
+                            .toList();
 
-                        if (records.size() <= 1) {
-                            return;
-                        }
+            if (prices.size() != deduplicatedPrices.size()) {
 
-                        log.error(
-                                "SOURCE DUPLICATE FOUND "
-                                        + "stockCode={}, tradingDate={}, count={}",
-                                stockCode,
-                                tradingDate,
-                                records.size()
-                        );
-
-                        for (int i = 0; i < records.size(); i++) {
-
-                            StockDayPrice record =
-                                    records.get(i);
-
-                            log.error(
-                                    "duplicate[{}] "
-                                            + "rawTradingDay={}, "
-                                            + "close={}, "
-                                            + "volume={}, "
-                                            + "ma5={}, "
-                                            + "ma10={}, "
-                                            + "ma20={}, "
-                                            + "ma60={}, "
-                                            + "entity={}",
-                                    i,
-                                    record.getTradingDay(),
-                                    record.getClosingPrice(),
-                                    record.getTradingVolume(),
-                                    record.getFiveDaysMa(),
-                                    record.getTenDaysMa(),
-                                    record.getTwentyDaysMa(),
-                                    record.getSixtyDaysMa(),
-                                    record
-                            );
-                        }
-                    }
-            );
-
+                log.warn(
+                        "Stock prices deduplicated, "
+                                + "stockCode={}, "
+                                + "originalSize={}, "
+                                + "deduplicatedSize={}, "
+                                + "removed={}",
+                        stockCode,
+                        prices.size(),
+                        deduplicatedPrices.size(),
+                        prices.size() - deduplicatedPrices.size()
+                );
+            }
 
             return stockDayPriceService
-                    .calculationVectors(prices);
-
+                    .calculationVectors(
+                            deduplicatedPrices
+                    );
 
         } catch (Exception e) {
 
@@ -238,7 +280,6 @@ public class CalculateCosineSimilarityVectorService {
             return null;
         }
     }
-
 
     private void reloadPythonCache() {
 
