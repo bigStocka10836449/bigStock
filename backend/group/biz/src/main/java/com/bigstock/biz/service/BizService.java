@@ -277,8 +277,8 @@ public class BizService {
 	    // 以下週/月先不要改
 	    List<SingleStockWeekPriceVo> singleStockWeekPriceVo = stockWeekPriceService
 	            .findStockCodeAndLimit(stockCode, 500).stream()
-	            .sorted(Comparator.comparing(StockWeekPrice::getWeekOfYear))
-	            .map(stockWeekPrice -> {
+	            // 依日期由舊到新排序
+		         .sorted(Comparator.comparing(StockWeekPrice::getFirstTradingDay)).map(stockWeekPrice -> {
 	                SingleStockWeekPriceVo vo = new SingleStockWeekPriceVo();
 	                vo.setStockName(singleStockName);
 	                vo.setClosingPrice(stockWeekPrice.getClosingPrice().toString());
@@ -315,7 +315,9 @@ public class BizService {
 	                        ObjectUtils.isNotEmpty(stockWeekPrice.getLineDValue()) ? stockWeekPrice.getLineDValue()
 	                                : new BigDecimal(0));
 	                return vo;
-	            }).toList();
+	            })
+
+	         .toList();
 
 	    List<SingleStockMonthPriceVo> singleStockMonthPriceVo = stockMonthPriceService
 	            .findStockCodeAndLimit(stockCode, 240).stream()

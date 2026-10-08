@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.bigstock.sharedComponent.dto.FcmRegisterRequest;
 import com.bigstock.sharedComponent.dto.FcmVerifyRequest;
 import com.bigstock.sharedComponent.entity.FcmRecord;
+import com.bigstock.sharedComponent.enums.DeviceType;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.repository.FcmRecordRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -97,11 +98,13 @@ public class FcmRecordService {
 		device.setFcmToken(request.getFcmToken());
 		device.setStatus("0");
 		device.setChallenge(challengeId);
+		device.setDeviceType(
+				ObjectUtils.isEmpty(request.getDeviceType()) ? DeviceType.ANDROID : request.getDeviceType());
 		device.setChallengeExpiresAt(
 				Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant()));
 		device.setLastSeenAt(
 				Date.from(LocalDateTime.now().plusMinutes(120).atZone(ZoneId.systemDefault()).toInstant()));
-
+		
 		fcmRecordRepository.save(device);
 
 		return challengeId;
@@ -149,5 +152,10 @@ public class FcmRecordService {
 	public FcmRecord save(FcmRecord fcmRecord, String cacheKey) throws JsonProcessingException {
 		cacheOperatorService.putObject("ultraLongLivedCache", "FcmRecord:Valid:" + cacheKey, fcmRecord, Duration.ofMinutes(125));
 		return fcmRecordRepository.save(fcmRecord);
+	}
+	
+	public int deleteByDeviceTypeAndLastSeenAtBefore(DeviceType deviceType, LocalDateTime cutoff) {
+		int deleted = fcmRecordRepository.deleteByDeviceTypeAndLastSeenAtBefore(deviceType, cutoff);
+		return deleted;
 	}
 }

@@ -2,8 +2,12 @@ package com.bigstock.sharedComponent.entity;
 
 import java.util.Date;
 
+import com.bigstock.sharedComponent.enums.DeviceType;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Data;
@@ -37,4 +41,11 @@ public class FcmRecord {
     
     @Column(name = "allowed_jwt")
     private String allowedJwt;
+    
+    /**
+     * WEB / ANDROID / IOS
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 7)
+    private DeviceType deviceType;
 }

@@ -34,7 +34,7 @@ public class FinancialCalendar{
 	@Column(name = "data_type_name")
 	private String dataTypeName;
 
-	@Column(name = "article_id")
+	@Column(name = "article_id", nullable = true)
 	private Long articleId;
 
 	@Column(name = "hyper_link")
