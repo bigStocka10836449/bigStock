@@ -47,52 +47,61 @@ public class FinancialCalendarService {
 	
 	public List<FinancialCalendar> getFinancialCalendar() {
 
-	    LocalDate ld = LocalDate.now().minusMonths(1);
+	    LocalDate startDate =
+	            LocalDate.now().minusMonths(1);
 
+	    List<String> cacheKeys = new ArrayList<>();
+
+	    // 1. Build all cache keys
+	    for (int index = 0; index < 4; index++) {
+
+	        LocalDate date = startDate.plusMonths(index);
+
+	        String yearMonth = String.format(
+	                "%04d:%02d",
+	                date.getYear(),
+	                date.getMonthValue()
+	        );
+
+	        for (String platform : PLAT_FORMS) {
+
+	            cacheKeys.add(
+	                    "financialCalendar:" +
+	                    yearMonth + ":" + platform
+	            );
+	        }
+	    }
+
+	    // 2. Batch Redis read
+	    Map<String, List<FinancialCalendar>> dataMap =
+	            cacheOperatorService.getSnapshotDataListBatch(
+	                    "ultraLongLivedCache",
+	                    cacheKeys,
+	                    FinancialCalendar.class
+	            );
+
+	    // 3. Deduplicate by ID
 	    Map<String, FinancialCalendar> uniqueCalendars =
 	            new LinkedHashMap<>();
 
-	    for (int index = 0; index < 4; index++) {
+	    for (List<FinancialCalendar> calendars : dataMap.values()) {
 
-	        int year = ld.getYear();
-	        int monthValue = ld.getMonthValue();
+	        if (CollectionUtils.isEmpty(calendars)) {
+	            continue;
+	        }
 
-	        PLAT_FORMS.forEach(platForm -> {
+	        for (FinancialCalendar calendar : calendars) {
 
-	            String cacheKey =
-	                    "financialCalendar:" + year + ":"
-	                    + String.format("%02d", monthValue)
-	                    + ":" + platForm;
-
-	            List<FinancialCalendar> currentFinancialCalendars =
-	                    cacheOperatorService.getSnapshotDataList(
-	                            "ultraLongLivedCache",
-	                            cacheKey,
-	                            FinancialCalendar.class
-	                    );
-
-	            if (CollectionUtils.isEmpty(currentFinancialCalendars)) {
-	                return;
+	            if (calendar == null ||
+	                    calendar.getId() == null) {
+	                continue;
 	            }
 
-	            for (FinancialCalendar calendar : currentFinancialCalendars) {
-
-	                if (calendar == null) {
-	                    continue;
-	                }
-
-	                String id = calendar.getId();
-
-	                if (id == null) {
-	                    continue;
-	                }
-
-	                FinancialCalendar existing =
-	                        uniqueCalendars.putIfAbsent(id, calendar);
-	            }
-	        });
-
-	        ld = ld.plusMonths(1);
+	            uniqueCalendars.putIfAbsent(
+	                    calendar.getId(),
+	                    calendar
+	            );
+	        }
 	    }
 
 	    return new ArrayList<>(uniqueCalendars.values());

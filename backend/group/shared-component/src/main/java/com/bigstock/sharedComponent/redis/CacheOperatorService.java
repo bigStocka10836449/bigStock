@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -16,6 +17,7 @@ import java.util.function.ToDoubleFunction;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -622,6 +624,117 @@ public class CacheOperatorService {
 	        return List.of();
 	    }
 	}
+	
+	public <T> Map<String, List<T>> getSnapshotDataListBatch(
+	        String cacheName,
+	        List<String> keys,
+	        Class<T> clazz
+	) {
+		ObjectMapper objectMapper = new ObjectMapper();
+	    Map<String, List<T>> result = new LinkedHashMap<>();
+
+	    if (CollectionUtils.isEmpty(keys)) {
+	        return result;
+	    }
+
+	    try {
+
+	        // 1. Build Redis keys
+	        List<String> redisKeys = new ArrayList<>();
+	        List<String> activeKeys = new ArrayList<>();
+
+	        for (String key : keys) {
+
+	            String redisKey = buildKey(cacheName, key);
+
+	            redisKeys.add(redisKey);
+	            activeKeys.add(redisKey + ":active");
+	        }
+
+	        // 2. Batch GET active pointers
+	        List<byte[]> activeVersions =
+	                rawRedisTemplate.opsForValue()
+	                        .multiGet(activeKeys);
+
+	        if (activeVersions == null) {
+	            return result;
+	        }
+
+	        // 3. Build version keys
+	        List<String> versionKeys = new ArrayList<>();
+	        List<String> validKeys = new ArrayList<>();
+
+	        for (int i = 0; i < activeVersions.size(); i++) {
+
+	            byte[] activeBytes = activeVersions.get(i);
+
+	            if (activeBytes == null) {
+	                continue;
+	            }
+
+	            String versionKey = new String(
+	                    activeBytes,
+	                    StandardCharsets.UTF_8
+	            );
+
+	            versionKeys.add(versionKey);
+	            validKeys.add(keys.get(i));
+	        }
+
+	        if (versionKeys.isEmpty()) {
+	            return result;
+	        }
+
+	        // 4. Batch GET snapshot data
+	        List<byte[]> snapshots =
+	                rawRedisTemplate.opsForValue()
+	                        .multiGet(versionKeys);
+
+	        if (snapshots == null) {
+	            return result;
+	        }
+
+	        // 5. Deserialize JSON
+	        JavaType type = objectMapper.getTypeFactory()
+	                .constructCollectionType(List.class, clazz);
+
+	        for (int i = 0; i < snapshots.size(); i++) {
+
+	            byte[] json = snapshots.get(i);
+
+	            if (json == null) {
+	                continue;
+	            }
+
+	            try {
+
+	                List<T> data =
+	                        objectMapper.readValue(json, type);
+
+	                result.put(validKeys.get(i), data);
+
+	            } catch (Exception e) {
+
+	                log.error(
+	                        "Deserialize snapshot failed key={}",
+	                        validKeys.get(i),
+	                        e
+	                );
+	            }
+	        }
+
+	    } catch (Exception e) {
+
+	        log.error(
+	                "Batch snapshot read failed cacheName={}",
+	                cacheName,
+	                e
+	        );
+	    }
+
+	    return result;
+	}
+	
 	public <T> T getSnapshotData(
 	        String cacheName,
 	        String key,
