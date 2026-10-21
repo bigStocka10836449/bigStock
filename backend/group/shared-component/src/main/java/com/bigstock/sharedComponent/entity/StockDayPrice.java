@@ -3,7 +3,10 @@ package com.bigstock.sharedComponent.entity;
 import java.io.Serializable;
 import java.util.Date;
 
+import com.bigstock.sharedComponent.NullableDoubleConverter;
+
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
@@ -52,6 +55,7 @@ public class StockDayPrice {
 	@Column(name = "change")
 	private String change;
 	
+	@Convert(converter = NullableDoubleConverter.class)
 	@Column(name = "change_rate")
 	private Double changeRate;
 	
