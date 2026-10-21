@@ -78,6 +78,7 @@ public class GrabFromThirdParty {
 	}
 
 
+	@PostConstruct
 	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
@@ -609,6 +610,8 @@ public class GrabFromThirdParty {
 		    //上下限值例外處理
 		    upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true, stockType) * 3;
 		    lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false, stockType) * 3;
+		    BigDecimal tempChange = change.setScale(3, RoundingMode.HALF_UP);
+		    stockTwseDayPrice.setChange(tempChange.toString());
 		}
 
 		stockTwseDayPrice.setLimitDown(lowerLimitPrice.toString());
