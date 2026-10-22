@@ -221,10 +221,66 @@ public class GrabThirdPartyStockDayPrice {
 					LocalDate endOfWeekLocalDate = today.with(DayOfWeek.SUNDAY);
 					Date startOfWeeDate = Date.from(startOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
 					Date endOfWeekDate = Date.from(endOfWeekLocalDate.atStartOfDay().toInstant(zoneOffset));
-					entity.setOpeningPrice(dataNode.path("regularMarketOpen").path("raw").asText());
-					entity.setClosingPrice(dataNode.path("price").path("raw").asText());
-					entity.setHighPrice(dataNode.path("regularMarketDayHigh").path("raw").asText());
-					entity.setLowPrice(dataNode.path("regularMarketDayLow").path("raw").asText());
+					BigDecimal close = parseYahooPrice(
+						    dataNode.path("price").path("raw")
+						);
+
+						BigDecimal previousClose = parseYahooPrice(
+						    dataNode.path("regularMarketPreviousClose").path("raw")
+						);
+
+						BigDecimal open = parseYahooPrice(
+						    dataNode.path("regularMarketOpen").path("raw")
+						);
+
+						BigDecimal high = parseYahooPrice(
+						    dataNode.path("regularMarketDayHigh").path("raw")
+						);
+
+						BigDecimal low = parseYahooPrice(
+						    dataNode.path("regularMarketDayLow").path("raw")
+						);
+
+						// 1. 收盤價缺失：優先使用當日其他有效價格
+						if (close == null) {
+						    close = low != null ? low : (high != null ? high : open);
+						}
+
+						// 2. 開盤價缺失：昨收價優先，其次當日收盤價
+						if (open == null) {
+						    open = previousClose != null ? previousClose : close;
+						}
+
+						// 3. 如果仍沒有當日價格，略過該筆資料
+						if (close == null) {
+						    log.warn("Yahoo daily price missing: {}",
+						            dataNode.path("symbol").asText());
+						    throw new Exception("stockCode :" + stockCode+ " price Error, skip"); // 若在迴圈中，依情況改成 continue
+						}
+
+						// 4. 最高價缺失：從當日已知價格推估
+						if (high == null) {
+						    high = close;
+						    if (low != null) {
+						        high = high.max(low);
+						    }
+						}
+
+						// 5. 最低價缺失：從當日已知價格推估
+						if (low == null) {
+						    low = close.min(high);
+						}
+
+						// 6. 確保 High >= Low
+						if (high.compareTo(low) < 0) {
+						    high = low;
+						}
+
+						// 7. 寫入 Entity
+						entity.setOpeningPrice(open.toPlainString());
+						entity.setClosingPrice(close.toPlainString());
+						entity.setHighPrice(high.toPlainString());
+						entity.setLowPrice(low.toPlainString());
 					entity.setStartOfWeekDate(startOfWeeDate);
 					entity.setEndOfWeekDate(endOfWeekDate);
 					entity.setWeekOfYear(
@@ -1032,4 +1088,29 @@ public class GrabThirdPartyStockDayPrice {
 
 	    return !latestYahooTime.isBefore(bucketEnd);
 	}
+	
+
+private BigDecimal parseYahooPrice(JsonNode node) {
+
+    if (node == null || node.isMissingNode() || node.isNull()) {
+        return null;
+    }
+
+    String value = node.asText().trim();
+
+    if (value.isEmpty()
+            || value.equals("-")
+            || value.equals("--")
+            || value.equals("----")
+            || value.equalsIgnoreCase("N/A")) {
+        return null;
+    }
+
+    try {
+        return new BigDecimal(value.replace(",", ""));
+    } catch (NumberFormatException e) {
+        return null;
+    }
+}
+
 }
