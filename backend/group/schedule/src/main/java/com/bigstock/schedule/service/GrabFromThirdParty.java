@@ -960,6 +960,7 @@ public class GrabFromThirdParty {
 		List<StockIntradayPrice> allStockFiveIntradayPrices = Lists.newArrayList();
 		List<StockIntradayPrice> allStockSixtyIntradayPrices = Lists.newArrayList();
 		allStockCodes.addAll(stockCodes);
+//		allStockCodes.add("2330");
 		allStockCodes.forEach(stockCode -> {
 			// 額外執行抓取5分K 與60分K內容
 			try {
@@ -980,10 +981,10 @@ public class GrabFromThirdParty {
 				.collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
 		
 		// 抓取目前DB 5分K 60分K 最新60筆資料庫內容
-		Map<String, List<StockIntradayPrice>> sixtyIntradayPriceDbInfoGroup = stockIntradayPriceService
-				.getTop60ByPeriod("60").stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
-		Map<String, List<StockIntradayPrice>> fiveIntradayPriceDbInfoGroup = stockIntradayPriceService
-				.getTop60ByPeriod("5").stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
+//		Map<String, List<StockIntradayPrice>> sixtyIntradayPriceDbInfoGroup = stockIntradayPriceService
+//				.getTop60ByPeriod("60").stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
+//		Map<String, List<StockIntradayPrice>> fiveIntradayPriceDbInfoGroup = stockIntradayPriceService
+//				.getTop60ByPeriod("5").stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
 
 		// 存放整理完後的 5分K 與 60分K內容
 		List<StockIntradayPrice> adjustmentedStockIntradayPrices = Lists.newArrayList();
@@ -996,9 +997,9 @@ public class GrabFromThirdParty {
 			}
 			List<StockIntradayPrice> fiveIntradayPriceYahooInfos = entry.getValue();
 
-			List<StockIntradayPrice> fiveIntradayPriceDbInfos = fiveIntradayPriceDbInfoGroup.getOrDefault(stockCode, Lists.newArrayList());
+			List<StockIntradayPrice> fiveIntradayPriceDbInfos = fiveIntradayPriceYahooInfoGroup.getOrDefault(stockCode, Lists.newArrayList());
 			LocalDateTime lastTradingDateTime = fiveIntradayPriceDbInfos.stream()
-					.map(StockIntradayPrice::getTradingTime).max(LocalDateTime::compareTo)
+					.map(StockIntradayPrice::getTradingTime).min(LocalDateTime::compareTo)
 					.orElse(perviouslyTradingDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
 			List<StockIntradayPrice> avaliableStockIntradayPrices = fiveIntradayPriceYahooInfos.stream()
 					.filter(iveIntradayPriceYahooInfo -> iveIntradayPriceYahooInfo.getTradingTime()
@@ -1024,9 +1025,9 @@ public class GrabFromThirdParty {
 			}
 			List<StockIntradayPrice> sixtyIntradayPriceYahooInfos = entry.getValue();
 
-			List<StockIntradayPrice> fiveIntradayPriceDbInfos = sixtyIntradayPriceDbInfoGroup.getOrDefault(stockCode, Lists.newArrayList());
+			List<StockIntradayPrice> fiveIntradayPriceDbInfos = sixtyIntradayPriceYahooInfoGroup.getOrDefault(stockCode, Lists.newArrayList());
 			LocalDateTime lastTradingDateTime = fiveIntradayPriceDbInfos.stream()
-					.map(StockIntradayPrice::getTradingTime).max(LocalDateTime::compareTo)
+					.map(StockIntradayPrice::getTradingTime).min(LocalDateTime::compareTo)
 					.orElse(perviouslyTradingDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
 			List<StockIntradayPrice> avaliableStockIntradayPrices = sixtyIntradayPriceYahooInfos.stream()
 					.filter(iveIntradayPriceYahooInfo -> iveIntradayPriceYahooInfo.getTradingTime()
