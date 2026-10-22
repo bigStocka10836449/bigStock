@@ -69,7 +69,7 @@ public class GrabFromThirdParty {
 
 	private final StockIntradayPriceService stockIntradayPriceService;
 
-	
+	@PostConstruct
 	@Scheduled(cron = "0 50 20 * * ?", zone = "Asia/Taipei")
 	public void updateStockIntradayPriceByThirdParty() throws Exception {
 		doCalculateIntradayPrices("0");
@@ -78,7 +78,7 @@ public class GrabFromThirdParty {
 	}
 
 
-	@PostConstruct
+	
 	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
 	public void updateStockDayPriceByThirdParty() throws Exception {
 		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
