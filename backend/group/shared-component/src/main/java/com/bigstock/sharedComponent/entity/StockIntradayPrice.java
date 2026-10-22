@@ -1,8 +1,7 @@
 package com.bigstock.sharedComponent.entity;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
-
-import com.bigstock.sharedComponent.entity.StockIntradayPrice.StockIntradayPriceId;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -20,7 +19,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Entity
 @Table(name = "stock_intraday_price", schema = "bstock")
-@IdClass(StockIntradayPriceId.class)
+@IdClass(StockIntradayPrice.StockIntradayPriceId.class)
 public class StockIntradayPrice {
 
     @Id
@@ -70,16 +69,17 @@ public class StockIntradayPrice {
 
     @Column(name = "line_d_value")
     private Double lineDValue;
-    
+
+    // Composite Primary Key
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public class StockIntradayPriceId {
+    public static class StockIntradayPriceId implements Serializable {
+
+        private static final long serialVersionUID = 1L;
 
         private String stockCode;
-
         private LocalDateTime tradingTime;
-
         private String period;
     }
 }
