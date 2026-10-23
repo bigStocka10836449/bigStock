@@ -24,7 +24,9 @@ import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.redis.StockTrendRedisService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockInfoService;
+import com.google.common.collect.Lists;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 @Service
@@ -40,7 +42,7 @@ public class CalculateCosineSimilarityVectorService {
     @Value("${schedule.task.scheduling.similiar-search-reload}")
     private String similiarSearchReloadUrl;
 
-//    @PostConstruct
+    @PostConstruct
     @Async("stockVectorExecutor")
     public void calculateAsDailyAspect() {
 
@@ -239,15 +241,15 @@ public class CalculateCosineSimilarityVectorService {
              * Do not rely on Map iteration order because
              * calculationVectors() works with time-series data.
              */
-            List<StockDayPrice> deduplicatedPrices =
-                    latestPriceByDate.values()
-                            .stream()
-                            .sorted(
-                                    Comparator.comparing(
-                                            StockDayPrice::getTradingDay
-                                    )
+            List<StockDayPrice> deduplicatedPrices = Lists.newArrayList(latestPriceByDate.values()
+                    .stream()
+                    .sorted(
+                            Comparator.comparing(
+                                    StockDayPrice::getTradingDay
                             )
-                            .toList();
+                    )
+                    .toList())
+                    ;
 
             if (prices.size() != deduplicatedPrices.size()) {
 
