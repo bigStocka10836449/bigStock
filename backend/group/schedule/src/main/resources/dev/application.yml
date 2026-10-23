@@ -59,7 +59,7 @@ schedule:
           update-margin-trading: "0 30 8 * * *"
           update-threeInsti: "0 30 18 * * *"
           update-monthlyRevenue: "0 0 8 * * SUN"
-      similiar-search-reload: https://bigstock-similiarearch.zeabur.app/cache/reload    
+      similiar-search-reload: ${SCHEDULE_SIMILIAR_SEARCH_RELOAD_URL:http://bigstock-python-api:8080/cache/reload}    
   chromeDriverPath:
     windows: 
       active: false	
