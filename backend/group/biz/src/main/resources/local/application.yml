@@ -1,3 +1,5 @@
+app:
+  env: local
 server:
   port: 18080
   shutdown: graceful
@@ -23,12 +25,12 @@ spring:
   main:
     allow-bean-definition-overriding: true
   datasource:
-    url: jdbc:postgresql://43.153.144.80:31482/bstock
-    username: bstockuser
-    password: postgresql
+    url: jdbc:postgresql://127.0.0.1:15432/bstock
+    username: 
+    password: 
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 20
+      maximum-pool-size: 5
       leak-detection-threshold: 10000
   jpa:
     hibernate:
@@ -40,21 +42,23 @@ spring:
           batch_size: 100
         order_inserts: true
         order_updates: true     
-  redis:
-    host: 43.153.144.80
-    lettuce:
-      pool:
-        max-active: 200
-        max-idle: 500
-        min-idle: 10
-        max-wait: 100000
-    port: 32666
+  data: 
+    redis:
+      host: 127.0.0.1
+      password: 
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 2
+          max-wait: 100000
+      port:   
   mail:
     host: smtp.gmail.com
     port: 587
-    username: a26404691@gmail.com
+    username: 1123@gmail.com
     password: uynt zdgf suhj cjmi
-    from: a26404691@gmail.com
+    from: 1234@gmail.com
     properties:
       mail:
         smtp:
