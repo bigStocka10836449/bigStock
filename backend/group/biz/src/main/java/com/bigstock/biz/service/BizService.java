@@ -2,30 +2,32 @@ package com.bigstock.biz.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Array;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.temporal.IsoFields;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.juli.logging.Log;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import com.bigstock.biz.controller.GatewayController;
 import com.bigstock.biz.domain.StockDayPriceNativeQueryService;
 import com.bigstock.biz.domain.StockMonthPriceNativeQueryService;
 import com.bigstock.biz.domain.StockWeekPriceNativeQueryService;
@@ -50,9 +52,11 @@ import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockExchangeDetailService;
 import com.bigstock.sharedComponent.service.StockInfoService;
 import com.bigstock.sharedComponent.service.StockMonthPriceService;
+import com.bigstock.sharedComponent.service.StockTagCacheService;
 import com.bigstock.sharedComponent.service.StockWeekPriceService;
 import com.google.common.collect.Lists;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -85,6 +89,152 @@ public class BizService {
 
 	private final StockInfoService stockInfoService;
 
+	  private final JdbcTemplate jdbcTemplate;
+	    private final StockTagCacheService stockTagCacheService;
+
+	    @PostConstruct
+	    public void syncFromDatabase() {
+
+	        log.info("Start syncing stock tags from PostgreSQL to Redis");
+
+	        // 1. 取得 Tag Mapping: tag -> tagName
+	        String mappingSql = """
+	            SELECT tag, tag_name
+	            FROM bstock.stock_info_tag_mapping
+	            ORDER BY tag
+	            """;
+
+	        Map<String, String> tagNameMap = new LinkedHashMap<>();
+
+	        jdbcTemplate.query(mappingSql, rs -> {
+	            String tag = rs.getString("tag");
+	            String tagName = rs.getString("tag_name");
+
+	            if (tag != null && !tag.isBlank()) {
+	                tagNameMap.put(tag, tagName);
+	            }
+	        });
+
+	        // 2. 取得 Stock -> Tags
+	        String stockSql = """
+	            SELECT stock_code, tags
+	            FROM bstock.stock_info_tag
+	            ORDER BY stock_code
+	            """;
+
+	        Map<String, List<String>> stockTagMap =
+	                new LinkedHashMap<>();
+
+	        // 反向整理成 Tag -> StockCodes
+	        Map<String, Set<String>> tagStockMap =
+	                new LinkedHashMap<>();
+
+	        jdbcTemplate.query(stockSql, rs -> {
+
+	            String stockCode = rs.getString("stock_code");
+	            Array sqlArray = rs.getArray("tags");
+
+	            if (stockCode == null || stockCode.isBlank()) {
+	                return;
+	            }
+
+	            Set<String> tags = new LinkedHashSet<>();
+
+	            if (sqlArray != null) {
+	                try {
+	                    String[] values =
+	                            (String[]) sqlArray.getArray();
+
+	                    for (String tag : values) {
+	                        if (tag != null && !tag.isBlank()) {
+	                            tags.add(tag.trim());
+	                        }
+	                    }
+	                } finally {
+	                    sqlArray.free();
+	                }
+	            }
+
+	            List<String> tagList = new ArrayList<>(tags);
+
+	            stockTagMap.put(stockCode, tagList);
+
+	            for (String tag : tagList) {
+	                tagStockMap
+	                    .computeIfAbsent(
+	                        tag,
+	                        k -> new LinkedHashSet<>()
+	                    )
+	                    .add(stockCode);
+	            }
+	        });
+
+	        // 防止資料庫查詢異常或空資料誤覆蓋快取
+	        if (tagNameMap.isEmpty() || stockTagMap.isEmpty()) {
+	            throw new IllegalStateException(
+	                "Stock tag database data is empty. Sync aborted."
+	            );
+	        }
+
+	        // 確認所有股票標籤都有對應名稱
+	        Set<String> missingTags =
+	                new LinkedHashSet<>(tagStockMap.keySet());
+
+	        missingTags.removeAll(tagNameMap.keySet());
+
+	        if (!missingTags.isEmpty()) {
+	            throw new IllegalStateException(
+	                "Missing tag mappings: " + missingTags
+	            );
+	        }
+
+	        // 3. Tag -> Stocks，使用原本 Redis 寫入方法
+	        int tagCount = 0;
+
+	        for (Map.Entry<String, String> entry :
+	                tagNameMap.entrySet()) {
+
+	            String tag = entry.getKey();
+	            String tagName = entry.getValue();
+
+	            Collection<String> stockCodes =
+	                    tagStockMap.getOrDefault(
+	                        tag,
+	                        Collections.emptySet()
+	                    );
+
+	            stockTagCacheService.cacheTagStocks(
+	                tag,
+	                tagName,
+	                stockCodes
+	            );
+
+	            tagCount++;
+	        }
+
+	        // 4. Stock -> Tags，使用原本 Redis 寫入方法
+	        int stockCount = 0;
+
+	        for (Map.Entry<String, List<String>> entry :
+	                stockTagMap.entrySet()) {
+
+	            stockTagCacheService.cacheStockTags(
+	                entry.getKey(),
+	                entry.getValue()
+	            );
+
+	            stockCount++;
+	        }
+
+	        log.info(
+	            "Stock tag Redis sync completed. " +
+	            "tagCount={}, stockCount={}",
+	            tagCount,
+	            stockCount
+	        );
+	    }
+	
+	
 	public List<StockExchangeDetail> getStockExchangeDetail(String stockCode, Date tradeDate) {
 		return stockExchangeDetailService.findByStockCodeAndTradingDateOrderBySeqAsc(stockCode, tradeDate);
 	}
