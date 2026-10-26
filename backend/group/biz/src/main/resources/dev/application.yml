@@ -1,10 +1,10 @@
 security:
-turnstile:
-  secret-key: ${TURNSTILE_SECRET_KEY}
-  expected-hostname: ${TURNSTILE_HOSTNAME:localhost}
-  expected-action: ${TURNSTILE_ACTION:fcm_challenge}
-  connect-timeout: 3000
-  read-timeout: 5000
+  turnstile:
+    secret-key: ${TURNSTILE_SECRET_KEY}
+    expected-hostname: ${TURNSTILE_HOSTNAME:localhost}
+    expected-action: ${TURNSTILE_ACTION:fcm_challenge}
+    connect-timeout: 3000
+    read-timeout: 5000
 server:
   port: 18080
   shutdown: graceful
