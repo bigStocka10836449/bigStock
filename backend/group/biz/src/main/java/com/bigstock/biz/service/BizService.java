@@ -92,7 +92,7 @@ public class BizService {
 	  private final JdbcTemplate jdbcTemplate;
 	    private final StockTagCacheService stockTagCacheService;
 
-	    @PostConstruct
+//	    @PostConstruct
 	    public void syncFromDatabase() {
 
 	        log.info("Start syncing stock tags from PostgreSQL to Redis");
