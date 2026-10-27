@@ -1,15 +1,16 @@
 package com.bigstock.sharedComponent.repository;
 
-import com.bigstock.sharedComponent.entity.StockRevenue;
-import com.bigstock.sharedComponent.entity.StockRevenueId;
+import java.time.LocalDate;
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDate;
-import java.util.List;
+import com.bigstock.sharedComponent.entity.StockRevenue;
+import com.bigstock.sharedComponent.entity.StockRevenueId;
 
 public interface StockRevenueRepository extends JpaRepository<StockRevenue, StockRevenueId> {
 
@@ -56,4 +57,12 @@ public interface StockRevenueRepository extends JpaRepository<StockRevenue, Stoc
             @Param("market") String market,
             Pageable pageable
     );
+    
+    @Query(
+    	    "SELECT r FROM StockRevenue r " +
+    	    "WHERE r.id.revenueMonth IN :months"
+    	)
+    	List<StockRevenue> findByRevenueMonths(
+    	        @Param("months") List<LocalDate> months
+    	);
 }

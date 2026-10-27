@@ -1,96 +1,629 @@
 package com.bigstock.sharedComponent.service;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialResponse;
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
 
-import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
-public class QuarterlyFinancialRedisService {
+public class QuarterlyFinancialRedisService
+        implements ApplicationRunner {
 
     private final StringRedisTemplate redis;
 
-    // ✅ 這個用 Spring 注入（不要 new ObjectMapper，避免跟全域設定不一致）
     private final ObjectMapper objectMapper;
 
-    // ✅ 新增：shared-component 的 DB upsert service
-    private final StockQuarterFinancialService stockQuarterFinancialService;
+    private final StockQuarterFinancialService
+            stockQuarterFinancialService;
 
-    private static String key(int year, int quarter, String market) {
-        return "FIN:QTR:" + year + "Q" + quarter + ":" + market;
+    private static final String KEY_PATTERN = "FIN:QTR:*";
+
+    private static final int BATCH_SIZE = 100;
+
+    private static final TypeReference<List<QuarterlyFinancialVo>>
+            FINANCIAL_LIST_TYPE =
+            new TypeReference<List<QuarterlyFinancialVo>>() {};
+
+    /**
+     * JVM Memory Cache
+     *
+     * Key:
+     * FIN:QTR:2026Q2:TPEX
+     *
+     * Value:
+     * Map<stockId, QuarterlyFinancialVo>
+     */
+    private final ConcurrentHashMap<String, FinancialSnapshot>
+            memoryCache = new ConcurrentHashMap<>();
+
+    /**
+     * Single-node locking.
+     */
+    private final ConcurrentHashMap<String, Object>
+            keyLocks = new ConcurrentHashMap<>();
+
+
+    // ============================================================
+    // Redis Key
+    // ============================================================
+
+    private static String key(
+            int year,
+            int quarter,
+            String market) {
+
+        return "FIN:QTR:"
+                + year
+                + "Q"
+                + quarter
+                + ":"
+                + market.trim().toUpperCase(Locale.ROOT);
     }
 
-    public void write(int year, int quarter, String market, List<QuarterlyFinancialVo> list) {
-        try {
-            // 1) 寫 Redis（保留你原本行為）
-            String json = objectMapper.writeValueAsString(list);
-            String k = key(year, quarter, market);
-            redis.opsForValue().set(k, json);
-            redis.expire(k, Duration.ofDays(90));
 
-            // 2) ✅ 同步寫 DB（不從 Redis 回寫，直接用當下 list）
-            //    - market 以參數為準（避免 vo 內有人塞錯）
-            //    - Double 兩位小數：shared-component upsert 內會 round2（你也可以在這裡先 round）
-            if (list != null && !list.isEmpty()) {
-                List<QuarterlyFinancialResponse> dtoList = list.stream()
-                        .map(v -> toResponse(year, quarter, market, v))
-                        .collect(Collectors.toList());
+    // ============================================================
+    // Snapshot
+    // ============================================================
 
-                stockQuarterFinancialService.upsertFromNormList(dtoList);
+    private static final class FinancialSnapshot {
+
+        private final Map<String, QuarterlyFinancialVo> stockMap;
+
+        private FinancialSnapshot(
+                Map<String, QuarterlyFinancialVo> stockMap) {
+
+            this.stockMap = Collections.unmodifiableMap(
+                    new HashMap<>(stockMap)
+            );
+        }
+
+        private QuarterlyFinancialVo get(String stockId) {
+            return stockMap.get(stockId);
+        }
+
+        private List<QuarterlyFinancialVo> toList() {
+            return new ArrayList<>(stockMap.values());
+        }
+
+        private int size() {
+            return stockMap.size();
+        }
+    }
+
+
+    // ============================================================
+    // Build Snapshot
+    // ============================================================
+
+    private FinancialSnapshot buildSnapshot(
+            List<QuarterlyFinancialVo> list) {
+
+        Map<String, QuarterlyFinancialVo> stockMap =
+                new HashMap<>(
+                        Math.max(
+                                16,
+                                list == null ? 16 : list.size() * 2
+                        )
+                );
+
+        if (list != null) {
+
+            for (QuarterlyFinancialVo vo : list) {
+
+                if (vo == null || vo.getStockId() == null) {
+                    continue;
+                }
+
+                String stockId = vo.getStockId().trim();
+
+                if (!stockId.isEmpty()) {
+                    stockMap.put(stockId, vo);
+                }
+            }
+        }
+
+        return new FinancialSnapshot(stockMap);
+    }
+
+
+    // ============================================================
+    // Application Startup
+    // ============================================================
+
+    @Override
+    public void run(ApplicationArguments args) {
+
+        log.info(
+                "[FINANCIAL] Starting quarterly financial preload"
+        );
+
+        long start = System.currentTimeMillis();
+
+        preload();
+
+        log.info(
+                "[FINANCIAL] Preload completed, quarters={}, elapsed={}ms",
+                memoryCache.size(),
+                System.currentTimeMillis() - start
+        );
+    }
+
+
+    // ============================================================
+    // PRELOAD
+    //
+    // 1. SCAN Redis keys
+    // 2. Batch MGET
+    // 3. Deserialize
+    // 4. Build snapshots
+    // 5. Publish into JVM
+    // ============================================================
+
+    public void preload() {
+
+        List<String> batch = new ArrayList<>(BATCH_SIZE);
+
+        ScanOptions options = ScanOptions.scanOptions()
+                .match(KEY_PATTERN)
+                .count(200)
+                .build();
+
+        int totalStocks = 0;
+
+        /*
+         * Redis SCAN.
+         *
+         * Avoid Redis KEYS in production.
+         */
+        try (Cursor<String> cursor = redis.scan(options)) {
+
+            while (cursor.hasNext()) {
+
+                String redisKey = cursor.next();
+
+                batch.add(redisKey);
+
+                if (batch.size() >= BATCH_SIZE) {
+
+                    totalStocks += preloadBatch(batch);
+
+                    batch.clear();
+                }
+            }
+
+            /*
+             * Process remaining keys.
+             */
+            if (!batch.isEmpty()) {
+
+                totalStocks += preloadBatch(batch);
+
+                batch.clear();
             }
 
         } catch (Exception e) {
-            throw new RuntimeException("write redis failed", e);
+
+            log.error(
+                    "[FINANCIAL] Preload failed",
+                    e
+            );
+
+            /*
+             * Fail startup rather than silently
+             * serving an incompletely initialized cache.
+             */
+            throw new IllegalStateException(
+                    "Quarterly financial preload failed",
+                    e
+            );
         }
+
+        log.info(
+                "[FINANCIAL] Preloaded quarterly financial records={}",
+                totalStocks
+        );
     }
 
-    public List<QuarterlyFinancialVo> read(int year, int quarter, String market) {
+
+    // ============================================================
+    // PRELOAD BATCH
+    // ============================================================
+
+    private int preloadBatch(List<String> keys) {
+
+        if (keys.isEmpty()) {
+            return 0;
+        }
+
+        /*
+         * MGET:
+         *
+         * One Redis call for multiple quarterly keys.
+         */
+        List<String> jsonList =
+                redis.opsForValue().multiGet(keys);
+
+        if (jsonList == null ||
+                jsonList.size() != keys.size()) {
+
+            throw new IllegalStateException(
+                    "Redis MGET returned unexpected result"
+            );
+        }
+
+        int total = 0;
+
+        for (int i = 0; i < keys.size(); i++) {
+
+            String redisKey = keys.get(i);
+
+            String json = jsonList.get(i);
+
+            if (json == null || json.isBlank()) {
+                continue;
+            }
+
+            try {
+
+                List<QuarterlyFinancialVo> list =
+                        objectMapper.readValue(
+                                json,
+                                FINANCIAL_LIST_TYPE
+                        );
+
+                FinancialSnapshot snapshot =
+                        buildSnapshot(list);
+
+                /*
+                 * Publish entire snapshot.
+                 *
+                 * Synchronize with write() and
+                 * cache-miss loading for this key.
+                 */
+                Object lock = keyLocks.computeIfAbsent(
+                        redisKey,
+                        k -> new Object()
+                );
+
+                synchronized (lock) {
+                    memoryCache.putIfAbsent(
+                            redisKey,
+                            snapshot
+                    );
+                }
+
+                total += snapshot.size();
+
+                log.debug(
+                        "[FINANCIAL] Loaded key={}, stocks={}",
+                        redisKey,
+                        snapshot.size()
+                );
+
+            } catch (Exception e) {
+
+                throw new IllegalStateException(
+                        "Failed to preload key: " + redisKey,
+                        e
+                );
+            }
+        }
+
+        return total;
+    }
+
+
+    // ============================================================
+    // WRITE
+    //
+    // Redis + JVM + PostgreSQL
+    // ============================================================
+
+    public void write(
+            int year,
+            int quarter,
+            String market,
+            List<QuarterlyFinancialVo> list) {
+
+        String redisKey = key(year, quarter, market);
+
+        List<QuarterlyFinancialVo> data =
+                list == null
+                        ? Collections.emptyList()
+                        : new ArrayList<>(list);
+
+        FinancialSnapshot newSnapshot =
+                buildSnapshot(data);
+
+        Object lock = keyLocks.computeIfAbsent(
+                redisKey,
+                k -> new Object()
+        );
+
         try {
-            String json = redis.opsForValue().get(key(year, quarter, market));
-            if (json == null || json.isBlank()) return Collections.emptyList();
-            return objectMapper.readValue(json, new TypeReference<>() {});
+
+            String json =
+                    objectMapper.writeValueAsString(data);
+
+            synchronized (lock) {
+
+                /*
+                 * Redis SET without TTL.
+                 *
+                 * Overwrites the old quarterly snapshot.
+                 */
+                redis.opsForValue().set(
+                        redisKey,
+                        json
+                );
+
+                /*
+                 * Replace entire JVM snapshot.
+                 */
+                memoryCache.put(
+                        redisKey,
+                        newSnapshot
+                );
+            }
+
+            /*
+             * Keep original PostgreSQL upsert.
+             */
+            if (!data.isEmpty()) {
+
+                List<QuarterlyFinancialResponse> dtoList =
+                        data.stream()
+                                .map(v -> toResponse(
+                                        year,
+                                        quarter,
+                                        market,
+                                        v
+                                ))
+                                .collect(Collectors.toList());
+
+                stockQuarterFinancialService
+                        .upsertFromNormList(dtoList);
+            }
+
+            log.info(
+                    "[FINANCIAL] Updated key={}, stocks={}",
+                    redisKey,
+                    newSnapshot.size()
+            );
+
         } catch (Exception e) {
-            throw new RuntimeException("read redis failed", e);
+
+            throw new RuntimeException(
+                    "write quarterly financial failed: "
+                            + redisKey,
+                    e
+            );
         }
     }
 
-    private static QuarterlyFinancialResponse toResponse(int year, int quarter, String market, QuarterlyFinancialVo v) {
-        QuarterlyFinancialResponse d = new QuarterlyFinancialResponse();
+
+    // ============================================================
+    // READ ONE
+    //
+    // Individual stock lookup.
+    // ============================================================
+
+    public QuarterlyFinancialVo readOne(
+            int year,
+            int quarter,
+            String market,
+            String stockId) {
+
+        if (stockId == null || stockId.isBlank()) {
+            return null;
+        }
+
+        FinancialSnapshot snapshot =
+                getOrLoadSnapshot(
+                        key(year, quarter, market)
+                );
+
+        return snapshot.get(stockId.trim());
+    }
+
+
+    // ============================================================
+    // READ ALL
+    // ============================================================
+
+    public List<QuarterlyFinancialVo> read(
+            int year,
+            int quarter,
+            String market) {
+
+        FinancialSnapshot snapshot =
+                getOrLoadSnapshot(
+                        key(year, quarter, market)
+                );
+
+        return snapshot.toList();
+    }
+
+
+    // ============================================================
+    // Memory First, Redis Fallback
+    // ============================================================
+
+    private FinancialSnapshot getOrLoadSnapshot(
+            String redisKey) {
+
+        /*
+         * Fast path:
+         *
+         * No Redis call.
+         * No synchronized block.
+         */
+        FinancialSnapshot snapshot =
+                memoryCache.get(redisKey);
+
+        if (snapshot != null) {
+            return snapshot;
+        }
+
+        /*
+         * Slow path:
+         *
+         * Only when key was not preloaded.
+         */
+        Object lock = keyLocks.computeIfAbsent(
+                redisKey,
+                k -> new Object()
+        );
+
+        synchronized (lock) {
+
+            snapshot = memoryCache.get(redisKey);
+
+            if (snapshot != null) {
+                return snapshot;
+            }
+
+            try {
+
+                String json =
+                        redis.opsForValue().get(redisKey);
+
+                if (json == null || json.isBlank()) {
+                    // Do not cache missing Redis keys.
+                    return buildSnapshot(
+                            Collections.emptyList()
+                    );
+                }
+
+                List<QuarterlyFinancialVo> list =
+                        objectMapper.readValue(
+                                json,
+                                FINANCIAL_LIST_TYPE
+                        );
+
+                snapshot = buildSnapshot(list);
+
+                memoryCache.put(
+                        redisKey,
+                        snapshot
+                );
+
+                return snapshot;
+
+            } catch (Exception e) {
+
+                throw new RuntimeException(
+                        "load quarterly financial failed: "
+                                + redisKey,
+                        e
+                );
+            }
+        }
+    }
+
+
+    // ============================================================
+    // Manual Evict
+    // ============================================================
+
+    public void evict(
+            int year,
+            int quarter,
+            String market) {
+
+        String redisKey = key(year, quarter, market);
+
+        Object lock = keyLocks.computeIfAbsent(
+                redisKey,
+                k -> new Object()
+        );
+
+        synchronized (lock) {
+            memoryCache.remove(redisKey);
+        }
+    }
+
+    // ============================================================
+    // Keep your existing toResponse() below this line.
+    // ============================================================
+    // ============================================================
+    // VO -> Response
+    // ============================================================
+
+    private static QuarterlyFinancialResponse toResponse(
+            int year,
+            int quarter,
+            String market,
+            QuarterlyFinancialVo v) {
+
+        QuarterlyFinancialResponse d =
+                new QuarterlyFinancialResponse();
+
         d.setStockId(v.getStockId());
         d.setStockName(v.getStockName());
 
-        // ✅ 以 write() 的 market 參數為準
-        d.setMarket(market == null ? null : market.trim().toUpperCase());
+        d.setMarket(
+                market == null
+                        ? null
+                        : market.trim().toUpperCase(Locale.ROOT)
+        );
 
-        // ✅ 以 write() 的 year/quarter 為準（你目前 redis key 已經用這兩個）
         d.setYear(year);
         d.setQuarter(quarter);
 
         d.setPeriodStartMonth(v.getPeriodStartMonth());
         d.setPeriodEndMonth(v.getPeriodEndMonth());
-        d.setUnit(v.getUnit() == null ? "TWD" : v.getUnit());
+
+        d.setUnit(
+                v.getUnit() == null
+                        ? "TWD"
+                        : v.getUnit()
+        );
 
         d.setOperatingRevenue(v.getOperatingRevenue());
         d.setOperatingProfit(v.getOperatingProfit());
-        d.setNonOperatingIncomeExpense(v.getNonOperatingIncomeExpense());
+
+        d.setNonOperatingIncomeExpense(
+                v.getNonOperatingIncomeExpense()
+        );
+
         d.setNetProfitAfterTax(v.getNetProfitAfterTax());
 
-        d.setCapitalStockEndPeriod(v.getCapitalStockEndPeriod());
+        d.setCapitalStockEndPeriod(
+                v.getCapitalStockEndPeriod()
+        );
+
         d.setEarningsPerShare(v.getEarningsPerShare());
-        d.setNetAssetValuePerShare(v.getNetAssetValuePerShare());
+
+        d.setNetAssetValuePerShare(
+                v.getNetAssetValuePerShare()
+        );
 
         d.setQuickRatio(v.getQuickRatio());
         d.setCurrentRatio(v.getCurrentRatio());
         d.setDepn(v.getDepn());
+
         return d;
     }
 }

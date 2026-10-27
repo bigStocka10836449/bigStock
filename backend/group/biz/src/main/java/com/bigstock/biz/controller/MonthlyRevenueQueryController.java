@@ -1,8 +1,10 @@
 package com.bigstock.biz.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -39,5 +41,28 @@ public class MonthlyRevenueQueryController {
             @RequestParam String yearMonth
     ) {
         return queryService.readMonthlyRevenueFromRedis(yearMonth);
+    }
+    
+    /**
+     * 取得最近 12 個已結束月份的營收。
+     *
+     * GET /api/revenue/recent
+     */
+    @GetMapping("/recent")
+    public Map<String, List<MonthlyRevenueVo>> readRecentRevenue() {
+
+        return queryService.readRecentRevenue();
+    }
+    
+    /**
+     * 取得指定股票最近 24 個月營收。
+     *
+     * GET /api/revenue/recent/2330
+     */
+    @GetMapping("/recent/{stockId}")
+    public Map<String, MonthlyRevenueVo> readRecentStockRevenue(
+            @PathVariable String stockId) {
+
+        return queryService.readRecentStockRevenue(stockId);
     }
 }
