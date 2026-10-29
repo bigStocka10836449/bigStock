@@ -11,10 +11,10 @@ public class QuarterlyFinancialVo {
     private String market; // TWSE / TPEX
 
     // Period (cumulative)
-    private int year;
-    private int quarter;
-    private int periodStartMonth;
-    private int periodEndMonth;
+    private Integer year;
+    private Integer quarter;
+    private Integer periodStartMonth;
+    private Integer periodEndMonth;
 
     // Common
     private String unit; // TWD

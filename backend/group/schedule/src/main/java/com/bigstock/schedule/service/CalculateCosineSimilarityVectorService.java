@@ -42,7 +42,6 @@ public class CalculateCosineSimilarityVectorService {
     @Value("${schedule.task.scheduling.similiar-search-reload}")
     private String similiarSearchReloadUrl;
 
-    @PostConstruct
     @Async("stockVectorExecutor")
     public void calculateAsDailyAspect() {
 

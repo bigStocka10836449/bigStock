@@ -5,6 +5,8 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+import javax.annotation.PostConstruct;
+
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -123,6 +125,7 @@ public class GrabUSMarketHistory {
 		cacheOperatorService.putCompressedValue("market:raw:history", "WTX&", json);
 	}
 	
+//	@PostConstruct
 	@Scheduled(cron = "0 20 17 * * ?", zone = "Asia/Taipei")
 	public void grabTWPMHistory() {
 		String json = grabThirdPartyStockDayPrice.grabAndCacheTWPMMarketHistoryFromYahoo();

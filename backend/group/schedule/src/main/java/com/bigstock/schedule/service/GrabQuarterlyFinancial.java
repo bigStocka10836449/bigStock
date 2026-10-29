@@ -1,9 +1,8 @@
 package com.bigstock.schedule.service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
-
-import javax.annotation.PostConstruct;
 
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -13,7 +12,7 @@ import com.bigstock.sharedComponent.client.TpexQuarterlyFinancialClient;
 import com.bigstock.sharedComponent.client.TwseQuarterlyFinancialClient;
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;
 import com.bigstock.sharedComponent.service.QuarterlyFinancialRedisService;
-import com.google.api.client.util.Lists;
+import com.bigstock.sharedComponent.service.StockFinancialRedisService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,59 +26,124 @@ public class GrabQuarterlyFinancial {
 	private final TpexQuarterlyFinancialClient tpexClient;
 	private final TwseQuarterlyFinancialClient twseClient;
 	private final QuarterlyFinancialRedisService quarterlyFinancialRedisService;
+	private final StockFinancialRedisService stockFinancialRedisService;
 
 //	@PostConstruct
 	@Scheduled(cron = "0 30 19 * * ?", zone = "Asia/Taipei")
 	public void syncToDb() throws InterruptedException {
+
 		List<YearQuarter> yearQuarters = GrabQuarterlyFinancial.resolveLastTwoReportQuarters();
-		for(YearQuarter yearQuarter : yearQuarters) {
-			List<QuarterlyFinancialVo> twselist = Lists.newArrayList();
+
+		for (YearQuarter yearQuarter : yearQuarters) {
+
+			int year = yearQuarter.year();
+			int quarter = yearQuarter.quarter();
+
+			// ==========================================
+			// 1. TWSE
+			// ==========================================
+
+			List<QuarterlyFinancialVo> twseList = new ArrayList<>();
+
 			try {
-				twselist = twseClient.fetch(yearQuarter.year(), yearQuarter.quarter());
+
+				twseList = twseClient.fetch(year, quarter);
+
 			} catch (Exception e) {
-				log.info("skip twseQuarterlyFinancial - error: {}", e.getMessage());
+
+				log.error("[FINANCIAL SYNC] TWSE fetch failed: year={}, quarter={}", year, quarter, e);
 			}
-			List<QuarterlyFinancialVo> tpexlist = Lists.newArrayList();
+
+			// ==========================================
+			// 2. TPEX
+			// ==========================================
+
+			List<QuarterlyFinancialVo> tpexList = new ArrayList<>();
+
 			try {
-				tpexlist = tpexClient.fetch(yearQuarter.year(), yearQuarter.quarter());
+
+				tpexList = tpexClient.fetch(year, quarter);
+
 			} catch (Exception e) {
-				log.info("skip tpexQuarterlyFinancial - error: {}", e.getMessage());
+
+				log.error("[FINANCIAL SYNC] TPEX fetch failed: year={}, quarter={}", year, quarter, e);
 			}
-			if(!tpexlist.isEmpty()) {
-				quarterlyFinancialRedisService.write(yearQuarter.year(),  yearQuarter.quarter(), "TPEX", tpexlist);
+
+			// ==========================================
+			// 3. TWSE Redis 更新
+			// ==========================================
+
+			if (twseList != null && !twseList.isEmpty()) {
+
+				try {
+
+					// 原本：市場季度 Snapshot
+					quarterlyFinancialRedisService.write(year, quarter, "TWSE", twseList);
+
+					// 新增：個股完整歷史財報
+					stockFinancialRedisService.mergeQuarter(year, quarter, "TWSE", twseList);
+
+					log.info("[FINANCIAL SYNC] TWSE completed: year={}, quarter={}, size={}", year, quarter,
+							twseList.size());
+
+				} catch (Exception e) {
+
+					log.error("[FINANCIAL SYNC] TWSE Redis update failed: year={}, quarter={}", year, quarter, e);
+				}
 			}
-			if(!twselist.isEmpty()) {
-				quarterlyFinancialRedisService.write(yearQuarter.year(),  yearQuarter.quarter(), "TWSE", twselist);
+
+			// ==========================================
+			// 4. TPEX Redis 更新
+			// ==========================================
+
+			if (tpexList != null && !tpexList.isEmpty()) {
+
+				try {
+
+					// 原本：市場季度 Snapshot
+					quarterlyFinancialRedisService.write(year, quarter, "TPEX", tpexList);
+
+					// 新增：個股完整歷史財報
+					stockFinancialRedisService.mergeQuarter(year, quarter, "TPEX", tpexList);
+
+					log.info("[FINANCIAL SYNC] TPEX completed: year={}, quarter={}, size={}", year, quarter,
+							tpexList.size());
+
+				} catch (Exception e) {
+
+					log.error("[FINANCIAL SYNC] TPEX Redis update failed: year={}, quarter={}", year, quarter, e);
+				}
 			}
+
 			Thread.sleep(3000);
 		}
 	}
-	
-	private static YearQuarter previousQuarter(YearQuarter current) {
-	    int year = current.year();
-	    int quarter = current.quarter();
 
-	    if (quarter == 1) {
-	        return new YearQuarter(year - 1, 4);
-	    }
-	    return new YearQuarter(year, quarter - 1);
+	private static YearQuarter previousQuarter(YearQuarter current) {
+		int year = current.year();
+		int quarter = current.quarter();
+
+		if (quarter == 1) {
+			return new YearQuarter(year - 1, 4);
+		}
+		return new YearQuarter(year, quarter - 1);
 	}
 
 	public static List<YearQuarter> resolveLastTwoReportQuarters() {
 
-	    LocalDate now = LocalDate.now();
+		LocalDate now = LocalDate.now();
 
-	    int year = now.getYear();
-	    int month = now.getMonthValue();
+		int year = now.getYear();
+		int month = now.getMonthValue();
 
-	    int currentQuarter = (month - 1) / 3 + 1;
+		int currentQuarter = (month - 1) / 3 + 1;
 
-	    YearQuarter current = new YearQuarter(year, currentQuarter);
+		YearQuarter current = new YearQuarter(year, currentQuarter);
 
-	    YearQuarter last = previousQuarter(current);
-	    YearQuarter secondLast = previousQuarter(last);
+		YearQuarter last = previousQuarter(current);
+		YearQuarter secondLast = previousQuarter(last);
 
-	    return List.of(last, secondLast);
+		return List.of(last, secondLast);
 	}
 
 	public static class YearQuarter {

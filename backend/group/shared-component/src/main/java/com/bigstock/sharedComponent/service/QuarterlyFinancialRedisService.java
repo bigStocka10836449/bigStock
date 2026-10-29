@@ -1,6 +1,5 @@
 package com.bigstock.sharedComponent.service;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialResponse;
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;
-import com.bigstock.sharedComponent.entity.StockQuarterFinancial;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -38,6 +36,8 @@ public class QuarterlyFinancialRedisService
 
     private final StockQuarterFinancialService
             stockQuarterFinancialService;
+    
+    private final StockFinancialRedisService stockFinancialRedisService;
     
 
     private static final String KEY_PATTERN = "FIN:QTR:*";
@@ -60,18 +60,7 @@ public class QuarterlyFinancialRedisService
     private final ConcurrentHashMap<String, FinancialSnapshot>
             memoryCache = new ConcurrentHashMap<>();
 
-    /**
-     * PostgreSQL fallback individual cache.
-     *
-     * Key:
-     * FIN:QTR:2026Q2:TPEX:6488
-     *
-     * Value:
-     * QuarterlyFinancialVo
-     */
-    private final ConcurrentHashMap<String, QuarterlyFinancialVo>
-            individualCache = new ConcurrentHashMap<>();
-    
+
     /**
      * Single-node locking.
      */
@@ -113,9 +102,7 @@ public class QuarterlyFinancialRedisService
             );
         }
 
-        private QuarterlyFinancialVo get(String stockId) {
-            return stockMap.get(stockId);
-        }
+
 
         private List<QuarterlyFinancialVo> toList() {
             return new ArrayList<>(stockMap.values());
@@ -125,24 +112,6 @@ public class QuarterlyFinancialRedisService
             return stockMap.size();
         }
 
-        /**
-         * 補入 PostgreSQL 查詢取得的股票財報。
-         *
-         * Copy-on-Write：
-         * 不修改原本 Snapshot，而是建立新的 Snapshot。
-         */
-        private FinancialSnapshot with(QuarterlyFinancialVo financial) {
-
-            Map<String, QuarterlyFinancialVo> updated =
-                    new HashMap<>(stockMap);
-
-            updated.put(
-                    financial.getStockId().trim(),
-                    financial
-            );
-
-            return new FinancialSnapshot(updated);
-        }
     }
 
 
@@ -461,74 +430,15 @@ public class QuarterlyFinancialRedisService
             int year,
             int quarter,
             String market,
-            String stockId) {
+            String stockId
+    ) {
 
-        if (stockId == null || stockId.isBlank()
-                || market == null || market.isBlank()) {
-            return null;
-        }
-
-        String normalizedStockId = stockId.trim();
-
-        String normalizedMarket =
-                market.trim().toUpperCase(Locale.ROOT);
-
-        String snapshotKey = key(
+        return stockFinancialRedisService.readOne(
                 year,
                 quarter,
-                normalizedMarket
+                market,
+                stockId
         );
-
-        String individualKey =
-                snapshotKey + ":" + normalizedStockId;
-
-        // =====================================================
-        // 1. PostgreSQL Fallback 個股 JVM Cache
-        // =====================================================
-
-        QuarterlyFinancialVo individual =
-                individualCache.get(individualKey);
-
-        if (individual != null) {
-            return individual;
-        }
-
-        // =====================================================
-        // 2. JVM / Redis 全市場 Snapshot
-        // =====================================================
-
-        FinancialSnapshot snapshot =
-                getOrLoadSnapshot(snapshotKey);
-
-        QuarterlyFinancialVo cached =
-                snapshot.get(normalizedStockId);
-
-        if (cached != null) {
-            return cached;
-        }
-
-        // =====================================================
-        // 3. PostgreSQL Fallback
-        // =====================================================
-
-		return stockQuarterFinancialService.findById(
-
-				normalizedStockId, normalizedMarket, year, quarter
-
-		)
-                .map(entity -> {
-
-                    QuarterlyFinancialVo vo = toVo(entity);
-
-                    // 只補入單筆 JVM Cache
-                    individualCache.putIfAbsent(
-                            individualKey,
-                            vo
-                    );
-
-                    return individualCache.get(individualKey);
-                })
-                .orElse(null);
     }
 
     
@@ -701,64 +611,4 @@ public class QuarterlyFinancialRedisService
         return d;
     }
     
-    private QuarterlyFinancialVo toVo(StockQuarterFinancial entity) {
-
-        if (entity == null) {
-            return null;
-        }
-
-        QuarterlyFinancialVo vo = new QuarterlyFinancialVo();
-
-        // Stock identity
-        vo.setStockId(entity.getStockId());
-        vo.setStockName(entity.getStockName());
-        vo.setMarket(entity.getMarket());
-
-        // Period
-        vo.setYear(entity.getYear());
-        vo.setQuarter(entity.getQuarter());
-        vo.setPeriodStartMonth(entity.getPeriodStartMonth());
-        vo.setPeriodEndMonth(entity.getPeriodEndMonth());
-
-        // Common
-        vo.setUnit(entity.getUnit());
-
-        // Income statement
-        vo.setOperatingRevenue(entity.getOperatingRevenue());
-        vo.setOperatingProfit(entity.getOperatingProfit());
-        vo.setNonOperatingIncomeExpense(
-                entity.getNonOperatingIncomeExpense()
-        );
-        vo.setNetProfitAfterTax(entity.getNetProfitAfterTax());
-
-        // Capital
-        vo.setCapitalStockEndPeriod(
-                entity.getCapitalStockEndPeriod()
-        );
-
-        // Per-share
-        vo.setEarningsPerShare(
-                toDouble(entity.getEarningsPerShare())
-        );
-        vo.setNetAssetValuePerShare(
-                toDouble(entity.getNetAssetValuePerShare())
-        );
-
-        // Ratios
-        vo.setQuickRatio(
-                toDouble(entity.getQuickRatio())
-        );
-        vo.setCurrentRatio(
-                toDouble(entity.getCurrentRatio())
-        );
-        vo.setDepn(
-                toDouble(entity.getDepn())
-        );
-
-        return vo;
-    }
-
-    private static Double toDouble(BigDecimal value) {
-        return value == null ? null : value.doubleValue();
-    }
 }
