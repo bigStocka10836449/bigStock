@@ -31,7 +31,7 @@ public class GrabUSMarketHistory {
 	private final CacheOperatorService cacheOperatorService;
 	
 //	@PostConstruct
-	@Scheduled(cron = "0 0 14 * * ?", zone = "Asia/Taipei")
+	@Scheduled(cron = "0 45 14 * * ?", zone = "Asia/Taipei")
 	public void grabUSHistory() {
 		ObjectMapper objectMapper = new ObjectMapper();
 	    Instant now = Instant.now();

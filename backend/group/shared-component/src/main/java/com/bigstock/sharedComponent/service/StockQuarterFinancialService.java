@@ -1,18 +1,24 @@
 package com.bigstock.sharedComponent.service;
 
-import com.bigstock.sharedComponent.dto.QuarterlyFinancialResponse;
-import com.bigstock.sharedComponent.repository.StockQuarterFinancialUpsertRepository;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.bigstock.sharedComponent.dto.QuarterlyFinancialResponse;
+import com.bigstock.sharedComponent.entity.StockQuarterFinancial;
+import com.bigstock.sharedComponent.entity.StockQuarterFinancial.StockQuarterFinancialId;
+import com.bigstock.sharedComponent.repository.StockQuarterFinancialRepository;
+import com.bigstock.sharedComponent.repository.StockQuarterFinancialUpsertRepository;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -20,6 +26,8 @@ import java.util.Map;
 public class StockQuarterFinancialService {
 
     private final StockQuarterFinancialUpsertRepository upsertRepository;
+    
+    private final StockQuarterFinancialRepository stockQuarterFinancialRepository;
 
     @Data
     @AllArgsConstructor
@@ -54,6 +62,15 @@ public class StockQuarterFinancialService {
         int saved = upsertRepository.batchUpsert(uniqList);
         return new UpsertResult(inputCount, uniq.size(), saved);
     }
+    
+	public Optional<StockQuarterFinancial> findById(String stockId, String market, Integer year, Integer quarter) {
+		StockQuarterFinancialId id = new StockQuarterFinancialId();
+		id.setMarket(market);
+		id.setQuarter(quarter);
+		id.setStockId(stockId);
+		id.setYear(year);
+		return stockQuarterFinancialRepository.findById(id);
+	}
 
     private static String safe(String s) {
         return s == null ? "" : s.trim();

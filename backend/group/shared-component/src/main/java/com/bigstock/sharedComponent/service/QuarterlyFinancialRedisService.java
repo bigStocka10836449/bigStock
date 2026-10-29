@@ -1,5 +1,6 @@
 package com.bigstock.sharedComponent.service;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialResponse;
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;
+import com.bigstock.sharedComponent.entity.StockQuarterFinancial;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -36,6 +38,7 @@ public class QuarterlyFinancialRedisService
 
     private final StockQuarterFinancialService
             stockQuarterFinancialService;
+    
 
     private static final String KEY_PATTERN = "FIN:QTR:*";
 
@@ -57,6 +60,18 @@ public class QuarterlyFinancialRedisService
     private final ConcurrentHashMap<String, FinancialSnapshot>
             memoryCache = new ConcurrentHashMap<>();
 
+    /**
+     * PostgreSQL fallback individual cache.
+     *
+     * Key:
+     * FIN:QTR:2026Q2:TPEX:6488
+     *
+     * Value:
+     * QuarterlyFinancialVo
+     */
+    private final ConcurrentHashMap<String, QuarterlyFinancialVo>
+            individualCache = new ConcurrentHashMap<>();
+    
     /**
      * Single-node locking.
      */
@@ -108,6 +123,25 @@ public class QuarterlyFinancialRedisService
 
         private int size() {
             return stockMap.size();
+        }
+
+        /**
+         * 補入 PostgreSQL 查詢取得的股票財報。
+         *
+         * Copy-on-Write：
+         * 不修改原本 Snapshot，而是建立新的 Snapshot。
+         */
+        private FinancialSnapshot with(QuarterlyFinancialVo financial) {
+
+            Map<String, QuarterlyFinancialVo> updated =
+                    new HashMap<>(stockMap);
+
+            updated.put(
+                    financial.getStockId().trim(),
+                    financial
+            );
+
+            return new FinancialSnapshot(updated);
         }
     }
 
@@ -423,29 +457,81 @@ public class QuarterlyFinancialRedisService
     }
 
 
-    // ============================================================
-    // READ ONE
-    //
-    // Individual stock lookup.
-    // ============================================================
-
     public QuarterlyFinancialVo readOne(
             int year,
             int quarter,
             String market,
             String stockId) {
 
-        if (stockId == null || stockId.isBlank()) {
+        if (stockId == null || stockId.isBlank()
+                || market == null || market.isBlank()) {
             return null;
         }
 
-        FinancialSnapshot snapshot =
-                getOrLoadSnapshot(
-                        key(year, quarter, market)
-                );
+        String normalizedStockId = stockId.trim();
 
-        return snapshot.get(stockId.trim());
+        String normalizedMarket =
+                market.trim().toUpperCase(Locale.ROOT);
+
+        String snapshotKey = key(
+                year,
+                quarter,
+                normalizedMarket
+        );
+
+        String individualKey =
+                snapshotKey + ":" + normalizedStockId;
+
+        // =====================================================
+        // 1. PostgreSQL Fallback 個股 JVM Cache
+        // =====================================================
+
+        QuarterlyFinancialVo individual =
+                individualCache.get(individualKey);
+
+        if (individual != null) {
+            return individual;
+        }
+
+        // =====================================================
+        // 2. JVM / Redis 全市場 Snapshot
+        // =====================================================
+
+        FinancialSnapshot snapshot =
+                getOrLoadSnapshot(snapshotKey);
+
+        QuarterlyFinancialVo cached =
+                snapshot.get(normalizedStockId);
+
+        if (cached != null) {
+            return cached;
+        }
+
+        // =====================================================
+        // 3. PostgreSQL Fallback
+        // =====================================================
+
+		return stockQuarterFinancialService.findById(
+
+				normalizedStockId, normalizedMarket, year, quarter
+
+		)
+                .map(entity -> {
+
+                    QuarterlyFinancialVo vo = toVo(entity);
+
+                    // 只補入單筆 JVM Cache
+                    individualCache.putIfAbsent(
+                            individualKey,
+                            vo
+                    );
+
+                    return individualCache.get(individualKey);
+                })
+                .orElse(null);
     }
+
+    
 
 
     // ============================================================
@@ -466,81 +552,69 @@ public class QuarterlyFinancialRedisService
     }
 
 
-    // ============================================================
-    // Memory First, Redis Fallback
-    // ============================================================
+ // ============================================================
+ // Memory First, Redis Fallback
+ // ============================================================
 
-    private FinancialSnapshot getOrLoadSnapshot(
-            String redisKey) {
+	private FinancialSnapshot getOrLoadSnapshot(String redisKey) {
 
-        /*
-         * Fast path:
-         *
-         * No Redis call.
-         * No synchronized block.
-         */
-        FinancialSnapshot snapshot =
-                memoryCache.get(redisKey);
+		// =====================================================
+		// 1. Fast Path：JVM Memory
+		// =====================================================
 
-        if (snapshot != null) {
-            return snapshot;
-        }
+		FinancialSnapshot snapshot = memoryCache.get(redisKey);
 
-        /*
-         * Slow path:
-         *
-         * Only when key was not preloaded.
-         */
-        Object lock = keyLocks.computeIfAbsent(
-                redisKey,
-                k -> new Object()
-        );
+		if (snapshot != null) {
+			return snapshot;
+		}
 
-        synchronized (lock) {
+		// =====================================================
+		// 2. Slow Path：Redis
+		// =====================================================
 
-            snapshot = memoryCache.get(redisKey);
+		Object lock = keyLocks.computeIfAbsent(redisKey, k -> new Object());
 
-            if (snapshot != null) {
-                return snapshot;
-            }
+		synchronized (lock) {
 
-            try {
+			// Double-check
+			snapshot = memoryCache.get(redisKey);
 
-                String json =
-                        redis.opsForValue().get(redisKey);
+			if (snapshot != null) {
+				return snapshot;
+			}
 
-                if (json == null || json.isBlank()) {
-                    // Do not cache missing Redis keys.
-                    return buildSnapshot(
-                            Collections.emptyList()
-                    );
-                }
+			try {
 
-                List<QuarterlyFinancialVo> list =
-                        objectMapper.readValue(
-                                json,
-                                FINANCIAL_LIST_TYPE
-                        );
+				String json = redis.opsForValue().get(redisKey);
 
-                snapshot = buildSnapshot(list);
+				if (json == null || json.isBlank()) {
 
-                memoryCache.put(
-                        redisKey,
-                        snapshot
-                );
+					/*
+					 * Redis 沒資料：
+					 *
+					 * 暫時保存 Empty Snapshot， 避免每次查詢都重新讀 Redis。
+					 */
+					snapshot = buildSnapshot(Collections.emptyList());
 
-                return snapshot;
+					memoryCache.put(redisKey, snapshot);
 
-            } catch (Exception e) {
+					return snapshot;
+				}
 
-                throw new RuntimeException(
-                        "load quarterly financial failed: "
-                                + redisKey,
-                        e
-                );
-            }
-        }
-    }
+				List<QuarterlyFinancialVo> list = objectMapper.readValue(json, FINANCIAL_LIST_TYPE);
+
+				snapshot = buildSnapshot(list);
+
+				memoryCache.put(redisKey, snapshot);
+
+				return snapshot;
+
+			} catch (Exception e) {
+
+				throw new RuntimeException("load quarterly financial failed: " + redisKey, e);
+			}
+		}
+	}
 
 
     // ============================================================
@@ -625,5 +699,66 @@ public class QuarterlyFinancialRedisService
         d.setDepn(v.getDepn());
 
         return d;
+    }
+    
+    private QuarterlyFinancialVo toVo(StockQuarterFinancial entity) {
+
+        if (entity == null) {
+            return null;
+        }
+
+        QuarterlyFinancialVo vo = new QuarterlyFinancialVo();
+
+        // Stock identity
+        vo.setStockId(entity.getStockId());
+        vo.setStockName(entity.getStockName());
+        vo.setMarket(entity.getMarket());
+
+        // Period
+        vo.setYear(entity.getYear());
+        vo.setQuarter(entity.getQuarter());
+        vo.setPeriodStartMonth(entity.getPeriodStartMonth());
+        vo.setPeriodEndMonth(entity.getPeriodEndMonth());
+
+        // Common
+        vo.setUnit(entity.getUnit());
+
+        // Income statement
+        vo.setOperatingRevenue(entity.getOperatingRevenue());
+        vo.setOperatingProfit(entity.getOperatingProfit());
+        vo.setNonOperatingIncomeExpense(
+                entity.getNonOperatingIncomeExpense()
+        );
+        vo.setNetProfitAfterTax(entity.getNetProfitAfterTax());
+
+        // Capital
+        vo.setCapitalStockEndPeriod(
+                entity.getCapitalStockEndPeriod()
+        );
+
+        // Per-share
+        vo.setEarningsPerShare(
+                toDouble(entity.getEarningsPerShare())
+        );
+        vo.setNetAssetValuePerShare(
+                toDouble(entity.getNetAssetValuePerShare())
+        );
+
+        // Ratios
+        vo.setQuickRatio(
+                toDouble(entity.getQuickRatio())
+        );
+        vo.setCurrentRatio(
+                toDouble(entity.getCurrentRatio())
+        );
+        vo.setDepn(
+                toDouble(entity.getDepn())
+        );
+
+        return vo;
+    }
+
+    private static Double toDouble(BigDecimal value) {
+        return value == null ? null : value.doubleValue();
     }
 }
