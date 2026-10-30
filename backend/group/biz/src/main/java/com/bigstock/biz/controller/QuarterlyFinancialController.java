@@ -1,5 +1,6 @@
 package com.bigstock.biz.controller;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -17,6 +18,7 @@ import com.bigstock.sharedComponent.client.TpexQuarterlyFinancialClient;
 import com.bigstock.sharedComponent.client.TwseQuarterlyFinancialClient;
 import com.bigstock.sharedComponent.dto.QuarterlyFinancialVo;
 import com.bigstock.sharedComponent.service.QuarterlyFinancialRedisService;
+import com.bigstock.sharedComponent.service.StockFinancialRedisService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,6 +33,7 @@ public class QuarterlyFinancialController {
 
     private final QuarterlyFinancialRedisService redisService;
 
+    private final StockFinancialRedisService stockFinancialRedisService;
 
     /**
      * ============================================================
@@ -132,5 +135,40 @@ public class QuarterlyFinancialController {
         }
 
         return ResponseEntity.ok(financial);
+    }
+    
+    @GetMapping("/stock/{market}/{stockId}")
+    public ResponseEntity<List<QuarterlyFinancialVo>> getStockFinancials(
+            @PathVariable String market,
+            @PathVariable String stockId
+    ) {
+
+        List<QuarterlyFinancialVo> financials =
+                stockFinancialRedisService.getStockFinancials(
+                        market,
+                        stockId
+                );
+
+        // 過濾無效季度、依照時間由新到舊排序
+        List<QuarterlyFinancialVo> result = financials.stream()
+                .filter(f -> f != null
+                        && f.getYear() != null
+                        && f.getQuarter() != null
+                        && f.getQuarter() >= 1
+                        && f.getQuarter() <= 4)
+                .sorted(
+                        Comparator
+                                .comparing(
+                                        QuarterlyFinancialVo::getYear
+                                )
+                                .thenComparing(
+                                        QuarterlyFinancialVo::getQuarter
+                                )
+                                .reversed()
+                )
+                .limit(13)
+                .toList();
+
+        return ResponseEntity.ok(result);
     }
 }

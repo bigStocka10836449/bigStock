@@ -1,3 +1,10 @@
+security:
+  turnstile:
+    secret-key: XXXXXXXXX
+    expected-hostname: ${TURNSTILE_HOSTNAME:localhost}
+    expected-action: ${TURNSTILE_ACTION:fcm_challenge}
+    connect-timeout: 3000
+    read-timeout: 5000
 app:
   env: local
 server:
@@ -25,9 +32,9 @@ spring:
   main:
     allow-bean-definition-overriding: true
   datasource:
-    url: jdbc:postgresql://127.0.0.1:15432/bstock
+    url: jdbc:postgresql://XXXXXX:15432/bstock
     username: bstockuser
-    password: bstockuserPostgresql&
+    password: XXXXXXXXX
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 5
@@ -44,8 +51,8 @@ spring:
         order_updates: true     
   data: 
     redis:
-      host: 127.0.0.1
-      password: bstockuserRedis!
+      host: XXXXXXX
+      password: XXXXXXXX
       lettuce:
         pool:
           max-active: 10
