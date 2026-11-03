@@ -1,28 +1,124 @@
--- Token Bucket 限流
--- KEYS[1]: 限流 Key
--- ARGV[1]: 每秒補充速率（tokensPerSecond）
--- ARGV[2]: 最大桶容量（burst）
--- ARGV[3]: 當前時間戳（秒）
+-- ============================================================
+-- BigStock Redis Token Bucket
+--
+-- KEYS[1] = Redis Rate Limit Key
+--
+-- ARGV[1] = Tokens Per Second
+-- ARGV[2] = Maximum Bucket Capacity
+--
+-- Return:
+-- 1 = ALLOWED
+-- 0 = REJECTED
+-- ============================================================
+
+local key = KEYS[1]
 
 local rate = tonumber(ARGV[1])
 local burst = tonumber(ARGV[2])
-local now = tonumber(ARGV[3])
 
--- 初始化 Token Bucket 結構
-local bucket = redis.call("HMGET", KEYS[1], "tokens", "timestamp")
-local tokens = tonumber(bucket[1]) or burst
-local lastRefill = tonumber(bucket[2]) or now
+-- ============================================================
+-- 1. Validate Configuration
+-- ============================================================
 
--- 計算新的 token 數量
-local delta = math.max(0, now - lastRefill)
-local refill = delta * rate
-local newTokens = math.min(burst, tokens + refill)
+if not rate or not burst or rate <= 0 or burst < 1 then
 
-if newTokens < 1 then
-    return 0
+    return redis.error_reply(
+        "INVALID_TOKEN_BUCKET_CONFIGURATION"
+    )
+
 end
 
--- 減少一個 token 並更新狀態
-redis.call("HMSET", KEYS[1], "tokens", newTokens - 1, "timestamp", now)
-redis.call("EXPIRE", KEYS[1], 3600)
-return 1
+-- ============================================================
+-- 2. Redis Server Time
+-- ============================================================
+
+local redisTime = redis.call("TIME")
+
+local now =
+    tonumber(redisTime[1])
+    + tonumber(redisTime[2]) / 1000000
+
+-- ============================================================
+-- 3. Load Token Bucket
+-- ============================================================
+
+local bucket = redis.call(
+    "HMGET",
+    key,
+    "tokens",
+    "timestamp"
+)
+
+local tokens = tonumber(bucket[1])
+
+local lastRefill = tonumber(bucket[2])
+
+if tokens == nil then
+    tokens = burst
+end
+
+if lastRefill == nil then
+    lastRefill = now
+end
+
+-- ============================================================
+-- 4. Refill Tokens
+-- ============================================================
+
+local elapsed = math.max(
+    0,
+    now - lastRefill
+)
+
+local refill = elapsed * rate
+
+local availableTokens = math.min(
+    burst,
+    tokens + refill
+)
+
+-- ============================================================
+-- 5. Consume Token
+-- ============================================================
+
+local allowed = 0
+
+if availableTokens >= 1 then
+
+    availableTokens = availableTokens - 1
+
+    allowed = 1
+
+end
+
+-- ============================================================
+-- 6. Update Bucket
+-- ============================================================
+
+redis.call(
+    "HSET",
+    key,
+    "tokens",
+    availableTokens,
+    "timestamp",
+    now
+)
+
+-- ============================================================
+-- 7. Expiration
+--
+-- 閒置後自動清除 Bucket。
+-- ============================================================
+
+local ttl = math.max(
+    60,
+    math.ceil(burst / rate) * 2
+)
+
+redis.call(
+    "EXPIRE",
+    key,
+    ttl
+)
+
+return allowed

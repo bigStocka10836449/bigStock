@@ -16,7 +16,7 @@ public class WebConfig {
     @Bean
     public WebFilter corsWebFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:13001")); //未來要改在設定檔裡面
+        config.setAllowedOrigins(List.of("http://localhost:13001",  "https://bstock.bigstockserver.link")); //未來要改在設定檔裡面
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("X-Refreshed-Token"));

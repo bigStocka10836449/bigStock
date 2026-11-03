@@ -1,3 +1,36 @@
+app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:}
+bstock:
+  rate-limit:
+
+    # ==========================================
+    # 全站 API Token Bucket
+    # ==========================================
+    global:
+      rate: 4
+      burst: 30
+
+    # ==========================================
+    # 三支股票 API 共用 Token Bucket
+    #
+    # stockShareholderStructure
+    # stockCodeMarginShortInfo
+    # SingleStockPrice
+    # ==========================================
+    history:
+      enabled: true
+      rate: 0.5
+      burst: 20
+
+    # ==========================================
+    # 每日不同股票查詢配額
+    #
+    # 每個 FCM Token 每天最多 500 支
+    # ==========================================
+    daily:
+      enabled: true
+      max-distinct-stocks: 500
 security:
   turnstile:
     secret-key: ${TURNSTILE_SECRET_KEY}
