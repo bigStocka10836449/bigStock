@@ -34,6 +34,10 @@ import com.bigstock.sharedComponent.entity.RolePath;
 import com.bigstock.sharedComponent.service.RolePathService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -42,11 +46,13 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Value("${server.oauth2.secret-key}")
+	@Value("${server.oauth2.secret-key}")
 	private String secretKey;
 
 	private final BigStockJwtAuthFilter jwtFilter;
 	private final RolePathService rolePathService;
+	private final BigStockBearerTokenResolver bigStockBearerTokenResolver;
+	private final BigStockCsrfRequestMatcher bigStockCsrfRequestMatcher;
 
 	/* ========= JWT Decoder ========= */
 
@@ -68,28 +74,21 @@ public class SecurityConfig {
 
 		List<RolePath> rolePaths = rolePathService.getAllRolePaths();
 
-		http.csrf(csrf -> csrf.disable()).httpBasic(httpBasic -> httpBasic.disable()).formLogin(form -> form.disable())
+		http.csrf(csrf -> csrf
+
+				.csrfTokenRepository(csrfTokenRepository())
+
+				.csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
+
+				.requireCsrfProtectionMatcher(bigStockCsrfRequestMatcher)).httpBasic(httpBasic -> httpBasic.disable())
+				.formLogin(form -> form.disable())
 				.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
 
 				.authorizeHttpRequests(auth -> {
 
-					/* ===== 公開路徑 ===== */
-//                String[] publicPaths = {
-//                    "/gateway/swagger/**",
-//                    "/api/biz/swagger/**",
-//                    "/auth/swagger/**",
-//                    "/webjars/**",
-//                    "/actuator/health",
-//                    "/auth/**",
-//                    "/api/auth/**"
-//                };
-//
-//                auth.requestMatchers(HttpMethod.OPTIONS, publicPaths).permitAll();
-//                auth.requestMatchers(HttpMethod.GET, publicPaths).permitAll();
-//                auth.requestMatchers(HttpMethod.POST, publicPaths).permitAll();
-//                auth.requestMatchers(HttpMethod.PUT, publicPaths).permitAll();
-					auth.requestMatchers("/gateway/swagger/**", "/api/biz/swagger/**", "/biz/swagger/**","/ws/**",
-							"/v3/api-docs/**", "/swagger-ui/**", "/webjars/**", "/auth/**","/device/**","/biz/stockShareholderStructure/**","/biz/financialCalendarImport/**").permitAll();
+					auth.requestMatchers("/gateway/swagger/**", "/api/biz/swagger/**", "/biz/swagger/**", "/ws/**",
+							"/v3/api-docs/**", "/swagger-ui/**", "/webjars/**", "/auth/**", "/device/**",
+							"/biz/stockShareholderStructure/**", "/biz/financialCalendarImport/**").permitAll();
 
 					/*
 					 * ========================================================= 動態 Role → Path（反轉成
@@ -132,8 +131,8 @@ public class SecurityConfig {
 					auth.anyRequest().authenticated();
 				})
 
-				.oauth2ResourceServer(
-						oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+				.oauth2ResourceServer(oauth2 -> oauth2.bearerTokenResolver(bigStockBearerTokenResolver)
+						.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
 		return http.build();
 	}
@@ -179,5 +178,14 @@ public class SecurityConfig {
 		} catch (IOException e) {
 			throw new RuntimeException("Error parsing role_allowed_url_path JSON", e);
 		}
+	}
+
+	private CookieCsrfTokenRepository csrfTokenRepository() {
+
+		CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+
+		repository.setCookiePath("/");
+
+		return repository;
 	}
 }

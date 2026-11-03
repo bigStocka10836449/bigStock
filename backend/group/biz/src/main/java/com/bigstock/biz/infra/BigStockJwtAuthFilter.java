@@ -38,8 +38,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import jakarta.servlet.http.Cookie;
+import org.springframework.http.HttpHeaders;
 
-//請保留專案實際的 FcmRecord / FcmRecordService imports。
 
 @Component
 @RequiredArgsConstructor
@@ -194,23 +195,19 @@ public class BigStockJwtAuthFilter extends OncePerRequestFilter {
 		}
 
 		// ========================================================
-		// 3. Authorization
+		// 3. Resolve JWT
+		//
+		// Mobile -> Authorization Bearer
+		// Web    -> HttpOnly Cookie
 		// ========================================================
 
-		String authHeader = request.getHeader("Authorization");
+		String token = resolveToken(request);
 
-		if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+		if (token == null || token.isBlank()) {
 
-			unauthorized(response);
-			return;
-		}
+		    unauthorized(response);
 
-		String token = authHeader.substring(7).trim();
-
-		if (token.isBlank()) {
-
-			unauthorized(response);
-			return;
+		    return;
 		}
 
 		// ========================================================
@@ -490,5 +487,58 @@ public class BigStockJwtAuthFilter extends OncePerRequestFilter {
 		response.setHeader("Cache-Control", "no-store");
 
 		response.getWriter().write("{\"error\":\"" + error + "\"}");
+	}
+	
+	private String resolveToken(HttpServletRequest request) {
+
+	    String authorization =
+	            request.getHeader(HttpHeaders.AUTHORIZATION);
+
+	    String bearerToken = null;
+
+	    if (authorization != null) {
+
+	        if (!authorization.startsWith("Bearer ")) {
+	            return null;
+	        }
+
+	        bearerToken = authorization.substring(7).trim();
+
+	        if (bearerToken.isEmpty()) {
+	            return null;
+	        }
+	    }
+
+	    String cookieToken = null;
+
+	    Cookie[] cookies = request.getCookies();
+
+	    if (cookies != null) {
+
+	        for (Cookie cookie : cookies) {
+
+	            if ("bstock_guest_token".equals(cookie.getName())) {
+
+	                cookieToken = cookie.getValue();
+
+	                break;
+	            }
+	        }
+	    }
+
+	    // 不接受同時提供兩種認證來源
+	    if (bearerToken != null && cookieToken != null) {
+	        return null;
+	    }
+
+	    if (bearerToken != null) {
+	        return bearerToken;
+	    }
+
+	    if (cookieToken != null && !cookieToken.isBlank()) {
+	        return cookieToken.trim();
+	    }
+
+	    return null;
 	}
 }

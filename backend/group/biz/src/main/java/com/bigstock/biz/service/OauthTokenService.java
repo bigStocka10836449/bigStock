@@ -83,6 +83,120 @@ public class OauthTokenService {
 				.body(Map.of("accessToken", accessToken, "exp", expiration.getTime()));
 	}
 	
+	
+	public ResponseEntity<?> getTmpTokenForWeb(
+	        HttpServletRequest request,
+	        String guestId,
+	        TempTokenVo tempTokenVo
+	) throws IOException, HttpException {
+
+	    // ==========================================
+	    // 1. Validate FCM Device
+	    // ==========================================
+
+	    String fcmToken = tempTokenVo.getToken();
+
+	    FcmRecord fcmRecord =
+	            fcmRecordService.validateVerifiedDevice(fcmToken);
+
+
+	    // ==========================================
+	    // 2. Generate Guest ID
+	    // ==========================================
+
+	    guestId = DigestUtils
+	            .md5Hex(fcmToken)
+	            .toUpperCase();
+
+
+	    // ==========================================
+	    // 3. Redis JWT Cache
+	    // ==========================================
+
+	    RBucket<String> jwtBucket =
+	            redissonClient.getBucket("jwt:" + guestId);
+
+	    String token = jwtBucket.get();
+
+	    if (token == null) {
+
+	        token = createTempAccessToken(
+	                guestId,
+	                "Guest"
+	        );
+
+	        jwtBucket.set(
+	                token,
+	                Duration.ofHours(2)
+	        );
+	    }
+
+
+	    // ==========================================
+	    // 4. Parse JWT
+	    // ==========================================
+
+	    Claims claims = parseJwtToken(token);
+
+
+	    // ==========================================
+	    // 5. Guest ID Cookie
+	    // ==========================================
+
+	    ResponseCookie guestCookie =
+	            ResponseCookie.from("guest_id", guestId)
+	                    .httpOnly(true)
+	                    .secure(true)
+	                    .sameSite("Strict")
+	                    .path("/")
+	                    .maxAge(Duration.ofHours(1))
+	                    .build();
+
+
+	    // ==========================================
+	    // 6. JWT HttpOnly Cookie
+	    // ==========================================
+
+	    ResponseCookie jwtCookie =
+	            ResponseCookie.from(
+	                    "bstock_guest_token",
+	                    token
+	            )
+	                    .httpOnly(true)
+	                    .secure(true)
+	                    .sameSite("Strict")
+	                    .path("/")
+	                    .maxAge(Duration.ofHours(1))
+	                    .build();
+
+
+	    // ==========================================
+	    // 7. Persist FCM JWT
+	    // ==========================================
+
+	    fcmRecord.setAllowedJwt(token);
+
+	    fcmRecordService.save(fcmRecord, token);
+
+
+	    // ==========================================
+	    // 8. Response
+	    // ==========================================
+
+	    return ResponseEntity.ok()
+	            .header(
+	                    HttpHeaders.SET_COOKIE,
+	                    guestCookie.toString(),
+	                    jwtCookie.toString()
+	            )
+	            .body(Map.of(
+	                    "authenticated", true,
+	                    "exp", claims.getExpiration()
+	            ));
+	}
+	
+	
+	
 	public ResponseEntity<?> getTmpToken(HttpServletRequest request, String guestId, TempTokenVo tempTokenVo) throws IOException, HttpException {
 
 

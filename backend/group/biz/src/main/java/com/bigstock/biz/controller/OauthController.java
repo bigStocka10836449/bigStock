@@ -55,6 +55,19 @@ public class OauthController {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
 		}
 	}
+	
+	@PostMapping(value = "wToken")
+	public ResponseEntity<?> webToken(HttpServletRequest request,
+            @CookieValue(value = "guest_id", required = false) String guestId, @RequestBody TempTokenVo tempTokenVo )  {
+		try {
+				return oauthTokenService.getTmpTokenForWeb(request, guestId, tempTokenVo);
+		} catch (HttpException e) {
+			 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("Rate limit exceeded");
+		} catch (IOException e) {
+			log.error(e.getMessage(), e);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+		}
+	}
 
 	@Operation(summary = "token 刷新", description = "acctoken 若失效，但refresh token還有效時，gateway自動跟auth要新的access token刷新")
 	@PostMapping(value = "refreshToken", consumes = MediaType.APPLICATION_JSON_VALUE)
