@@ -8,8 +8,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.bigstock.biz.infra.TurnstileVerificationService;
 import com.bigstock.biz.service.FcmService;
-import com.bigstock.biz.service.TurnstileService;
 import com.bigstock.sharedComponent.dto.FcmRegisterRequest;
 import com.bigstock.sharedComponent.dto.FcmVerifyRequest;
 import com.bigstock.sharedComponent.dto.WebFcmRegisterRequest;
@@ -22,7 +22,6 @@ import lombok.RequiredArgsConstructor;
 public class DeviceController {
 
     private final FcmService fcmService;
-    private final TurnstileService turnstileService;
 
     // APP：原本流程不變
     @PostMapping("/register")
@@ -37,22 +36,6 @@ public class DeviceController {
         ));
     }
 
-    // WEB：新增 Turnstile 保護
-    @PostMapping("/web/register")
-    public ResponseEntity<?> registerWeb(
-            @RequestBody WebFcmRegisterRequest request) {
-
-        turnstileService.verifyOrThrow(
-                request.getTurnstileToken()
-        );
-
-        fcmService.sendDeviceChallenge(request);
-
-        return ResponseEntity.ok(Map.of(
-                "message",
-                "Device registered. FCM challenge sent."
-        ));
-    }
 
     // 原本的裝置驗證不變
     @PostMapping("/verify")

@@ -1,6 +1,7 @@
 package com.bigstock.biz.infra;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -26,6 +27,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -34,11 +36,8 @@ import com.bigstock.sharedComponent.entity.RolePath;
 import com.bigstock.sharedComponent.service.RolePathService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import lombok.RequiredArgsConstructor;
 
 @Configuration
@@ -58,8 +57,8 @@ public class SecurityConfig {
 
 	@Bean
 	public JwtDecoder jwtDecoder() {
-		SecretKey key = new SecretKeySpec(secretKey.getBytes(), "HmacSHA512");
-		return NimbusJwtDecoder.withSecretKey(key).build();
+	    SecretKey key = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+	    return NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
 	}
 
 	@Bean

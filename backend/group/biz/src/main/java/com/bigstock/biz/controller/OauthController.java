@@ -1,11 +1,15 @@
 package com.bigstock.biz.controller;
 
 import java.io.IOException;
+import java.util.Map;
 
 import org.apache.http.HttpException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bigstock.biz.domain.vo.UserRegistryInfo;
+import com.bigstock.biz.dto.WebTokenRequest;
 import com.bigstock.biz.service.OauthTokenService;
 import com.bigstock.biz.service.UserRegistryService;
 import com.bigstock.biz.vo.UserInloginInfo;
@@ -29,6 +34,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -56,18 +62,30 @@ public class OauthController {
 		}
 	}
 	
-	@PostMapping(value = "wToken")
-	public ResponseEntity<?> webToken(HttpServletRequest request,
-            @CookieValue(value = "guest_id", required = false) String guestId, @RequestBody TempTokenVo tempTokenVo )  {
-		try {
-				return oauthTokenService.getTmpTokenForWeb(request, guestId, tempTokenVo);
-		} catch (HttpException e) {
-			 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("Rate limit exceeded");
-		} catch (IOException e) {
-			log.error(e.getMessage(), e);
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
-		}
+	@GetMapping("csrf")
+	public ResponseEntity<Map<String, Object>> csrf(CsrfToken csrfToken) {
+
+		// 強制載入 Token，讓 CookieCsrfTokenRepository
+		// 有機會產生 XSRF-TOKEN Cookie。
+		csrfToken.getToken();
+
+		return ResponseEntity.ok(Map.of("csrfEnabled", true));
 	}
+
+	@PostMapping("wToken")
+	public ResponseEntity<?> webToken(@Valid @RequestBody WebTokenRequest request) {
+		return oauthTokenService.getTmpTokenForWeb(request);
+	}
+
+	@GetMapping("session")
+	public ResponseEntity<Map<String, Object>> webSession(
+			@CookieValue(value = "bstock_guest_token", required = false) String cookieToken,
+			Authentication authentication) {
+		return oauthTokenService.getWebSession(cookieToken,
+				authentication instanceof JwtAuthenticationToken jwtAuth ? jwtAuth : null);
+	}
+
+	
 
 	@Operation(summary = "token 刷新", description = "acctoken 若失效，但refresh token還有效時，gateway自動跟auth要新的access token刷新")
 	@PostMapping(value = "refreshToken", consumes = MediaType.APPLICATION_JSON_VALUE)
