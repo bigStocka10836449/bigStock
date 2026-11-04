@@ -335,6 +335,27 @@ public class CacheOperatorService {
 			throw new IllegalStateException("gzip decompress failed", e);
 		}
 	}
+	
+	/** Only fetch and decompress the requested newest records. */
+	public <T> List<T> getLatestCompressedZSetSeries(String cacheName, String key,
+			Class<T> clazz, int limit) {
+		if (limit <= 0) return Collections.emptyList();
+
+		Set<byte[]> raw = rawRedisTemplate.opsForZSet()
+				.reverseRange(buildKey(cacheName, key), 0, limit - 1L);
+		if (raw == null || raw.isEmpty()) return Collections.emptyList();
+
+		ObjectMapper mapper = new ObjectMapper();
+		List<T> result = new ArrayList<>(raw.size());
+		for (byte[] compressed : raw) {
+			try {
+				result.add(mapper.readValue(gzipDecompressBytes(compressed), clazz));
+			} catch (IOException e) {
+				throw new IllegalStateException("Failed to read latest compressed series", e);
+			}
+		}
+		return result;
+	}
 
 	public <T> List<T> getCompressedZSetAllScore(String cacheName, String key,
 			Class<T> clazz) {

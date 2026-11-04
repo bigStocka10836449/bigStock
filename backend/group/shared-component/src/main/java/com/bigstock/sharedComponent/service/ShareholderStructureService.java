@@ -6,6 +6,8 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.time.Duration;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +23,7 @@ import org.postgresql.core.BaseConnection;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.context.ApplicationContext;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
@@ -32,10 +35,14 @@ import com.bigstock.sharedComponent.repository.StockDayPriceRepository;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ShareholderStructureService {
+	private static final String LATEST_QUERY_CACHE = "shareholderQueryCache";
+	private static final Duration LATEST_QUERY_TTL = Duration.ofMinutes(1);
 	private final ShareholderStructureRepository shareholderStructureRepository;
 
 	
@@ -123,6 +130,66 @@ public class ShareholderStructureService {
 
 			}
 
+				}
+		}
+	
+		/** Read the API's bounded history without truncating the shared full-history cache. */
+		public List<ShareholderStructure> getLatestShareholderStructureByStockCode(String stockCode, int limit) {
+			if (stockCode == null || stockCode.isBlank() || limit <= 0) return List.of();
+			String code = stockCode.trim();
+			int safeLimit = Math.min(limit, CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+			String queryKey = code + ":" + safeLimit;
+			List<ShareholderStructure> cached = readLatestShareholderCache(code, queryKey, safeLimit);
+			if (cached != null) return cached;
+	
+			RLock lock = null;
+			boolean acquired = false;
+			try {
+				lock = redissonClient.getLock("lock:shareholder-query:" + queryKey);
+				acquired = lock.tryLock(2, TimeUnit.SECONDS);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new IllegalStateException("Interrupted while loading shareholder history", e);
+			} catch (RuntimeException e) {
+				log.warn("Shareholder query lock unavailable, stockCode={}", code, e);
+			}
+
+			try {
+				// Recheck even after a lock timeout; a previous reader may just have finished.
+				cached = readLatestShareholderCache(code, queryKey, safeLimit);
+				if (cached != null) return cached;
+				List<ShareholderStructure> rows = shareholderStructureRepository
+						.getShareholderStructureByStockCodeDesc(code, PageRequest.of(0, safeLimit));
+				try {
+				// A separate, short-lived result cache also caches an empty DB result.
+					cacheOperatorService.putObject(LATEST_QUERY_CACHE, queryKey, rows, LATEST_QUERY_TTL);
+				} catch (Exception e) {
+					log.warn("Shareholder query cache write failed, stockCode={}", code, e);
+				}
+				return rows;
+			} finally {
+				if (acquired) {
+					try {
+						if (lock.isHeldByCurrentThread()) lock.unlock();
+					} catch (RuntimeException e) {
+						log.warn("Shareholder query lock release failed, stockCode={}", code, e);
+					}
+				}
+			}
+		}
+	
+		private List<ShareholderStructure> readLatestShareholderCache(String code, String queryKey, int limit) {
+			try {
+				List<ShareholderStructure> rows = cacheOperatorService.getLatestCompressedZSetSeries(
+						"ultraLongLivedCache", "shareholderStructure:compressed:" + code,
+						ShareholderStructure.class, limit);
+			if (CollectionUtils.isNotEmpty(rows)) return rows;
+				ShareholderStructure[] snapshot = cacheOperatorService.getObject(
+						LATEST_QUERY_CACHE, queryKey, ShareholderStructure[].class);
+				return snapshot == null ? null : Arrays.asList(snapshot);
+			} catch (Exception e) {
+				log.warn("Shareholder query cache read failed, stockCode={}", code, e);
+				return null;
 		}
 	}
 
