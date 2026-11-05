@@ -69,6 +69,28 @@ public class BizController {
 		return ResponseEntity.ok(service.getAllNews(31));
 	}
 	
+	@Operation(summary = "取得指定 Stream ID 之後新增的新聞")
+	@GetMapping("newsSince")
+	public ResponseEntity<List<Map<String, Object>>> getNewsSince(
+	        @RequestParam String afterId
+	) {
+	    return ResponseEntity.ok(
+	            service.getNewsSince(afterId)
+	    );
+	}
+	
+	/**
+	 * 用於前端 Polling。
+	 *
+	 * 每 20 秒取得最新 Redis Stream ID， 判斷是否出現新的新聞 Record。
+	 */
+	@Operation(summary = "取得最新快訊版本")
+	@GetMapping("latestNews")
+	public ResponseEntity<Map<String, Object>> getLatestNews() {
+
+		return ResponseEntity.ok(service.getLatestNews());
+	}
+	
 	
 	@Operation(summary = "股市分類資訊", description = "")
 	@GetMapping("stockInfo")

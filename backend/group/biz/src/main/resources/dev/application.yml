@@ -31,7 +31,13 @@ bstock:
     daily:
       enabled: true
       max-distinct-stocks: 500
+management:
+  endpoints:
+    enabled-by-default: false      
 security:
+  websocket:
+    # 以逗號分隔，原生 Mobile 無 Origin 時走 Query JWT+FCM；有 Origin 必須在白名單。
+    allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS}
   turnstile:
     secret-key: ${TURNSTILE_SECRET_KEY}
     expected-hostname: ${TURNSTILE_HOSTNAME:localhost}

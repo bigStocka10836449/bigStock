@@ -17,8 +17,7 @@ public class BigStockCsrfRequestMatcher implements RequestMatcher {
     private static final Set<String> SAFE_METHODS = Set.of(
             "GET",
             "HEAD",
-            "OPTIONS",
-            "TRACE"
+            "OPTIONS"
     );
 
     @Override

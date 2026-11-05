@@ -22,7 +22,10 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -37,7 +40,6 @@ import com.bigstock.sharedComponent.service.RolePathService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import lombok.RequiredArgsConstructor;
 
 @Configuration
@@ -52,13 +54,21 @@ public class SecurityConfig {
 	private final RolePathService rolePathService;
 	private final BigStockBearerTokenResolver bigStockBearerTokenResolver;
 	private final BigStockCsrfRequestMatcher bigStockCsrfRequestMatcher;
+	private final BigStockJwtSessionValidator bigStockJwtSessionValidator;
 
 	/* ========= JWT Decoder ========= */
 
 	@Bean
 	public JwtDecoder jwtDecoder() {
-	    SecretKey key = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-	    return NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
+
+		SecretKey key = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+
+		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
+
+		decoder.setJwtValidator(
+				new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefault(), bigStockJwtSessionValidator));
+
+		return decoder;
 	}
 
 	@Bean

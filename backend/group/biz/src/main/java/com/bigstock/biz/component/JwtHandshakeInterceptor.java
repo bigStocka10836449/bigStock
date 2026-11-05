@@ -1,11 +1,13 @@
 package com.bigstock.biz.component;
 
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpRequest;
@@ -32,219 +34,425 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
-    private static final String JWT_COOKIE_NAME =
-            "bstock_guest_token";
+	private static final String JWT_COOKIE_NAME = "bstock_guest_token";
 
-    private final FcmRecordService fcmRecordService;
+	private static final String WEB_TOKEN_TYPE = "web_guest";
 
-    @Value("${server.oauth2.secret-key}")
-    private String secretKey;
+	private static final String GUEST_ROLE = "4";
 
-    @Override
-    public boolean beforeHandshake(
-            ServerHttpRequest request,
-            ServerHttpResponse response,
-            WebSocketHandler wsHandler,
-            Map<String, Object> attributes
-    ) throws IOException {
+	private static final String WEB_JWT_REDIS_PREFIX = "web:jwt:";
 
-        if (!(request instanceof ServletServerHttpRequest servletRequest)) {
-            unauthorized(response);
-            return false;
-        }
+	private final RedissonClient redissonClient;
 
-        HttpServletRequest httpRequest =
-                servletRequest.getServletRequest();
+	private final FcmRecordService fcmRecordService;
 
-        // ====================================================
-        // 1. Resolve JWT
-        // ====================================================
+	@Value("${server.oauth2.secret-key}")
+	private String secretKey;
 
-        String token = resolveToken(httpRequest);
+	// ============================================================
+	// Handshake
+	// ============================================================
 
-        if (token == null || token.isBlank()) {
-            unauthorized(response);
-            return false;
-        }
+	@Override
+	public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler,
+			Map<String, Object> attributes) throws IOException {
 
-        // ====================================================
-        // 2. Verify JWT
-        // ====================================================
+		// ========================================================
+		// 1. Resolve Servlet Request
+		// ========================================================
 
-        final Claims claims;
+		if (!(request instanceof ServletServerHttpRequest servletRequest)) {
 
-        try {
-            claims = Jwts.parser()
-                    .verifyWith(
-                            Keys.hmacShaKeyFor(
-                                    secretKey.getBytes(
-                                            StandardCharsets.UTF_8
-                                    )
-                            )
-                    )
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
+			unauthorized(response);
+			return false;
+		}
 
-        } catch (JwtException | IllegalArgumentException e) {
+		HttpServletRequest httpRequest = servletRequest.getServletRequest();
 
-            log.warn("[WS AUTH] Invalid JWT");
+		// ========================================================
+		// 2. Resolve Authentication Source
+		// ========================================================
 
-            unauthorized(response);
-            return false;
-        }
+		ResolvedToken resolvedToken = resolveToken(httpRequest);
 
-        // ====================================================
-        // 3. Verify Expiration
-        // ====================================================
+		if (resolvedToken == null) {
 
-        Date expiration = claims.getExpiration();
+			log.debug("[WS AUTH] Missing or ambiguous credentials");
 
-        if (expiration == null ||
-                !expiration.after(new Date())) {
+			unauthorized(response);
+			return false;
+		}
 
-            unauthorized(response);
-            return false;
-        }
+		String token = resolvedToken.token;
 
-        // ====================================================
-        // 4. Verify Subject
-        // ====================================================
+		// ========================================================
+		// 3. Verify JWT Signature
+		// ========================================================
 
-        String userId = claims.getSubject();
+		final Claims claims;
 
-        if (userId == null || userId.isBlank()) {
+		try {
 
-            unauthorized(response);
-            return false;
-        }
+			claims = Jwts.parser().verifyWith(Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8))).build()
+					.parseSignedClaims(token).getPayload();
 
-        // ====================================================
-        // 5. Verify FCM Device
-        // ====================================================
+		} catch (JwtException | IllegalArgumentException e) {
 
-        final FcmRecord fcmRecord;
+			log.debug("[WS AUTH] Invalid JWT");
 
-        try {
-            fcmRecord = fcmRecordService.getFcmRecord(token);
+			unauthorized(response);
+			return false;
+		}
 
-        } catch (RuntimeException e) {
+		// ========================================================
+		// 4. Verify Expiration
+		// ========================================================
 
-            log.error(
-                    "[WS AUTH] FCM verification lookup failed",
-                    e
-            );
+		Date expiration = claims.getExpiration();
 
-            response.setStatusCode(
-                    HttpStatus.SERVICE_UNAVAILABLE
-            );
+		if (expiration == null || !expiration.after(new Date())) {
 
-            return false;
-        }
+			log.debug("[WS AUTH] JWT expired");
 
-        if (fcmRecord == null ||
-                fcmRecord.getFcmToken() == null ||
-                fcmRecord.getFcmToken().isBlank()) {
+			unauthorized(response);
+			return false;
+		}
 
-            unauthorized(response);
-            return false;
-        }
+		// ========================================================
+		// 5. Verify Subject
+		// ========================================================
 
-        /*
-         * getFcmRecord(token) 必須確保：
-         *
-         * - 裝置已完成驗證
-         * - Token 尚未撤銷
-         * - 裝置紀錄仍有效
-         *
-         * 如果目前的方法只是單純查詢，
-         * 請在 FcmRecordService 補上完整條件。
-         */
+		String userId = claims.getSubject();
 
-        // ====================================================
-        // 6. Store userId
-        // ====================================================
+		if (userId == null || userId.isBlank()) {
 
-        attributes.put(
-                WebSocketAttributes.USER_ID,
-                userId
-        );
+			unauthorized(response);
+			return false;
+		}
 
-        log.debug(
-                "[WS AUTH] Handshake authenticated, userId={}",
-                userId
-        );
+		// ========================================================
+		// 6. Verify Guest Role
+		// ========================================================
 
-        return true;
-    }
+		Object rolesValue = claims.get("roles");
 
-    /**
-     * New Web:
-     * Cookie: bstock_guest_token=<JWT>
-     *
-     * Legacy:
-     * /ws/websocket?token=<JWT>
-     *
-     * Reject ambiguous authentication sources.
-     */
-    private String resolveToken(HttpServletRequest request) {
+		if (!(rolesValue instanceof List<?> roles) || !roles.contains(GUEST_ROLE)) {
 
-        String cookieToken = null;
-        int cookieCount = 0;
+			log.debug("[WS AUTH] Invalid guest role");
 
-        Cookie[] cookies = request.getCookies();
+			unauthorized(response);
+			return false;
+		}
 
-        if (cookies != null) {
-            for (Cookie cookie : cookies) {
+		// ========================================================
+		// 7. Determine Token Type
+		// ========================================================
 
-                if (JWT_COOKIE_NAME.equals(cookie.getName())) {
-                    cookieCount++;
-                    cookieToken = cookie.getValue();
-                }
-            }
-        }
+		String tokenType = claims.get("token_type", String.class);
 
-        if (cookieCount > 1) {
-            return null;
-        }
+		// ========================================================
+		// 8. WEB: Turnstile JWT + Redis
+		// ========================================================
 
-        String[] queryTokens =
-                request.getParameterValues("token");
+		if (WEB_TOKEN_TYPE.equals(tokenType)) {
 
-        if (queryTokens != null && queryTokens.length != 1) {
-            return null;
-        }
+			// Web authentication only accepts Cookie.
+			if (resolvedToken.source != TokenSource.COOKIE) {
 
-        String queryToken =
-                queryTokens == null ? null : queryTokens[0];
+				log.debug("[WS AUTH] Web JWT must use Cookie");
 
-        if (cookieToken != null && queryToken != null) {
-            return null;
-        }
+				unauthorized(response);
+				return false;
+			}
 
-        String resolved =
-                cookieToken != null
-                        ? cookieToken
-                        : queryToken;
+			if (!validateWebSession(userId, token, response)) {
 
-        if (resolved == null || resolved.isBlank()) {
-            return null;
-        }
+				return false;
+			}
 
-        return resolved.trim();
-    }
+			log.debug("[WS AUTH] Web guest authenticated, userId={}", userId);
 
-    private void unauthorized(ServerHttpResponse response) {
-        response.setStatusCode(HttpStatus.UNAUTHORIZED);
-    }
+			// ========================================================
+			// 9. MOBILE: Legacy FCM JWT
+			// ========================================================
 
-    @Override
-    public void afterHandshake(
-            ServerHttpRequest request,
-            ServerHttpResponse response,
-            WebSocketHandler wsHandler,
-            Exception exception
-    ) {
-        // No additional cleanup.
-    }
+		} else if (tokenType == null || tokenType.isBlank()) {
+
+			// Existing Mobile WebSocket uses ?token=<JWT>.
+			if (resolvedToken.source != TokenSource.QUERY) {
+
+				log.debug("[WS AUTH] Mobile JWT must use query token");
+
+				unauthorized(response);
+				return false;
+			}
+
+			if (!validateMobileSession(userId, token, response)) {
+
+				return false;
+			}
+
+			log.debug("[WS AUTH] Mobile guest authenticated, userId={}", userId);
+
+			// ========================================================
+			// 10. Unknown JWT Type
+			// ========================================================
+
+		} else {
+
+			log.warn("[WS AUTH] Unsupported token type={}", tokenType);
+
+			unauthorized(response);
+			return false;
+		}
+
+		// ========================================================
+		// 11. Store userId for HandshakeHandler / STOMP
+		// ========================================================
+
+		attributes.put(WebSocketAttributes.USER_ID, userId);
+
+		return true;
+	}
+
+	// ============================================================
+	// WEB Session Validation
+	// ============================================================
+
+	/**
+	 * Web JWT must:
+	 *
+	 * 1. Have a valid signature and expiration. 2. Have token_type = web_guest. 3.
+	 * Arrive through bstock_guest_token Cookie. 4. Match Redis web:jwt:{guestId}.
+	 *
+	 * No FcmRecord lookup.
+	 */
+	private boolean validateWebSession(String guestId, String token, ServerHttpResponse response) {
+
+		String redisKey = WEB_JWT_REDIS_PREFIX + guestId;
+
+		final String cachedToken;
+
+		try {
+
+			cachedToken = redissonClient.<String>getBucket(redisKey).get();
+
+		} catch (RuntimeException e) {
+
+			log.error("[WS AUTH] Web Redis session lookup failed", e);
+
+			serviceUnavailable(response);
+			return false;
+		}
+
+		if (!secureTokenEquals(token, cachedToken)) {
+
+			log.debug("[WS AUTH] Web session not found or revoked");
+
+			unauthorized(response);
+			return false;
+		}
+
+		return true;
+	}
+
+	// ============================================================
+	// MOBILE Session Validation
+	// ============================================================
+
+	/**
+	 * Preserve Mobile FCM verification.
+	 *
+	 * Mobile JWT does not have token_type yet.
+	 * 
+	 * @throws IOException
+	 */
+	private boolean validateMobileSession(String guestId, String token, ServerHttpResponse response)
+			throws IOException {
+
+		final FcmRecord fcmRecord;
+
+		try {
+
+			fcmRecord = fcmRecordService.getFcmRecord(token);
+
+		} catch (RuntimeException e) {
+
+			log.error("[WS AUTH] Mobile FCM lookup failed", e);
+
+			serviceUnavailable(response);
+			return false;
+		}
+
+		if (fcmRecord == null || fcmRecord.getFcmToken() == null || fcmRecord.getFcmToken().isBlank()) {
+
+			log.debug("[WS AUTH] Mobile FCM record invalid");
+
+			unauthorized(response);
+			return false;
+		}
+
+		// The JWT must still be the one allowed by FCM.
+		if (!secureTokenEquals(token, fcmRecord.getAllowedJwt())) {
+
+			unauthorized(response);
+			return false;
+		}
+
+		// Verify that the FCM token belongs to this guestId.
+		String expectedGuestId = org.apache.commons.codec.digest.DigestUtils.md5Hex(fcmRecord.getFcmToken())
+				.toUpperCase(java.util.Locale.ROOT);
+
+		if (!expectedGuestId.equals(guestId)) {
+
+			unauthorized(response);
+			return false;
+		}
+
+		// Preserve the Mobile Redis session binding.
+		final String cachedToken;
+
+		try {
+
+			cachedToken = redissonClient.<String>getBucket("jwt:" + guestId).get();
+
+		} catch (RuntimeException e) {
+
+			log.error("[WS AUTH] Mobile Redis session lookup failed", e);
+
+			serviceUnavailable(response);
+			return false;
+		}
+
+		if (!secureTokenEquals(token, cachedToken)) {
+
+			unauthorized(response);
+			return false;
+		}
+
+		return true;
+	}
+
+	// ============================================================
+	// Resolve JWT
+	// ============================================================
+
+	/**
+	 * WEB: Cookie: bstock_guest_token=<JWT>
+	 *
+	 * MOBILE (legacy): /ws/websocket?token=<JWT>
+	 *
+	 * Reject ambiguous credential sources.
+	 */
+	private ResolvedToken resolveToken(HttpServletRequest request) {
+
+		String cookieToken = null;
+		int cookieCount = 0;
+
+		Cookie[] cookies = request.getCookies();
+
+		if (cookies != null) {
+
+			for (Cookie cookie : cookies) {
+
+				if (JWT_COOKIE_NAME.equals(cookie.getName())) {
+
+					cookieCount++;
+					cookieToken = cookie.getValue();
+				}
+			}
+		}
+
+		if (cookieCount > 1) {
+			return null;
+		}
+
+		String[] queryTokens = request.getParameterValues("token");
+
+		if (queryTokens != null && queryTokens.length != 1) {
+			return null;
+		}
+
+		String queryToken = queryTokens == null ? null : queryTokens[0];
+
+		// Reject multiple authentication sources.
+		if (cookieToken != null && queryToken != null) {
+			return null;
+		}
+
+		// Web Cookie.
+		if (cookieToken != null && !cookieToken.isBlank()) {
+
+			return new ResolvedToken(cookieToken.trim(), TokenSource.COOKIE);
+		}
+
+		// Legacy Mobile query token.
+		if (queryToken != null && !queryToken.isBlank()) {
+
+			return new ResolvedToken(queryToken.trim(), TokenSource.QUERY);
+		}
+
+		return null;
+	}
+
+	// ============================================================
+	// Constant-Time Token Comparison
+	// ============================================================
+
+	private boolean secureTokenEquals(String expected, String actual) {
+
+		if (expected == null || actual == null) {
+			return false;
+		}
+
+		return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
+				actual.getBytes(StandardCharsets.UTF_8));
+	}
+
+	// ============================================================
+	// HTTP Error Responses
+	// ============================================================
+
+	private void unauthorized(ServerHttpResponse response) {
+
+		response.setStatusCode(HttpStatus.UNAUTHORIZED);
+	}
+
+	private void serviceUnavailable(ServerHttpResponse response) {
+
+		response.setStatusCode(HttpStatus.SERVICE_UNAVAILABLE);
+	}
+
+	// ============================================================
+	// Authentication Source
+	// ============================================================
+
+	private enum TokenSource {
+
+		COOKIE, QUERY
+	}
+
+	private static final class ResolvedToken {
+
+		private final String token;
+
+		private final TokenSource source;
+
+		private ResolvedToken(String token, TokenSource source) {
+
+			this.token = token;
+			this.source = source;
+		}
+	}
+
+	// ============================================================
+	// After Handshake
+	// ============================================================
+
+	@Override
+	public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler,
+			Exception exception) {
+
+		// No additional cleanup.
+	}
 }

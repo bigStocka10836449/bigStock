@@ -2,6 +2,7 @@ package com.bigstock.biz.infra;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,8 @@ public class NewsStreamConsumer {
     private static final String STREAM_KEY = "news_stream_for_server";
     private static final String GROUP = "news_group";
     private static final String CONSUMER = "consumer_1";
+    
+    private static final int MAX_NEWS_RECORDS = 31;
 
 
     // ============================================================
@@ -272,42 +275,89 @@ public class NewsStreamConsumer {
     }
 
 
-    public List<Map<String, Object>> getAllNews(
-            int limit
-    ) {
+    public List<Map<String, Object>> getAllNews(int limit) {
 
         List<MapRecord<String, Object, Object>> records =
-                redisTemplate.opsForStream().range(
+                redisTemplate.opsForStream().reverseRange(
                         STREAM_KEY,
                         Range.unbounded(),
                         Limit.limit().count(limit)
                 );
 
+        List<Map<String, Object>> result = new ArrayList<>();
 
-        List<Map<String, Object>> result =
-                new ArrayList<>();
-
+        if (records == null || records.isEmpty()) {
+            return result;
+        }
 
         for (MapRecord<String, Object, Object> record : records) {
 
-            Map<String, Object> map =
-                    new HashMap<>();
+            Map<String, Object> map = new HashMap<>();
 
-
-            map.put(
-                    "id",
-                    record.getId().getValue()
-            );
-
-            map.put(
-                    "data",
-                    record.getValue()
-            );
-
+            map.put("id", record.getId().getValue());
+            map.put("data", record.getValue());
 
             result.add(map);
         }
 
+        return result;
+    }
+    
+    /**
+     * 只取得最新一筆 Redis Stream Record。
+     *
+     * 用於前端每 20 秒檢查是否有新新聞。
+     *
+     * 不回傳完整新聞內容，避免不必要的流量。
+     */
+    public Map<String, Object> getLatestNews() {
+
+        List<MapRecord<String, Object, Object>> records =
+                redisTemplate.opsForStream().reverseRange(
+                        STREAM_KEY,
+                        Range.unbounded(),
+                        Limit.limit().count(1)
+                );
+
+        if (records == null || records.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        MapRecord<String, Object, Object> latest = records.get(0);
+
+        Map<String, Object> result = new HashMap<>(1);
+
+        result.put("id", latest.getId().getValue());
+
+        return result;
+    }
+    
+    public List<Map<String, Object>> getNewsSince(String afterId) {
+
+        List<MapRecord<String, Object, Object>> records =
+                redisTemplate.opsForStream().range(
+                        STREAM_KEY,
+                        Range.from(Range.Bound.exclusive(afterId))
+                             .to(Range.Bound.unbounded()),
+                        Limit.limit().count(MAX_NEWS_RECORDS)
+                );
+
+        if (records == null || records.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Map<String, Object>> result =
+                new ArrayList<>(records.size());
+
+        for (MapRecord<String, Object, Object> record : records) {
+
+            Map<String, Object> map = new HashMap<>(2);
+
+            map.put("id", record.getId().getValue());
+            map.put("data", record.getValue());
+
+            result.add(map);
+        }
 
         return result;
     }
