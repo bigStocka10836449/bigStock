@@ -20,9 +20,12 @@ import com.bigstock.biz.component.ConnectInterceptor;
 import com.bigstock.biz.component.JwtHandshakeInterceptor;
 import com.bigstock.biz.component.LocalSessionRegistry;
 import com.bigstock.biz.component.PrincipalHandshakeHandler;
+import com.bigstock.biz.component.SocketSingleSessionService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Configuration
 @EnableWebSocketMessageBroker
 @RequiredArgsConstructor
@@ -32,24 +35,27 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	private final PrincipalHandshakeHandler principalHandshakeHandler;
 	private final ConnectInterceptor connectInterceptor;
 	private final LocalSessionRegistry registry;
+	private final SocketSingleSessionService sessions;
+	private final BigStockWebSocketOriginInterceptor bigStockWebSocketOriginInterceptor;
 
 	@Value("${security.websocket.allowed-origins}")
 	private String webSocketAllowedOrigins;
 
-	private final BigStockWebSocketOriginInterceptor bigStockWebSocketOriginInterceptor;
-
 	@Override
 	public void configureMessageBroker(MessageBrokerRegistry registry) {
+
 		registry.enableSimpleBroker("/topic").setHeartbeatValue(new long[] { 10000, 10000 })
 				.setTaskScheduler(webSocketTaskScheduler());
-		registry.setApplicationDestinationPrefixes("/app");
 	}
 
 	@Override
 	public void registerStompEndpoints(StompEndpointRegistry registry) {
-		registry.addEndpoint("/ws")
-				.setAllowedOrigins(
-						Arrays.stream(webSocketAllowedOrigins.split(",")).map(String::trim).toArray(String[]::new))
+		String[] allowedOrigins = Arrays.stream(webSocketAllowedOrigins.split(",")).map(String::trim)
+				.filter(s -> !s.isBlank()).toArray(String[]::new);
+		if (allowedOrigins.length == 0 || Arrays.asList(allowedOrigins).contains("*")) {
+			throw new IllegalStateException("Explicit WebSocket origins are required");
+		}
+		registry.addEndpoint("/ws").setAllowedOrigins(allowedOrigins)
 				.addInterceptors(bigStockWebSocketOriginInterceptor, jwtHandshakeInterceptor)
 				.setHandshakeHandler(principalHandshakeHandler).withSockJS();
 	}
@@ -59,13 +65,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 		registration.interceptors(connectInterceptor);
 	}
 
-	/**
-	 * 監聽前端自主停止websocket連線或建立連線，將session實例存入到本地cache
-	 */
 	@Override
 	public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
-		registration.addDecoratorFactory(handler -> new WebSocketHandlerDecorator(handler) {
+		// Test against the largest actual inbound STOMP payload before deploying.
+		registration.setMessageSizeLimit(64 * 1024);
+		registration.setSendBufferSizeLimit(512 * 1024);
+		registration.setSendTimeLimit(15_000);
+		registration.setTimeToFirstMessage(30_000);
 
+		registration.addDecoratorFactory(handler -> new WebSocketHandlerDecorator(handler) {
 			@Override
 			public void afterConnectionEstablished(WebSocketSession session) throws Exception {
 				registry.register(session);
@@ -74,21 +82,26 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
 			@Override
 			public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
-				registry.remove(session.getId());
-				super.afterConnectionClosed(session, status);
+				try {
+					registry.remove(session.getId());
+					// Compare-and-delete prevents an old connection from deleting
+					// a new connection's active session mapping.
+					try {
+						sessions.disconnect(session.getId());
+					} catch (RuntimeException ex) {
+						log.error("[WS] Redis cleanup failed", ex);
+					}
+				} finally {
+					super.afterConnectionClosed(session, status);
+				}
 			}
 		});
 	}
 
-	/**
-	 * 設定socket session 心跳監控排程
-	 * 
-	 * @return
-	 */
 	@Bean
 	public ThreadPoolTaskScheduler webSocketTaskScheduler() {
 		ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
-		scheduler.setPoolSize(1);
+		scheduler.setPoolSize(2);
 		scheduler.setThreadNamePrefix("ws-heartbeat-");
 		scheduler.initialize();
 		return scheduler;
