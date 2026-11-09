@@ -47,7 +47,7 @@ public class CacheOperatorService {
 
 	@Autowired
 	private RedisTemplate<String, Object> redisTemplate;
-	
+
 	@Autowired
 	private StringRedisTemplate stringRedisTemplate;
 
@@ -74,7 +74,7 @@ public class CacheOperatorService {
 			redisTemplate.expire(redisKey, sliding);
 		}
 	}
-	
+
 	private void touch(String redisKey, Duration sliding) {
 		if (sliding != null) {
 			redisTemplate.expire(redisKey, sliding);
@@ -195,8 +195,7 @@ public class CacheOperatorService {
 				byte[] rawKey = keySer.serialize(redisKey);
 
 				// remove duplicate timestamp candle
-				connection.zSetCommands()
-		          .zRemRangeByScore(rawKey, score, score);
+				connection.zSetCommands().zRemRangeByScore(rawKey, score, score);
 
 				// insert new candle
 				connection.zAdd(rawKey, score, compressed);
@@ -221,56 +220,85 @@ public class CacheOperatorService {
 	public <T> void batchUpsertCompressedZSetSeries(String cacheName, String key, List<T> values,
 			ToDoubleFunction<T> scoreExtractor, int maxSize) {
 
-		if (values == null || values.isEmpty())
+		if (values == null || values.isEmpty()) {
 			return;
+		}
+
+		if (maxSize <= 0) {
+			throw new IllegalArgumentException("maxSize must be greater than zero");
+		}
 
 		String redisKey = buildKey(cacheName, key);
+
+		// ==========================================
+		// 1. Defensive Copy + Sorting
+		// ==========================================
+
+		List<T> sortedValues = new ArrayList<>(values);
+
+		sortedValues.sort(Comparator.comparingDouble(scoreExtractor::applyAsDouble));
+
+		// ==========================================
+		// 2. Initialize Redis Components
+		// ==========================================
+
+		RedisSerializer<String> keySerializer = rawRedisTemplate.getStringSerializer();
+
+		byte[] rawKey = keySerializer.serialize(redisKey);
+
 		ObjectMapper objectMapper = new ObjectMapper();
-		// optional but recommended
-		values.sort(Comparator.comparingDouble(scoreExtractor::applyAsDouble));
 
-		for (int i = 0; i < values.size(); i += PIPELINE_CHUNK) {
+		// ==========================================
+		// 3. Pipeline Batch Upsert
+		// ==========================================
 
-			List<T> chunk = values.subList(i, Math.min(i + PIPELINE_CHUNK, values.size()));
+		for (int i = 0; i < sortedValues.size(); i += PIPELINE_CHUNK) {
+
+			List<T> chunk = sortedValues.subList(i, Math.min(i + PIPELINE_CHUNK, sortedValues.size()));
 
 			rawRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
 
-				RedisSerializer<String> keySer = rawRedisTemplate.getStringSerializer();
+				for (T value : chunk) {
 
-				byte[] rawKey = keySer.serialize(redisKey);
-
-				for (T v : chunk) {
-
-					double score = scoreExtractor.applyAsDouble(v);
+					double score = scoreExtractor.applyAsDouble(value);
 
 					try {
 
-						byte[] json = objectMapper.writeValueAsBytes(v);
+						byte[] json = objectMapper.writeValueAsBytes(value);
+
 						byte[] compressed = gzipCompress(json);
 
-						// overwrite same timestamp candle
-						connection.zSetCommands()
-				          .zRemRangeByScore(rawKey, score, score);
+						// Remove existing candle with same timestamp
+						connection.zSetCommands().zRemRangeByScore(rawKey, score, score);
 
-						connection.zAdd(rawKey, score, compressed);
+						// Insert recalculated candle
+						connection.zSetCommands().zAdd(rawKey, score, compressed);
 
 					} catch (Exception e) {
-						throw new RuntimeException(e);
+
+						throw new IllegalStateException(
+								"Failed to serialize Redis ZSet value, key=" + redisKey + ", score=" + score, e);
 					}
 				}
 
 				return null;
-
 			});
 		}
 
-		// trim series length
+		// ==========================================
+		// 4. Trim Oldest Records
+		// ==========================================
+
 		Long size = rawRedisTemplate.opsForZSet().size(redisKey);
 
 		if (size != null && size > maxSize) {
 
 			rawRedisTemplate.opsForZSet().removeRange(redisKey, 0, size - maxSize - 1);
 		}
+
+		// ==========================================
+		// 5. Refresh Cache TTL
+		// ==========================================
 
 		touch(redisKey, cacheName);
 	}
@@ -335,15 +363,15 @@ public class CacheOperatorService {
 			throw new IllegalStateException("gzip decompress failed", e);
 		}
 	}
-	
-	/** Only fetch and decompress the requested newest records. */
-	public <T> List<T> getLatestCompressedZSetSeries(String cacheName, String key,
-			Class<T> clazz, int limit) {
-		if (limit <= 0) return Collections.emptyList();
 
-		Set<byte[]> raw = rawRedisTemplate.opsForZSet()
-				.reverseRange(buildKey(cacheName, key), 0, limit - 1L);
-		if (raw == null || raw.isEmpty()) return Collections.emptyList();
+	/** Only fetch and decompress the requested newest records. */
+	public <T> List<T> getLatestCompressedZSetSeries(String cacheName, String key, Class<T> clazz, int limit) {
+		if (limit <= 0)
+			return Collections.emptyList();
+
+		Set<byte[]> raw = rawRedisTemplate.opsForZSet().reverseRange(buildKey(cacheName, key), 0, limit - 1L);
+		if (raw == null || raw.isEmpty())
+			return Collections.emptyList();
 
 		ObjectMapper mapper = new ObjectMapper();
 		List<T> result = new ArrayList<>(raw.size());
@@ -357,8 +385,7 @@ public class CacheOperatorService {
 		return result;
 	}
 
-	public <T> List<T> getCompressedZSetAllScore(String cacheName, String key,
-			Class<T> clazz) {
+	public <T> List<T> getCompressedZSetAllScore(String cacheName, String key, Class<T> clazz) {
 
 		String redisKey = buildKey(cacheName, key);
 
@@ -384,9 +411,8 @@ public class CacheOperatorService {
 
 		return result;
 	}
-	
-	public <T> List<T> getCompressedZSetAllScore(String key,
-			Class<T> clazz) {
+
+	public <T> List<T> getCompressedZSetAllScore(String key, Class<T> clazz) {
 
 		Set<byte[]> raw = rawRedisTemplate.opsForZSet().range(key, 0, -1);
 
@@ -434,127 +460,105 @@ public class CacheOperatorService {
 			throw new RuntimeException("decompress read fail", e);
 		}
 	}
-	
-	public <T> List<T> getCompressedZSetEntries(
-	        String key,
-	        Class<T> targetClass
-	) {
+
+	public <T> List<T> getCompressedZSetEntries(String key, Class<T> targetClass) {
 		ObjectMapper objectMapper = new ObjectMapper();
-	    Set<ZSetOperations.TypedTuple<byte[]>> tuples =
-	            rawRedisTemplate.opsForZSet()
-	                    .rangeWithScores(key, 0, -1);
+		Set<ZSetOperations.TypedTuple<byte[]>> tuples = rawRedisTemplate.opsForZSet().rangeWithScores(key, 0, -1);
 
-	    if (tuples == null || tuples.isEmpty()) {
-	        return Collections.emptyList();
-	    }
+		if (tuples == null || tuples.isEmpty()) {
+			return Collections.emptyList();
+		}
 
-	    List<T> result = new ArrayList<>(tuples.size());
+		List<T> result = new ArrayList<>(tuples.size());
 
-	    for (ZSetOperations.TypedTuple<byte[]> tuple : tuples) {
+		for (ZSetOperations.TypedTuple<byte[]> tuple : tuples) {
 
-	        byte[] raw = tuple.getValue();
+			byte[] raw = tuple.getValue();
 
-	        try {
+			try {
 
-	            T obj = objectMapper.readValue(safeDecode(raw), targetClass);
+				T obj = objectMapper.readValue(safeDecode(raw), targetClass);
 
-	            result.add(obj);
+				result.add(obj);
 
-	        } catch (Exception e) {
-	            throw new RuntimeException(
-	                    "json cast failed → " + targetClass.getSimpleName(),
-	                    e
-	            );
-	        }
-	    }
+			} catch (Exception e) {
+				throw new RuntimeException("json cast failed → " + targetClass.getSimpleName(), e);
+			}
+		}
 
-	    return result;
+		return result;
 	}
-	
+
 	private byte[] safeDecode(byte[] raw) {
 
-	    if (raw == null) {
-	        return null;
-	    }
+		if (raw == null) {
+			return null;
+		}
 
-	    try {
+		try {
 
-	        if (isGzip(raw)) {
-	            return gzipDecompressBytes(raw);
-	        }
+			if (isGzip(raw)) {
+				return gzipDecompressBytes(raw);
+			}
 
-	        return raw;
+			return raw;
 
-	    } catch (Exception e) {
-	        throw new RuntimeException("decode cache value failed", e);
-	    }
+		} catch (Exception e) {
+			throw new RuntimeException("decode cache value failed", e);
+		}
 	}
-	
-	public <T> void putSnapshotDataListAtomic(
-			String cacheName, String key,
-	        List<T> data
-	) {
+
+	public <T> void putSnapshotDataListAtomic(String cacheName, String key, List<T> data) {
 
 		String redisKey = buildKey(cacheName, key);
-	    try {
-	    	ObjectMapper objectMapper = new ObjectMapper();
-	    	objectMapper.registerModule(new JavaTimeModule());
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
+			objectMapper.registerModule(new JavaTimeModule());
 			byte[] jsonByte = objectMapper.writeValueAsBytes(data);
 
-	        String versionKey =
-	        		redisKey + ":v" + System.currentTimeMillis();
+			String versionKey = redisKey + ":v" + System.currentTimeMillis();
 
-	        byte[] versionKeyByte = versionKey.getBytes();
-	        
-	        String activeKey =
-	        		redisKey + ":active";
+			byte[] versionKeyByte = versionKey.getBytes();
 
-	     // write snapshot blob
-	        rawRedisTemplate.opsForValue()
-	                .set(versionKey, jsonByte);
+			String activeKey = redisKey + ":active";
 
-	        // atomic pointer swap
-	        rawRedisTemplate.opsForValue()
-	                .set(activeKey, versionKeyByte);
+			// write snapshot blob
+			rawRedisTemplate.opsForValue().set(versionKey, jsonByte);
 
-	    } catch (Exception e) {
+			// atomic pointer swap
+			rawRedisTemplate.opsForValue().set(activeKey, versionKeyByte);
 
-	        log.error("put snapshot failed redisKey={}", redisKey, e);
-	    }
+		} catch (Exception e) {
+
+			log.error("put snapshot failed redisKey={}", redisKey, e);
+		}
 	}
-	
-	public <T> void putSnapshotDataAtomic(
-			String cacheName, String key,
-	        T data
-	) {
+
+	public <T> void putSnapshotDataAtomic(String cacheName, String key, T data) {
 
 		String redisKey = buildKey(cacheName, key);
-	    try {
-	    	ObjectMapper objectMapper = new ObjectMapper();
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
 			byte[] jsonByte = objectMapper.writeValueAsBytes(data);
 
-	        String versionKey =
-	        		redisKey + ":v" + System.currentTimeMillis();
+			String versionKey = redisKey + ":v" + System.currentTimeMillis();
 
-	        byte[] versionKeyByte = versionKey.getBytes();
-	        
-	        String activeKey =
-	        		redisKey + ":active";
+			byte[] versionKeyByte = versionKey.getBytes();
 
-	     // write snapshot blob
-	        rawRedisTemplate.opsForValue()
-	                .set(versionKey, jsonByte);
+			String activeKey = redisKey + ":active";
 
-	        // atomic pointer swap
-	        rawRedisTemplate.opsForValue()
-	                .set(activeKey, versionKeyByte);
+			// write snapshot blob
+			rawRedisTemplate.opsForValue().set(versionKey, jsonByte);
 
-	    } catch (Exception e) {
+			// atomic pointer swap
+			rawRedisTemplate.opsForValue().set(activeKey, versionKeyByte);
 
-	        log.error("put snapshot failed redisKey={}", redisKey, e);
-	    }
+		} catch (Exception e) {
+
+			log.error("put snapshot failed redisKey={}", redisKey, e);
+		}
 	}
-	
+
 	public <T> void putDataList(String cacheName, String key, List<T> data) {
 
 		String redisKey = buildKey(cacheName, key);
@@ -569,430 +573,372 @@ public class CacheOperatorService {
 			log.error("put dataList failed redisKey={}", redisKey, e);
 		}
 	}
-	
+
 	public <T> List<T> getDataList(String cacheName, String key, Class<T> clazz) {
-	    String redisKeyPattern = buildKey(cacheName, key);
+		String redisKeyPattern = buildKey(cacheName, key);
 
-	    List<T> result = new ArrayList<>();
-	    ObjectMapper objectMapper = new ObjectMapper();
-	    objectMapper.registerModule(new JavaTimeModule());
+		List<T> result = new ArrayList<>();
+		ObjectMapper objectMapper = new ObjectMapper();
+		objectMapper.registerModule(new JavaTimeModule());
 
-	    RedisConnection connection = null;
-	    Cursor<byte[]> cursor = null;
+		RedisConnection connection = null;
+		Cursor<byte[]> cursor = null;
 
-	    try {
-	        connection = rawRedisTemplate.getConnectionFactory().getConnection();
+		try {
+			connection = rawRedisTemplate.getConnectionFactory().getConnection();
 
-	        cursor = connection.scan(ScanOptions.scanOptions()
-	                .match(redisKeyPattern)
-	                .count(100)
-	                .build());
+			cursor = connection.scan(ScanOptions.scanOptions().match(redisKeyPattern).count(100).build());
 
-	        while (cursor.hasNext()) {
-	            byte[] currentKey = cursor.next();
+			while (cursor.hasNext()) {
+				byte[] currentKey = cursor.next();
 
-	            // ✅ IMPORTANT: use connection.get(), NOT redisTemplate
-	            byte[] value = connection.get(currentKey);
+				// ✅ IMPORTANT: use connection.get(), NOT redisTemplate
+				byte[] value = connection.get(currentKey);
 				JavaType type = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
 
 				List<T> list = objectMapper.readValue(value, type);
 				result.addAll(list);
 			}
 
-	        return result;
+			return result;
 
-	    } catch (Exception e) {
-	        log.error("get dataList failed redisKey={}", redisKeyPattern, e);
-	        return List.of();
-	    } finally {
-	        try {
-	            if (cursor != null) cursor.close();
-	            if (connection != null) connection.close();
-	        } catch (Exception ignore) {}
-	    }
+		} catch (Exception e) {
+			log.error("get dataList failed redisKey={}", redisKeyPattern, e);
+			return List.of();
+		} finally {
+			try {
+				if (cursor != null)
+					cursor.close();
+				if (connection != null)
+					connection.close();
+			} catch (Exception ignore) {
+			}
+		}
 	}
-	
-	public <T> List<T> getSnapshotDataList(
-			String cacheName, String key,
-	        Class<T> clazz
-	) {
+
+	public <T> List<T> getSnapshotDataList(String cacheName, String key, Class<T> clazz) {
 		String redisKey = buildKey(cacheName, key);
-	    try {
-	    	ObjectMapper objectMapper = new ObjectMapper();
-	        String activeKey = redisKey + ":active";
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
+			String activeKey = redisKey + ":active";
 
-		    byte[] activeVersionBytes =
-		            rawRedisTemplate.opsForValue().get(activeKey);
-	        if (activeVersionBytes == null) {
-	            return List.of();
-	        }
-	        String versionKey = new String(activeVersionBytes);
-	        byte[] json =
-	                rawRedisTemplate.opsForValue()
-	                        .get(versionKey);
-	        if (json == null) {
-	            return List.of();
-	        }
+			byte[] activeVersionBytes = rawRedisTemplate.opsForValue().get(activeKey);
+			if (activeVersionBytes == null) {
+				return List.of();
+			}
+			String versionKey = new String(activeVersionBytes);
+			byte[] json = rawRedisTemplate.opsForValue().get(versionKey);
+			if (json == null) {
+				return List.of();
+			}
 
-	        JavaType type = objectMapper.getTypeFactory()
-	                .constructCollectionType(List.class, clazz);
+			JavaType type = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
 
-	        return objectMapper.readValue(json, type);
+			return objectMapper.readValue(json, type);
 
-	    } catch (Exception e) {
+		} catch (Exception e) {
 
-	        log.error("read snapshot failed redisKey={}", redisKey, e);
-	        return List.of();
-	    }
+			log.error("read snapshot failed redisKey={}", redisKey, e);
+			return List.of();
+		}
 	}
-	
-	public <T> Map<String, List<T>> getSnapshotDataListBatch(
-	        String cacheName,
-	        List<String> keys,
-	        Class<T> clazz
-	) {
+
+	public <T> Map<String, List<T>> getSnapshotDataListBatch(String cacheName, List<String> keys, Class<T> clazz) {
 		ObjectMapper objectMapper = new ObjectMapper();
-	    Map<String, List<T>> result = new LinkedHashMap<>();
+		Map<String, List<T>> result = new LinkedHashMap<>();
 
-	    if (CollectionUtils.isEmpty(keys)) {
-	        return result;
-	    }
+		if (CollectionUtils.isEmpty(keys)) {
+			return result;
+		}
 
-	    try {
+		try {
 
-	        // 1. Build Redis keys
-	        List<String> redisKeys = new ArrayList<>();
-	        List<String> activeKeys = new ArrayList<>();
+			// 1. Build Redis keys
+			List<String> redisKeys = new ArrayList<>();
+			List<String> activeKeys = new ArrayList<>();
 
-	        for (String key : keys) {
+			for (String key : keys) {
 
-	            String redisKey = buildKey(cacheName, key);
+				String redisKey = buildKey(cacheName, key);
 
-	            redisKeys.add(redisKey);
-	            activeKeys.add(redisKey + ":active");
-	        }
+				redisKeys.add(redisKey);
+				activeKeys.add(redisKey + ":active");
+			}
 
-	        // 2. Batch GET active pointers
-	        List<byte[]> activeVersions =
-	                rawRedisTemplate.opsForValue()
-	                        .multiGet(activeKeys);
+			// 2. Batch GET active pointers
+			List<byte[]> activeVersions = rawRedisTemplate.opsForValue().multiGet(activeKeys);
 
-	        if (activeVersions == null) {
-	            return result;
-	        }
+			if (activeVersions == null) {
+				return result;
+			}
 
-	        // 3. Build version keys
-	        List<String> versionKeys = new ArrayList<>();
-	        List<String> validKeys = new ArrayList<>();
+			// 3. Build version keys
+			List<String> versionKeys = new ArrayList<>();
+			List<String> validKeys = new ArrayList<>();
 
-	        for (int i = 0; i < activeVersions.size(); i++) {
+			for (int i = 0; i < activeVersions.size(); i++) {
 
-	            byte[] activeBytes = activeVersions.get(i);
+				byte[] activeBytes = activeVersions.get(i);
 
-	            if (activeBytes == null) {
-	                continue;
-	            }
+				if (activeBytes == null) {
+					continue;
+				}
 
-	            String versionKey = new String(
-	                    activeBytes,
-	                    StandardCharsets.UTF_8
-	            );
+				String versionKey = new String(activeBytes, StandardCharsets.UTF_8);
 
-	            versionKeys.add(versionKey);
-	            validKeys.add(keys.get(i));
-	        }
+				versionKeys.add(versionKey);
+				validKeys.add(keys.get(i));
+			}
 
-	        if (versionKeys.isEmpty()) {
-	            return result;
-	        }
+			if (versionKeys.isEmpty()) {
+				return result;
+			}
 
-	        // 4. Batch GET snapshot data
-	        List<byte[]> snapshots =
-	                rawRedisTemplate.opsForValue()
-	                        .multiGet(versionKeys);
+			// 4. Batch GET snapshot data
+			List<byte[]> snapshots = rawRedisTemplate.opsForValue().multiGet(versionKeys);
 
-	        if (snapshots == null) {
-	            return result;
-	        }
+			if (snapshots == null) {
+				return result;
+			}
 
-	        // 5. Deserialize JSON
-	        JavaType type = objectMapper.getTypeFactory()
-	                .constructCollectionType(List.class, clazz);
+			// 5. Deserialize JSON
+			JavaType type = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
 
-	        for (int i = 0; i < snapshots.size(); i++) {
+			for (int i = 0; i < snapshots.size(); i++) {
 
-	            byte[] json = snapshots.get(i);
+				byte[] json = snapshots.get(i);
 
-	            if (json == null) {
-	                continue;
-	            }
+				if (json == null) {
+					continue;
+				}
 
-	            try {
+				try {
 
-	                List<T> data =
-	                        objectMapper.readValue(json, type);
+					List<T> data = objectMapper.readValue(json, type);
 
-	                result.put(validKeys.get(i), data);
+					result.put(validKeys.get(i), data);
 
-	            } catch (Exception e) {
+				} catch (Exception e) {
 
-	                log.error(
-	                        "Deserialize snapshot failed key={}",
-	                        validKeys.get(i),
-	                        e
-	                );
-	            }
-	        }
+					log.error("Deserialize snapshot failed key={}", validKeys.get(i), e);
+				}
+			}
 
-	    } catch (Exception e) {
+		} catch (Exception e) {
 
-	        log.error(
-	                "Batch snapshot read failed cacheName={}",
-	                cacheName,
-	                e
-	        );
-	    }
+			log.error("Batch snapshot read failed cacheName={}", cacheName, e);
+		}
 
-	    return result;
+		return result;
 	}
-	
-	public <T> T getSnapshotData(
-	        String cacheName,
-	        String key,
-	        Class<T> clazz
-	) {
-	    String redisKey = buildKey(cacheName, key);
 
-	    try {
-	        ObjectMapper objectMapper = new ObjectMapper();
+	public <T> T getSnapshotData(String cacheName, String key, Class<T> clazz) {
+		String redisKey = buildKey(cacheName, key);
 
-	        String activeKey = redisKey + ":active";
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
 
-	        byte[] activeVersionBytes =
-	                rawRedisTemplate.opsForValue().get(activeKey);
-	        if (activeVersionBytes == null) {
-	            return null;
-	        }
+			String activeKey = redisKey + ":active";
 
-	        String versionKey = new String(activeVersionBytes);
+			byte[] activeVersionBytes = rawRedisTemplate.opsForValue().get(activeKey);
+			if (activeVersionBytes == null) {
+				return null;
+			}
 
-	        byte[] json =
-	                rawRedisTemplate.opsForValue().get(versionKey);
-	        if (json == null) {
-	            return null;
-	        }
+			String versionKey = new String(activeVersionBytes);
 
-	        return objectMapper.readValue(json, clazz);
+			byte[] json = rawRedisTemplate.opsForValue().get(versionKey);
+			if (json == null) {
+				return null;
+			}
 
-	    } catch (Exception e) {
-	        log.error("read snapshot failed redisKey={}", redisKey, e);
-	        return null;
-	    }
+			return objectMapper.readValue(json, clazz);
+
+		} catch (Exception e) {
+			log.error("read snapshot failed redisKey={}", redisKey, e);
+			return null;
+		}
 	}
-	public <T> void putSnapshotDataListCompressedAtomic(
-			String cacheName, String key,
-	        List<T> data
-	) {
+
+	public <T> void putSnapshotDataListCompressedAtomic(String cacheName, String key, List<T> data) {
 
 		String redisKey = buildKey(cacheName, key);
-	    try {
-	    	ObjectMapper objectMapper = new ObjectMapper();
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
 			byte[] jsonByte = objectMapper.writeValueAsBytes(data);
-	        byte[] compressed = gzipCompress(jsonByte);
+			byte[] compressed = gzipCompress(jsonByte);
 
-	        String versionKey =
-	        		redisKey + ":v" + System.currentTimeMillis();
+			String versionKey = redisKey + ":v" + System.currentTimeMillis();
 
-	        byte[] versionKeycompressed = gzipCompress(versionKey.getBytes());
-	        
-	        String activeKey =
-	        		redisKey + ":active";
+			byte[] versionKeycompressed = gzipCompress(versionKey.getBytes());
 
-	     // write snapshot blob
-	        rawRedisTemplate.opsForValue()
-	                .set(versionKey, compressed);
+			String activeKey = redisKey + ":active";
 
-	        // atomic pointer swap
-	        rawRedisTemplate.opsForValue()
-	                .set(activeKey, versionKeycompressed);
+			// write snapshot blob
+			rawRedisTemplate.opsForValue().set(versionKey, compressed);
 
-	    } catch (Exception e) {
+			// atomic pointer swap
+			rawRedisTemplate.opsForValue().set(activeKey, versionKeycompressed);
 
-	        log.error("put snapshot failed redisKey={}", redisKey, e);
-	    }
+		} catch (Exception e) {
+
+			log.error("put snapshot failed redisKey={}", redisKey, e);
+		}
 	}
-	
-	public <T> List<T> getSnapshotDataListDeCompressed(
-			String cacheName, String key,
-	        Class<T> clazz
-	) {
+
+	public <T> List<T> getSnapshotDataListDeCompressed(String cacheName, String key, Class<T> clazz) {
 		String redisKey = buildKey(cacheName, key);
-	    try {
-	    	ObjectMapper objectMapper = new ObjectMapper();
-	        String activeKey = redisKey + ":active";
+		try {
+			ObjectMapper objectMapper = new ObjectMapper();
+			String activeKey = redisKey + ":active";
 
-		    byte[] activeVersionBytes =
-		            rawRedisTemplate.opsForValue().get(activeKey);
-	        if (activeVersionBytes == null) {
-	            return List.of();
-	        }
-	        String versionKey = new String(safeDecode(activeVersionBytes));
-	        byte[] compressed =
-	                rawRedisTemplate.opsForValue()
-	                        .get(versionKey);
+			byte[] activeVersionBytes = rawRedisTemplate.opsForValue().get(activeKey);
+			if (activeVersionBytes == null) {
+				return List.of();
+			}
+			String versionKey = new String(safeDecode(activeVersionBytes));
+			byte[] compressed = rawRedisTemplate.opsForValue().get(versionKey);
 
-	        if (compressed == null) {
-	            return List.of();
-	        }
+			if (compressed == null) {
+				return List.of();
+			}
 
-	        byte[] json = gzipDecompressBytes(compressed);
+			byte[] json = gzipDecompressBytes(compressed);
 
-	        JavaType type = objectMapper.getTypeFactory()
-	                .constructCollectionType(List.class, clazz);
+			JavaType type = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
 
-	        return objectMapper.readValue(json, type);
+			return objectMapper.readValue(json, type);
 
-	    } catch (Exception e) {
+		} catch (Exception e) {
 
-	        log.error("read snapshot failed redisKey={}", redisKey, e);
-	        return List.of();
-	    }
+			log.error("read snapshot failed redisKey={}", redisKey, e);
+			return List.of();
+		}
 	}
-	
-	public <T> Map<String, List<T>> getAllCompressedZSets( String cacheName, String cacheKey,
-			Class<T> clazz) {
+
+	public <T> Map<String, List<T>> getAllCompressedZSets(String cacheName, String cacheKey, Class<T> clazz) {
 		String redisKey = buildKey(cacheName, cacheKey);
-	    List<String> keys = scanCompressedStockKeys(redisKey);
+		List<String> keys = scanCompressedStockKeys(redisKey);
 
-	    Map<String, List<T>> result = new HashMap<>();
+		Map<String, List<T>> result = new HashMap<>();
 
-	    for (String key : keys) {
-	    	List<T> singleCompressedZSetAllScores = getCompressedZSetAllScore(key,clazz);
+		for (String key : keys) {
+			List<T> singleCompressedZSetAllScores = getCompressedZSetAllScore(key, clazz);
 			result.put(key, singleCompressedZSetAllScores);
 		}
 
-	    return result;
+		return result;
 	}
-
-	
 
 	public List<String> scanCompressedStockKeys(String key) {
 
-	    List<String> result = new ArrayList<>();
+		List<String> result = new ArrayList<>();
 
-	    ScanOptions options =
-	            ScanOptions.scanOptions()
-	                    .match(key)
-	                    .count(1000)
-	                    .build();
+		ScanOptions options = ScanOptions.scanOptions().match(key).count(1000).build();
 
-	    Cursor<byte[]> cursor =
-	            rawRedisTemplate.getConnectionFactory()
-	                    .getConnection()
-	                    .keyCommands().scan(options);
-	    
-	    while (cursor.hasNext()) {
-	        result.add(new String(cursor.next()));
-	    }
+		Cursor<byte[]> cursor = rawRedisTemplate.getConnectionFactory().getConnection().keyCommands().scan(options);
 
-	    return result;
+		while (cursor.hasNext()) {
+			result.add(new String(cursor.next()));
+		}
+
+		return result;
 	}
-	
+
 	public long cleanupOldSnapshots(String cacheName, String cacheKey, int keepLatest) {
 
 		String redisKey = buildKey(cacheName, cacheKey);
-	    String activeKey = redisKey + ":active";
+		String activeKey = redisKey + ":active";
 
-	    byte[] activeVersionBytes =
-	            rawRedisTemplate.opsForValue().get(activeKey);
+		byte[] activeVersionBytes = rawRedisTemplate.opsForValue().get(activeKey);
 
-	    String activeVersion =
-	            activeVersionBytes == null
-	                    ? null
-	                    : new String(activeVersionBytes, StandardCharsets.UTF_8);
+		String activeVersion = activeVersionBytes == null ? null
+				: new String(activeVersionBytes, StandardCharsets.UTF_8);
 
-	    String pattern = redisKey + ":v*";
+		String pattern = redisKey + ":v*";
 
-	    List<String> allKeys = scanKeys(pattern);
+		List<String> allKeys = scanKeys(pattern);
 
-	    if (allKeys.isEmpty()) {
-	        return 0;
-	    }
+		if (allKeys.isEmpty()) {
+			return 0;
+		}
 
-	    // ⭐ sort by timestamp numeric (SAFE)
-	    allKeys.sort((a, b) -> Long.compare(extractTs(b), extractTs(a)));
+		// ⭐ sort by timestamp numeric (SAFE)
+		allKeys.sort((a, b) -> Long.compare(extractTs(b), extractTs(a)));
 
-	    List<String> deleteList = new ArrayList<>();
+		List<String> deleteList = new ArrayList<>();
 
-	    int kept = 0;
+		int kept = 0;
 
-	    for (String k : allKeys) {
+		for (String k : allKeys) {
 
-	        if (k.equals(activeVersion)) {
-	            continue;   // ⭐ NEVER delete active snapshot
-	        }
+			if (k.equals(activeVersion)) {
+				continue; // ⭐ NEVER delete active snapshot
+			}
 
-	        if (kept < keepLatest) {
-	            kept++;
-	            continue;
-	        }
+			if (kept < keepLatest) {
+				kept++;
+				continue;
+			}
 
-	        deleteList.add(k);
-	    }
+			deleteList.add(k);
+		}
 
-	    return pipelineDelete(deleteList);
+		return pipelineDelete(deleteList);
 	}
-	
-	 // ---------- Object----------
-    public <T> void putObject(String cacheName, String cacheKey, T object, Duration ttl) throws JsonProcessingException {
-    	String redisKey = buildKey(cacheName, cacheKey);
-    	ObjectMapper objectMapper = new ObjectMapper();
+
+	// ---------- Object----------
+	public <T> void putObject(String cacheName, String cacheKey, T object, Duration ttl)
+			throws JsonProcessingException {
+		String redisKey = buildKey(cacheName, cacheKey);
+		ObjectMapper objectMapper = new ObjectMapper();
 		byte[] jsonByte = objectMapper.writeValueAsBytes(object);
 
 		rawRedisTemplate.opsForValue().set(redisKey, jsonByte, ttl);
-    }
-    public <T> T getObject(String cacheName, String cacheKey, Class<T> clazz) throws IOException {
-    	String redisKey = buildKey(cacheName, cacheKey);
-    	ObjectMapper objectMapper = new ObjectMapper();
-        byte[] json =
-                rawRedisTemplate.opsForValue().get(redisKey);
-        if (json == null) {
-            return null;
-        }
+	}
 
-        return objectMapper.readValue(json, clazz);
-    }
-	
+	public <T> T getObject(String cacheName, String cacheKey, Class<T> clazz) throws IOException {
+		String redisKey = buildKey(cacheName, cacheKey);
+		ObjectMapper objectMapper = new ObjectMapper();
+		byte[] json = rawRedisTemplate.opsForValue().get(redisKey);
+		if (json == null) {
+			return null;
+		}
+
+		return objectMapper.readValue(json, clazz);
+	}
+
 	// ---------- SET ----------
-    public void putSet(String cacheName, String cacheKey, Collection<String> values) {
-        if (values == null || values.isEmpty()) return;
-        String redisKey = buildKey(cacheName, cacheKey);
+	public void putSet(String cacheName, String cacheKey, Collection<String> values) {
+		if (values == null || values.isEmpty())
+			return;
+		String redisKey = buildKey(cacheName, cacheKey);
 
-        stringRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
-            byte[] k = redisKey.getBytes();
-            for (String v : values) {
-                connection.sAdd(k, v.getBytes());
-            }
-            return null;
-        });
-    }
+		stringRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+			byte[] k = redisKey.getBytes();
+			for (String v : values) {
+				connection.sAdd(k, v.getBytes());
+			}
+			return null;
+		});
+	}
 
-    //  ----   -一般正常流程
-    public Set<String> getSet(String cacheName, String cacheKey) {
-    	String redisKey = buildKey(cacheName, cacheKey);
-        Set<String> result = stringRedisTemplate.opsForSet().members(redisKey);
-        return result != null ? result : Collections.emptySet();
-    }
+	// ---- -一般正常流程
+	public Set<String> getSet(String cacheName, String cacheKey) {
+		String redisKey = buildKey(cacheName, cacheKey);
+		Set<String> result = stringRedisTemplate.opsForSet().members(redisKey);
+		return result != null ? result : Collections.emptySet();
+	}
 
-    public void addToSet(String key, String value) {
-    	stringRedisTemplate.opsForSet().add(key, value);
-    }
+	public void addToSet(String key, String value) {
+		stringRedisTemplate.opsForSet().add(key, value);
+	}
 
-    // ---------- HASH ----------
-    public void putHash(String key, Map<String, String> map) {
-    	stringRedisTemplate.opsForHash().putAll(key, map);
-    }
-    
+	// ---------- HASH ----------
+	public void putHash(String key, Map<String, String> map) {
+		stringRedisTemplate.opsForHash().putAll(key, map);
+	}
+
 	public void putHashPipelined(Map<String, String> map) {
 
 		redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
@@ -1006,103 +952,96 @@ public class CacheOperatorService {
 		});
 	}
 
-    public Map<Object, Object> getHash(String key) {
-        return stringRedisTemplate.opsForHash().entries(key);
-    }
+	public Map<Object, Object> getHash(String key) {
+		return stringRedisTemplate.opsForHash().entries(key);
+	}
 
-    // ---------- STRING ----------
-    public void putValue(String key, String value) {
-    	stringRedisTemplate.opsForValue().set(key, value);
-    }
+	// ---------- STRING ----------
+	public void putValue(String key, String value) {
+		stringRedisTemplate.opsForValue().set(key, value);
+	}
 
-    public String getValue(String key) {
-        return stringRedisTemplate.opsForValue().get(key);
-    }
+	public String getValue(String key) {
+		return stringRedisTemplate.opsForValue().get(key);
+	}
 
-    // ---------- COMMON ----------
-    public void delete(String cacheName, String key) {
-    	String redisKey = buildKey(cacheName, key);
-    	stringRedisTemplate.delete(redisKey);
-    }
+	// ---------- COMMON ----------
+	public void delete(String cacheName, String key) {
+		String redisKey = buildKey(cacheName, key);
+		stringRedisTemplate.delete(redisKey);
+	}
 
-    public boolean exists(String key) {
-        Boolean exist = stringRedisTemplate.hasKey(key);
-        return Boolean.TRUE.equals(exist);
-    }
-	
+	public boolean exists(String key) {
+		Boolean exist = stringRedisTemplate.hasKey(key);
+		return Boolean.TRUE.equals(exist);
+	}
+
 	private List<String> scanKeys(String pattern) {
 
-	    List<String> keys = new ArrayList<>();
+		List<String> keys = new ArrayList<>();
 
-	    ScanOptions options = ScanOptions.scanOptions()
-	            .match(pattern)
-	            .count(1000)
-	            .build();
+		ScanOptions options = ScanOptions.scanOptions().match(pattern).count(1000).build();
 
-	    RedisConnection connection =
-	            rawRedisTemplate.getConnectionFactory().getConnection();
+		RedisConnection connection = rawRedisTemplate.getConnectionFactory().getConnection();
 
-	    try (Cursor<byte[]> cursor = connection.keyCommands().scan(options)) {
+		try (Cursor<byte[]> cursor = connection.keyCommands().scan(options)) {
 
-	        while (cursor.hasNext()) {
-	            keys.add(new String(cursor.next()));
-	        }
+			while (cursor.hasNext()) {
+				keys.add(new String(cursor.next()));
+			}
 
-	    } catch (Exception e) {
+		} catch (Exception e) {
 
-	        log.error("scan redis keys failed pattern={}", pattern, e);
+			log.error("scan redis keys failed pattern={}", pattern, e);
 
-	    } finally {
-	        connection.close();
-	    }
+		} finally {
+			connection.close();
+		}
 
-	    return keys;
+		return keys;
 	}
-	
-	
+
 	private long pipelineDelete(List<String> keys) {
 
-	    if (keys.isEmpty()) return 0;
+		if (keys.isEmpty())
+			return 0;
 
-	    RedisConnection connection =
-	            rawRedisTemplate.getConnectionFactory().getConnection();
+		RedisConnection connection = rawRedisTemplate.getConnectionFactory().getConnection();
 
-	    try {
+		try {
 
-	        connection.openPipeline();
+			connection.openPipeline();
 
-	        for (String k : keys) {
-	            connection.keyCommands().del(k.getBytes());
-	        }
+			for (String k : keys) {
+				connection.keyCommands().del(k.getBytes());
+			}
 
-	        List<Object> result = connection.closePipeline();
+			List<Object> result = connection.closePipeline();
 
-	        return result == null ? 0 : result.size();
+			return result == null ? 0 : result.size();
 
-	    } finally {
-	        connection.close();
-	    }
+		} finally {
+			connection.close();
+		}
 	}
-	
+
 	private long extractTs(String key) {
 
-	    int idx = key.lastIndexOf(":v");
+		int idx = key.lastIndexOf(":v");
 
-	    if (idx < 0) return 0;
+		if (idx < 0)
+			return 0;
 
-	    try {
-	        return Long.parseLong(key.substring(idx + 2));
-	    } catch (Exception e) {
-	        return 0;
-	    }
+		try {
+			return Long.parseLong(key.substring(idx + 2));
+		} catch (Exception e) {
+			return 0;
+		}
 	}
-	
+
 	private boolean isGzip(byte[] data) {
 
-	    return data != null
-	            && data.length >= 2
-	            && data[0] == (byte) 0x1f
-	            && data[1] == (byte) 0x8b;
+		return data != null && data.length >= 2 && data[0] == (byte) 0x1f && data[1] == (byte) 0x8b;
 	}
-	
+
 }
