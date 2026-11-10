@@ -1,14 +1,16 @@
 package com.bigstock.sharedComponent.service;
 
+import java.io.IOException;
 import java.io.Reader;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
@@ -21,490 +23,756 @@ import com.bigstock.sharedComponent.entity.StockIntradayPrice;
 import com.bigstock.sharedComponent.repository.StockIntradayPriceRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StockIntradayPriceService {
 
-    private final StockIntradayPriceRepository repository;
-    
-    private final DataSource dataSource;
-    
-    @Transactional(readOnly = true)
-    public List<StockIntradayPrice> getTop60ByPeriod(String period){
-    	 List<StockIntradayPrice> prices = repository.findTop60ByPeriod(period);
-    	 return prices;
-    }
-    
-    @Transactional(readOnly = true)
-    public List<StockIntradayPrice> getLatest60Prices(
-            String stockCode,
-            String period) {
-
-        List<StockIntradayPrice> prices =
-                repository
-                        .findTop60ByStockCodeAndPeriodOrderByTradingTimeDesc(
-                                stockCode,
-                                period
-                        );
-
-        Collections.reverse(prices);
-
-        return prices;
-    }
-
-    @Transactional(readOnly = true)
-    public List<StockIntradayPrice> getPrices(
-            String stockCode,
-            String period) {
-
-        return repository
-                .findByStockCodeAndPeriodOrderByTradingTimeAsc(
-                        stockCode,
-                        period
-                );
-    }
-
-    @Transactional(readOnly = true)
-    public StockIntradayPrice getLatestPrice(
-            String stockCode,
-            String period) {
-
-        return repository
-                .findFirstByStockCodeAndPeriodOrderByTradingTimeDesc(
-                        stockCode,
-                        period
-                )
-                .orElse(null);
-    }
-
-    @Transactional(readOnly = true)
-    public StockIntradayPrice getOldestPrice(
-            String stockCode,
-            String period) {
-
-        return repository
-                .findFirstByStockCodeAndPeriodOrderByTradingTimeAsc(
-                        stockCode,
-                        period
-                )
-                .orElse(null);
-    }
-
-    @Transactional
-    public List<StockIntradayPrice> saveAll(
-            List<StockIntradayPrice> prices) {
-
-        if (prices == null || prices.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        return repository.saveAll(prices);
-    }
-
-    @Transactional
-    public int deleteBefore(
-            String period,
-            LocalDateTime cutoffTime) {
-
-        return repository.deleteBefore(
-                period,
-                cutoffTime
-        );
-    }
-
-    @Transactional
-    public int cleanupExpiredData() {
-
-        ZoneId zoneId =
-                ZoneId.of("Asia/Taipei");
-
-        LocalDateTime now =
-                LocalDateTime.now(zoneId);
-
-        int deleted = 0;
-
-        deleted += repository.deleteBefore(
-                "5m",
-                now.minusDays(60)
-        );
+	private final StockIntradayPriceRepository repository;
 
-        deleted += repository.deleteBefore(
-                "60m",
-                now.minusMonths(4)
-        );
+	private final DataSource dataSource;
 
-        return deleted;
-    }
-    public void bulkUpsertIntradayPrices(
-            List<StockIntradayPrice> data) throws Exception {
+	@Transactional(readOnly = true)
+	public List<StockIntradayPrice> getTopByPeriodAndStockCodes(String period, List<String> stockCodes, int limit) {
 
-        if (data == null || data.isEmpty()) {
-            return;
-        }
+		if (stockCodes == null || stockCodes.isEmpty()) {
+			return Collections.emptyList();
+		}
 
-        try (Connection connection = dataSource.getConnection()) {
+		return repository.findTopByPeriodAndStockCodes(period, stockCodes, limit);
+	}
 
-            connection.setAutoCommit(false);
+	@Transactional(readOnly = true)
+	public List<StockIntradayPrice> getLatest60Prices(String stockCode, String period) {
 
-            try {
+		List<StockIntradayPrice> prices = repository.findTop60ByStockCodeAndPeriodOrderByTradingTimeDesc(stockCode,
+				period);
 
-                CopyManager copyManager =
-                        new CopyManager(
-                                connection.unwrap(
-                                        BaseConnection.class
-                                )
-                        );
+		Collections.reverse(prices);
 
-                // =====================================================
-                // TEMP TABLE
-                // =====================================================
+		return prices;
+	}
 
-                try (Statement stmt =
-                             connection.createStatement()) {
+	@Transactional(readOnly = true)
+	public List<StockIntradayPrice> getPrices(String stockCode, String period) {
 
-                    stmt.execute("""
-                        CREATE TEMP TABLE tmp_stock_intraday_price
-                        (
-                            LIKE bstock.stock_intraday_price
-                            INCLUDING ALL
-                        )
-                        ON COMMIT DROP
-                    """);
-                }
+		return repository.findByStockCodeAndPeriodOrderByTradingTimeAsc(stockCode, period);
+	}
 
+	@Transactional(readOnly = true)
+	public StockIntradayPrice getLatestPrice(String stockCode, String period) {
 
-                // =====================================================
-                // STREAM DATA -> COPY
-                // =====================================================
+		return repository.findFirstByStockCodeAndPeriodOrderByTradingTimeDesc(stockCode, period).orElse(null);
+	}
 
-                Reader reader = new Reader() {
+	@Transactional(readOnly = true)
+	public StockIntradayPrice getOldestPrice(String stockCode, String period) {
 
-                    private final Iterator<StockIntradayPrice> it =
-                            data.iterator();
+		return repository.findFirstByStockCodeAndPeriodOrderByTradingTimeAsc(stockCode, period).orElse(null);
+	}
 
-                    private String currentLine = null;
+	@Transactional
+	public List<StockIntradayPrice> saveAll(List<StockIntradayPrice> prices) {
 
-                    private int index = 0;
+		if (prices == null || prices.isEmpty()) {
+			return Collections.emptyList();
+		}
 
+		return repository.saveAll(prices);
+	}
 
-                    @Override
-                    public int read(
-                            char[] cbuf,
-                            int off,
-                            int len) {
+	@Transactional
+	public int deleteBefore(String period, LocalDateTime cutoffTime) {
 
-                        try {
+		return repository.deleteBefore(period, cutoffTime);
+	}
 
-                            int count = 0;
+	@Transactional
+	public int cleanupExpiredData() {
 
-                            while (count < len) {
+		ZoneId zoneId = ZoneId.of("Asia/Taipei");
 
-                                if (currentLine == null
-                                        || index >= currentLine.length()) {
+		LocalDateTime now = LocalDateTime.now(zoneId);
 
-                                    if (!it.hasNext()) {
-                                        break;
-                                    }
+		int deleted = 0;
 
-                                    currentLine =
-                                            buildIntradayCsvLine(
-                                                    it.next()
-                                            )
-                                            + "\n";
+		deleted += repository.deleteBefore("5m", now.minusDays(60));
 
-                                    index = 0;
-                                }
+		deleted += repository.deleteBefore("60m", now.minusMonths(4));
 
-                                cbuf[off + count] =
-                                        currentLine.charAt(index++);
+		return deleted;
+	}
 
-                                count++;
-                            }
+	public void bulkUpsertIntradayPrices(
+	        List<StockIntradayPrice> data) throws Exception {
 
-                            return count == 0
-                                    ? -1
-                                    : count;
+	    if (data == null || data.isEmpty()) {
+	        return;
+	    }
 
-                        } catch (Exception e) {
-
-                            throw new RuntimeException(e);
-                        }
-                    }
-
-
-                    @Override
-                    public void close() {
-                    }
-                };
-
-
-                // =====================================================
-                // COPY -> TEMP TABLE
-                // =====================================================
-
-                copyManager.copyIn("""
-                    COPY tmp_stock_intraday_price (
-                        stock_code,
-                        trading_time,
-                        period,
+	    long startTime = System.nanoTime();
 
-                        opening_price,
-                        closing_price,
-                        high_price,
-                        low_price,
-                        trading_volume,
+	    try (Connection connection = dataSource.getConnection()) {
 
-                        five_ma,
-                        ten_ma,
-                        twenty_ma,
-                        sixty_ma,
-
-                        line_rsv_value,
-                        line_k_value,
-                        line_d_value
-                    )
-                    FROM STDIN
-                    WITH (
-                        FORMAT csv,
-                        NULL ''
-                    )
-                """, reader);
+	        connection.setAutoCommit(false);
 
-
-                // =====================================================
-                // DELETE EXISTING MATCHING ROWS
-                //
-                // unique:
-                // stock_code + trading_time + period
-                // =====================================================
+	        try {
 
-                try (PreparedStatement ps =
-                             connection.prepareStatement("""
-                        DELETE FROM bstock.stock_intraday_price t
-                        USING tmp_stock_intraday_price tmp
-                        WHERE t.stock_code = tmp.stock_code
-                          AND t.trading_time = tmp.trading_time
-                          AND t.period = tmp.period
-                    """)) {
-
-                    ps.executeUpdate();
-                }
+	            CopyManager copyManager = new CopyManager(
+	                    connection.unwrap(BaseConnection.class)
+	            );
 
+	            // =====================================================
+	            // 1. CREATE TEMP TABLE
+	            // =====================================================
+	            // 不複製 UNIQUE INDEX，避免 COPY 重複資料時直接失敗
+	            // =====================================================
 
-                // =====================================================
-                // INSERT TEMP -> REAL TABLE
-                // =====================================================
-
-                try (Statement stmt =
-                             connection.createStatement()) {
+	            try (Statement stmt = connection.createStatement()) {
 
-                    stmt.execute("""
-                        INSERT INTO bstock.stock_intraday_price (
-                            stock_code,
-                            trading_time,
-                            period,
+	                stmt.execute("""
 
-                            opening_price,
-                            closing_price,
-                            high_price,
-                            low_price,
-                            trading_volume,
+	                    CREATE TEMP TABLE tmp_stock_intraday_price
+	                    (
+	                        LIKE bstock.stock_intraday_price
+	                        INCLUDING DEFAULTS
+	                    )
+	                    ON COMMIT DROP
 
-                            five_ma,
-                            ten_ma,
-                            twenty_ma,
-                            sixty_ma,
+	                """);
 
-                            line_rsv_value,
-                            line_k_value,
-                            line_d_value
-                        )
-                        SELECT
-                            stock_code,
-                            trading_time,
-                            period,
+	            }
 
-                            opening_price,
-                            closing_price,
-                            high_price,
-                            low_price,
-                            trading_volume,
+	            // =====================================================
+	            // 2. STREAM DATA -> COPY
+	            // =====================================================
 
-                            five_ma,
-                            ten_ma,
-                            twenty_ma,
-                            sixty_ma,
+	            long copyStart = System.nanoTime();
 
-                            line_rsv_value,
-                            line_k_value,
-                            line_d_value
-                        FROM tmp_stock_intraday_price
-                    """);
-                }
+	            long copiedRows;
 
+	            try (Reader reader = new Reader() {
 
-                connection.commit();
+	                private final Iterator<StockIntradayPrice> iterator =
+	                        data.iterator();
 
-            } catch (Exception e) {
+	                private String currentLine;
 
-                connection.rollback();
+	                private int index = 0;
 
-                throw e;
-            }
-        }
-    }
-    
-    private String buildIntradayCsvLine(
-            StockIntradayPrice data) {
+	                @Override
+	                public int read(
+	                        char[] cbuf,
+	                        int off,
+	                        int len) throws IOException {
 
-        StringBuilder sb =
-                new StringBuilder(256);
+	                    if (off < 0
+	                            || len < 0
+	                            || off > cbuf.length - len) {
 
-        appendCsv(
-                sb,
-                data.getStockCode()
-        );
+	                        throw new IndexOutOfBoundsException();
 
-        sb.append(',');
+	                    }
 
-        appendCsv(
-                sb,
-                data.getTradingTime() == null
-                        ? null
-                        : data.getTradingTime().toString()
-        );
+	                    if (len == 0) {
+	                        return 0;
+	                    }
 
-        sb.append(',');
+	                    int count = 0;
 
-        appendCsv(
-                sb,
-                data.getPeriod()
-        );
+	                    while (count < len) {
 
-        sb.append(',');
+	                        if (currentLine == null
+	                                || index >= currentLine.length()) {
 
-        appendCsv(
-                sb,
-                data.getOpeningPrice()
-        );
+	                            if (!iterator.hasNext()) {
+	                                break;
+	                            }
 
-        sb.append(',');
+	                            try {
 
-        appendCsv(
-                sb,
-                data.getClosingPrice()
-        );
+	                                currentLine =
+	                                        buildIntradayCsvLine(
+	                                                iterator.next()
+	                                        ) + "\n";
 
-        sb.append(',');
+	                            } catch (Exception e) {
 
-        appendCsv(
-                sb,
-                data.getHighPrice()
-        );
+	                                throw new IOException(
+	                                        "Failed to build intraday CSV",
+	                                        e
+	                                );
 
-        sb.append(',');
+	                            }
 
-        appendCsv(
-                sb,
-                data.getLowPrice()
-        );
+	                            index = 0;
 
-        sb.append(',');
+	                        }
 
-        appendCsv(
-                sb,
-                data.getTradingVolume()
-        );
+	                        cbuf[off + count] =
+	                                currentLine.charAt(index++);
 
-        sb.append(',');
+	                        count++;
 
-        appendCsv(
-                sb,
-                data.getFiveMa()
-        );
+	                    }
 
-        sb.append(',');
+	                    return count == 0 ? -1 : count;
 
-        appendCsv(
-                sb,
-                data.getTenMa()
-        );
+	                }
 
-        sb.append(',');
+	                @Override
+	                public void close() {
+	                }
 
-        appendCsv(
-                sb,
-                data.getTwentyMa()
-        );
+	            }) {
 
-        sb.append(',');
+	                copiedRows = copyManager.copyIn("""
 
-        appendCsv(
-                sb,
-                data.getSixtyMa()
-        );
+	                    COPY tmp_stock_intraday_price (
 
-        sb.append(',');
+	                        stock_code,
+	                        trading_time,
+	                        period,
 
-        appendCsv(
-                sb,
-                data.getLineRsvValue()
-        );
+	                        opening_price,
+	                        closing_price,
+	                        high_price,
+	                        low_price,
 
-        sb.append(',');
+	                        trading_volume,
 
-        appendCsv(
-                sb,
-                data.getLineKValue()
-        );
+	                        five_ma,
+	                        ten_ma,
+	                        twenty_ma,
+	                        sixty_ma,
 
-        sb.append(',');
+	                        line_rsv_value,
+	                        line_k_value,
+	                        line_d_value
 
-        appendCsv(
-                sb,
-                data.getLineDValue()
-        );
+	                    )
 
-        return sb.toString();
-    }
-    private void appendCsv(
-            StringBuilder sb,
-            Object value) {
+	                    FROM STDIN
 
-        if (value == null) {
+	                    WITH (
+	                        FORMAT csv,
+	                        NULL ''
+	                    )
 
-            // PostgreSQL COPY NULL ''
-            sb.append("");
+	                """, reader);
 
-            return;
-        }
+	            }
 
-        String text =
-                String.valueOf(value);
+	            long copyElapsed = TimeUnit.NANOSECONDS.toMillis(
+	                    System.nanoTime() - copyStart
+	            );
 
-        boolean needQuote =
-                text.contains(",")
-                || text.contains("\"")
-                || text.contains("\n")
-                || text.contains("\r");
+	            log.info(
+	                    "Intraday COPY completed, rows={}, elapsed={}ms",
+	                    copiedRows,
+	                    copyElapsed
+	            );
 
-        if (!needQuote) {
+	            // =====================================================
+	            // 3. REMOVE DUPLICATES
+	            // =====================================================
+	            //
+	            // 相同：
+	            // stock_code + trading_time + period
+	            //
+	            // 只保留一筆
+	            // =====================================================
 
-            sb.append(text);
+	            long dedupStart = System.nanoTime();
 
-            return;
-        }
+	            int duplicateCount;
 
-        sb.append('"');
+	            try (Statement stmt = connection.createStatement()) {
 
-        sb.append(
-                text.replace(
-                        "\"",
-                        "\"\""
-                )
-        );
+	                duplicateCount = stmt.executeUpdate("""
 
-        sb.append('"');
-    }
+	                    DELETE FROM tmp_stock_intraday_price t
+
+	                    USING (
+
+	                        SELECT
+
+	                            ctid,
+
+	                            ROW_NUMBER() OVER (
+
+	                                PARTITION BY
+	                                    stock_code,
+	                                    trading_time,
+	                                    period
+
+	                                ORDER BY ctid DESC
+
+	                            ) AS rn
+
+	                        FROM tmp_stock_intraday_price
+
+	                    ) duplicates
+
+	                    WHERE t.ctid = duplicates.ctid
+	                      AND duplicates.rn > 1
+
+	                """);
+
+	            }
+
+	            long dedupElapsed = TimeUnit.NANOSECONDS.toMillis(
+	                    System.nanoTime() - dedupStart
+	            );
+
+	            if (duplicateCount > 0) {
+
+	                log.warn(
+	                        "Intraday duplicates removed, count={}",
+	                        duplicateCount
+	                );
+
+	            }
+
+	            // =====================================================
+	            // 4. FIND STOCKS WITH NEW RECORDS
+	            // =====================================================
+	            //
+	            // 只針對真正新增 K 線的股票進行歷史清理
+	            //
+	            // 使用 TEMP TABLE 紀錄
+	            // =====================================================
+
+	            long detectStart = System.nanoTime();
+
+	            try (Statement stmt = connection.createStatement()) {
+
+	                stmt.execute("""
+
+	                    CREATE TEMP TABLE tmp_intraday_cleanup_targets
+	                    ON COMMIT DROP
+	                    AS
+
+	                    SELECT DISTINCT
+
+	                        tmp.stock_code,
+	                        tmp.period
+
+	                    FROM tmp_stock_intraday_price tmp
+
+	                    WHERE tmp.period IN ('5m', '60m')
+
+	                      AND NOT EXISTS (
+
+	                          SELECT 1
+
+	                          FROM bstock.stock_intraday_price t
+
+	                          WHERE t.stock_code = tmp.stock_code
+	                            AND t.trading_time = tmp.trading_time
+	                            AND t.period = tmp.period
+
+	                      )
+
+	                """);
+
+	            }
+
+	            long detectElapsed = TimeUnit.NANOSECONDS.toMillis(
+	                    System.nanoTime() - detectStart
+	            );
+
+	            // =====================================================
+	            // 5. UPSERT ONLY DIFFERENT RECORDS
+	            // =====================================================
+
+	            long upsertStart = System.nanoTime();
+
+	            int affectedRows;
+
+	            try (Statement stmt = connection.createStatement()) {
+
+	                affectedRows = stmt.executeUpdate("""
+
+	                    INSERT INTO bstock.stock_intraday_price AS target (
+
+	                        stock_code,
+	                        trading_time,
+	                        period,
+
+	                        opening_price,
+	                        closing_price,
+	                        high_price,
+	                        low_price,
+
+	                        trading_volume,
+
+	                        five_ma,
+	                        ten_ma,
+	                        twenty_ma,
+	                        sixty_ma,
+
+	                        line_rsv_value,
+	                        line_k_value,
+	                        line_d_value
+
+	                    )
+
+	                    SELECT
+
+	                        stock_code,
+	                        trading_time,
+	                        period,
+
+	                        opening_price,
+	                        closing_price,
+	                        high_price,
+	                        low_price,
+
+	                        trading_volume,
+
+	                        five_ma,
+	                        ten_ma,
+	                        twenty_ma,
+	                        sixty_ma,
+
+	                        line_rsv_value,
+	                        line_k_value,
+	                        line_d_value
+
+	                    FROM tmp_stock_intraday_price
+
+	                    ORDER BY
+	                        stock_code,
+	                        period,
+	                        trading_time
+
+	                    ON CONFLICT (
+
+	                        stock_code,
+	                        trading_time,
+	                        period
+
+	                    )
+
+	                    DO UPDATE SET
+
+	                        opening_price = EXCLUDED.opening_price,
+	                        closing_price = EXCLUDED.closing_price,
+
+	                        high_price = EXCLUDED.high_price,
+	                        low_price = EXCLUDED.low_price,
+
+	                        trading_volume = EXCLUDED.trading_volume,
+
+	                        five_ma = EXCLUDED.five_ma,
+	                        ten_ma = EXCLUDED.ten_ma,
+	                        twenty_ma = EXCLUDED.twenty_ma,
+	                        sixty_ma = EXCLUDED.sixty_ma,
+
+	                        line_rsv_value = EXCLUDED.line_rsv_value,
+	                        line_k_value = EXCLUDED.line_k_value,
+	                        line_d_value = EXCLUDED.line_d_value
+
+	                    WHERE (
+
+	                        target.opening_price,
+	                        target.closing_price,
+	                        target.high_price,
+	                        target.low_price,
+
+	                        target.trading_volume,
+
+	                        target.five_ma,
+	                        target.ten_ma,
+	                        target.twenty_ma,
+	                        target.sixty_ma,
+
+	                        target.line_rsv_value,
+	                        target.line_k_value,
+	                        target.line_d_value
+
+	                    )
+
+	                    IS DISTINCT FROM (
+
+	                        EXCLUDED.opening_price,
+	                        EXCLUDED.closing_price,
+	                        EXCLUDED.high_price,
+	                        EXCLUDED.low_price,
+
+	                        EXCLUDED.trading_volume,
+
+	                        EXCLUDED.five_ma,
+	                        EXCLUDED.ten_ma,
+	                        EXCLUDED.twenty_ma,
+	                        EXCLUDED.sixty_ma,
+
+	                        EXCLUDED.line_rsv_value,
+	                        EXCLUDED.line_k_value,
+	                        EXCLUDED.line_d_value
+
+	                    )
+
+	                """);
+
+	            }
+
+	            long upsertElapsed = TimeUnit.NANOSECONDS.toMillis(
+	                    System.nanoTime() - upsertStart
+	            );
+
+	            log.info(
+	                    "Intraday UPSERT completed, affectedRows={}, elapsed={}ms",
+	                    affectedRows,
+	                    upsertElapsed
+	            );
+
+	            // =====================================================
+	            // 6. CLEANUP OLD INTRADAY PRICES
+	            // =====================================================
+	            //
+	            // 5m  -> 2880 records
+	            // 60m -> 240 records
+	            //
+	            // Only process stocks with new records
+	            //
+	            // LATERAL + OFFSET
+	            // =====================================================
+
+	            long cleanupStart = System.nanoTime();
+
+	            int deletedCount;
+
+	            try (Statement stmt = connection.createStatement()) {
+
+	                deletedCount = stmt.executeUpdate("""
+
+	                    WITH expired AS (
+
+	                        SELECT old_prices.ctid AS row_id
+
+	                        FROM tmp_intraday_cleanup_targets a
+
+	                        CROSS JOIN LATERAL (
+
+	                            SELECT t.ctid
+
+	                            FROM bstock.stock_intraday_price t
+
+	                            WHERE t.stock_code = a.stock_code
+	                              AND t.period = a.period
+
+	                            ORDER BY t.trading_time DESC
+
+	                            OFFSET (
+
+	                                CASE
+
+	                                    WHEN a.period = '5m'
+	                                        THEN 2880
+
+	                                    WHEN a.period = '60m'
+	                                        THEN 240
+
+	                                END
+
+	                            )
+
+	                        ) old_prices
+
+	                    )
+
+	                    DELETE FROM bstock.stock_intraday_price t
+
+	                    USING expired e
+
+	                    WHERE t.ctid = e.row_id
+
+	                """);
+
+	            }
+
+	            long cleanupElapsed = TimeUnit.NANOSECONDS.toMillis(
+	                    System.nanoTime() - cleanupStart
+	            );
+
+	            if (deletedCount > 0) {
+
+	                log.info(
+	                        "Intraday cleanup completed, deletedRecords={}, elapsed={}ms",
+	                        deletedCount,
+	                        cleanupElapsed
+	                );
+
+	            }
+
+	            // =====================================================
+	            // 7. COMMIT
+	            // =====================================================
+
+	            connection.commit();
+
+	            long totalElapsed = TimeUnit.NANOSECONDS.toMillis(
+	                    System.nanoTime() - startTime
+	            );
+
+	            // =====================================================
+	            // 8. PERFORMANCE LOG
+	            // =====================================================
+
+	            log.info(
+	                    """
+	                    
+	                    ==========================================
+	                    Intraday Bulk UPSERT Performance
+	                    ==========================================
+	                    Input Records   : {}
+	                    Copied Records  : {}
+	                    Duplicates      : {}
+	                    Affected Rows   : {}
+	                    Deleted Records : {}
+	                    ------------------------------------------
+	                    COPY Time       : {} ms
+	                    Dedup Time      : {} ms
+	                    Detect Time     : {} ms
+	                    UPSERT Time     : {} ms
+	                    Cleanup Time    : {} ms
+	                    ------------------------------------------
+	                    Total Time      : {} ms
+	                    ==========================================
+	                    """,
+	                    data.size(),
+	                    copiedRows,
+	                    duplicateCount,
+	                    affectedRows,
+	                    deletedCount,
+	                    copyElapsed,
+	                    dedupElapsed,
+	                    detectElapsed,
+	                    upsertElapsed,
+	                    cleanupElapsed,
+	                    totalElapsed
+	            );
+
+	        } catch (Exception e) {
+
+	            try {
+
+	                connection.rollback();
+
+	            } catch (SQLException rollbackException) {
+
+	                e.addSuppressed(rollbackException);
+
+	            }
+
+	            log.error(
+	                    "Intraday bulk UPSERT failed, records={}",
+	                    data.size(),
+	                    e
+	            );
+
+	            throw e;
+
+	        }
+
+	    }
+
+	}
+
+	private String buildIntradayCsvLine(StockIntradayPrice data) {
+
+		StringBuilder sb = new StringBuilder(256);
+
+		appendCsv(sb, data.getStockCode());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getTradingTime() == null ? null : data.getTradingTime().toString());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getPeriod());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getOpeningPrice());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getClosingPrice());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getHighPrice());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getLowPrice());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getTradingVolume());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getFiveMa());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getTenMa());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getTwentyMa());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getSixtyMa());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getLineRsvValue());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getLineKValue());
+
+		sb.append(',');
+
+		appendCsv(sb, data.getLineDValue());
+
+		return sb.toString();
+	}
+
+	private void appendCsv(StringBuilder sb, Object value) {
+
+		if (value == null) {
+
+			// PostgreSQL COPY NULL ''
+			sb.append("");
+
+			return;
+		}
+
+		String text = String.valueOf(value);
+
+		boolean needQuote = text.contains(",") || text.contains("\"") || text.contains("\n") || text.contains("\r");
+
+		if (!needQuote) {
+
+			sb.append(text);
+
+			return;
+		}
+
+		sb.append('"');
+
+		sb.append(text.replace("\"", "\"\""));
+
+		sb.append('"');
+	}
 }

@@ -17,21 +17,24 @@ public interface StockIntradayPriceRepository
 		extends JpaRepository<StockIntradayPrice, StockIntradayPrice.StockIntradayPriceId> {
 
 	@Query(value = """
-			SELECT *
-				FROM (
-				    SELECT
-				        sip.*,
-				        ROW_NUMBER() OVER (
-				            PARTITION BY sip.stock_code
-				            ORDER BY sip.trading_time DESC
-				        ) AS rn
-				    FROM bstock.stock_intraday_price sip
-				    WHERE sip.period = :period
-				) t
-				WHERE t.rn <= 60
-				ORDER BY t.stock_code, t.trading_time ASC;
+			SELECT
+			    t.*
+			FROM (
+			    SELECT
+			        sip.*,
+			        ROW_NUMBER() OVER (
+			            PARTITION BY sip.stock_code
+			            ORDER BY sip.trading_time DESC
+			        ) AS rn
+			    FROM bstock.stock_intraday_price sip
+			    WHERE sip.period = :period
+			      AND sip.stock_code IN (:stockCodes)
+			) t
+			WHERE t.rn <= :limit
+			ORDER BY t.stock_code, t.trading_time ASC
 			""", nativeQuery = true)
-	List<StockIntradayPrice> findTop60ByPeriod(@Param("period") String period);
+	List<StockIntradayPrice> findTopByPeriodAndStockCodes(@Param("period") String period,
+			@Param("stockCodes") List<String> stockCodes, @Param("limit") int limit);
 
 	List<StockIntradayPrice> findTop60ByStockCodeAndPeriodOrderByTradingTimeDesc(String stockCode, String period);
 

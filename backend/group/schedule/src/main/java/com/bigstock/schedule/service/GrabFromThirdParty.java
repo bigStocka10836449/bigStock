@@ -9,8 +9,10 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -50,6 +52,18 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class GrabFromThirdParty {
+	
+	private static final int STOCK_BATCH_SIZE = 50;
+
+	private static final int FIVE_MINUTE_MAX_SIZE = 2880;
+	private static final int SIXTY_MINUTE_MAX_SIZE = 240;
+
+	// Yahoo 抓取間隔
+	private static final long YAHOO_REQUEST_INTERVAL_MS = 2000L;
+	
+	// DB 歷史資料讀取數量
+	private static final int INDICATOR_HISTORY_SIZE = 240;
+
 
 	private final StockInfoService stockInfoService;
 	private final GrabThirdPartyStockDayPrice grabThirdPartyStockDayPrice;
@@ -75,7 +89,6 @@ public class GrabFromThirdParty {
 		doCalculateIntradayPrices("1");
 		doCalculateIntradayPrices("2");
 	}
-
 
 //	@PostConstruct
 	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
@@ -135,7 +148,8 @@ public class GrabFromThirdParty {
 				List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTwseDayPrice.getStockCode());
 				allThisStockCodeDayPrices.addAll(stockDayPrices);
 			}
-			calculateRSVValueAndLimitDownUp(stockTwseDayPrice, allThisStockCodeDayPrices, allStockInfoMap.get(stockTwseDayPrice.getStockCode()).stream().findFirst().get().getStockType());
+			calculateRSVValueAndLimitDownUp(stockTwseDayPrice, allThisStockCodeDayPrices,
+					allStockInfoMap.get(stockTwseDayPrice.getStockCode()).stream().findFirst().get().getStockType());
 			stockTwseDayPrice.setMonthOfYear((stockTwseDayPrice.getTradingDay().getYear() + 1900) + "W"
 					+ (stockTwseDayPrice.getTradingDay().getMonth() + 1));
 			groupedStockDayPrices.put(stockTwseDayPrice.getStockCode(), allThisStockCodeDayPrices);
@@ -352,16 +366,16 @@ public class GrabFromThirdParty {
 				.toList();
 		List<StockDayPrice> needRankOESs = allStockDayPrices.stream()
 				.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
-						&& oesStockCodes.contains(data.getStockCode())
-						&& ObjectUtils.isNotEmpty(data.getChangeRate())))
+						&& oesStockCodes.contains(data.getStockCode()) && ObjectUtils.isNotEmpty(data.getChangeRate())))
 				.toList();
 		rankStockChangeService.writeStockListToRedis(needRankTPEXs, allStockInfoMap, "TPEX");
 		rankStockChangeService.writeStockListToRedis(needRankTWSEs, allStockInfoMap, "TWSE");
 		rankStockChangeService.writeStockListToRedis(needRankOESs, allStockInfoMap, "OES");
-		//成交量排名
-		rankStockChangeService.writeStockListTradingQuantityRankToRedis(allStockDayPrices.stream()
-				.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
-						&& ObjectUtils.isNotEmpty(data.getChangeRate()))).toList(), allStockInfoMap);
+		// 成交量排名
+		rankStockChangeService.writeStockListTradingQuantityRankToRedis(
+				allStockDayPrices.stream().filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
+						&& ObjectUtils.isNotEmpty(data.getChangeRate()))).toList(),
+				allStockInfoMap);
 		groupedStockDayPrices.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
 				.forEach(entry -> {
 					String stockCode = entry.getKey();
@@ -386,28 +400,28 @@ public class GrabFromThirdParty {
 					}
 				});
 		groupedStockWeekPrice.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
-		.forEach(entry -> {
-			String stockCode = entry.getKey();
-			List<StockWeekPrice> stockWeekPrices = entry.getValue();
-			if (allStockInfoMap.containsKey(stockCode)) {
-				List<StockWeekPrice> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
-						"ultraLongLivedCache", "stock-weekly:compressed:" + stockCode, StockWeekPrice.class);
-				if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
+				.forEach(entry -> {
+					String stockCode = entry.getKey();
+					List<StockWeekPrice> stockWeekPrices = entry.getValue();
+					if (allStockInfoMap.containsKey(stockCode)) {
+						List<StockWeekPrice> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
+								"ultraLongLivedCache", "stock-weekly:compressed:" + stockCode, StockWeekPrice.class);
+						if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
 
-					cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
-							"stock-weekly:compressed:" + stockCode, stockWeekPrices.stream().findFirst().get(),
-							stockWeekPrices.stream().findFirst().get().getFirstTradingDay().getTime(),
-							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
-				} else {
-					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
-							"stock-weekly:compressed:" + stockCode, stockWeekPrices,
-							stockWeekPrice -> stockWeekPrice.getFirstTradingDay().getTime(),
-							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
-				}
-			} else {
-				log.warn("stock_info missing : {}", stockCode);
-			}
-		});
+							cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
+									"stock-weekly:compressed:" + stockCode, stockWeekPrices.stream().findFirst().get(),
+									stockWeekPrices.stream().findFirst().get().getFirstTradingDay().getTime(),
+									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+						} else {
+							cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+									"stock-weekly:compressed:" + stockCode, stockWeekPrices,
+									stockWeekPrice -> stockWeekPrice.getFirstTradingDay().getTime(),
+									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+						}
+					} else {
+						log.warn("stock_info missing : {}", stockCode);
+					}
+				});
 		calculateCosineSimilarityVectorService.calculateAsDailyAspect();
 	}
 
@@ -581,36 +595,26 @@ public class GrabFromThirdParty {
 		BigDecimal change;
 
 		try {
-		    change = new BigDecimal(stockTwseDayPrice.getChange());
-		    standarPrice = Double.valueOf(
-		    		stockTwseDayPrice.getClosingPrice()
-		    		.replace("+", "")
-		    		.replaceAll(",", "")
-		    		) - change.doubleValue();
-		    upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true, stockType);
-		    lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false, stockType);
+			change = new BigDecimal(stockTwseDayPrice.getChange());
+			standarPrice = Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""))
+					- change.doubleValue();
+			upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true, stockType);
+			lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false, stockType);
 		} catch (Exception e) {
-			//登櫃情況直接漲跌幅特殊計算
-		    log.error(
-		        "Invalid change value, change={}, stockTwseDayPrice={}",
-		        stockTwseDayPrice.getChange(),
-		        stockTwseDayPrice,
-		        e
-		    );
+			// 登櫃情況直接漲跌幅特殊計算
+			log.error("Invalid change value, change={}, stockTwseDayPrice={}", stockTwseDayPrice.getChange(),
+					stockTwseDayPrice, e);
 
 			change = new BigDecimal(
 					(Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", "")) - Double
 							.valueOf(stockTwseDayPrice.getOpeningPrice().replace("+", "").replaceAll(",", ""))));
-		    standarPrice = Double.valueOf(
-		    		stockTwseDayPrice.getClosingPrice()
-		    		.replace("+", "")
-		    		.replaceAll(",", "")
-		    		) - change.doubleValue();
-		    //上下限值例外處理
-		    upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true, stockType) * 3;
-		    lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false, stockType) * 3;
-		    BigDecimal tempChange = change.setScale(3, RoundingMode.HALF_UP);
-		    stockTwseDayPrice.setChange(tempChange.toString());
+			standarPrice = Double.valueOf(stockTwseDayPrice.getClosingPrice().replace("+", "").replaceAll(",", ""))
+					- change.doubleValue();
+			// 上下限值例外處理
+			upperLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, true, stockType) * 3;
+			lowerLimitPrice = ChromeDriverUtils.calculateLimitPrice(standarPrice, false, stockType) * 3;
+			BigDecimal tempChange = change.setScale(3, RoundingMode.HALF_UP);
+			stockTwseDayPrice.setChange(tempChange.toString());
 		}
 
 		stockTwseDayPrice.setLimitDown(lowerLimitPrice.toString());
@@ -845,9 +849,6 @@ public class GrabFromThirdParty {
 		});
 	}
 
-
-	
-	
 	public void calculateRSVValueAndLimitDownUp(StockWeekPrice stockWeekPrice,
 			List<StockWeekPrice> twoFourtyStockWeekPrices) {
 		if (twoFourtyStockWeekPrices.size() < 9) {
@@ -948,104 +949,534 @@ public class GrabFromThirdParty {
 		// 計算平均值並保留小數點第 4 位（四捨五入）
 		return total.divide(new BigDecimal(period), 4, RoundingMode.HALF_UP);
 	}
-	
+
 	private void doCalculateIntradayPrices(String stockType) throws Exception {
 
-		Date perviouslyTradingDate = stockDayPriceService.getCurrentTradeDate();
-		List<String> stockCodes = stockInfoService.getStockCodeByStockType(stockType).stream().filter(data -> {
-			return !data.matches(".*[a-zA-Z].*");
-		}).toList();
-		List<String> allStockCodes = Lists.newArrayList();
-		List<StockIntradayPrice> allStockFiveIntradayPrices = Lists.newArrayList();
-		List<StockIntradayPrice> allStockSixtyIntradayPrices = Lists.newArrayList();
-		allStockCodes.addAll(stockCodes);
-		allStockCodes.forEach(stockCode -> {
-			// 額外執行抓取5分K 與60分K內容
-			try {
-				List<StockIntradayPrice> fiveMinutes = grabThirdPartyStockDayPrice.grabIntradayFromYahoo(stockCode,
-						"5m");
-				allStockFiveIntradayPrices.addAll(fiveMinutes);
-				Thread.sleep(2000);
-				// -- accumulate to each trade from fiveMinutes
-				allStockSixtyIntradayPrices.addAll(grabThirdPartyStockDayPrice.aggregateToHourly(fiveMinutes));
-			} catch (InterruptedException e) {
-				log.warn(stockCode + e.getMessage(), e);
-			}
-		});
-		// 整理從yahoo抓來的5分K 與60分K內容
-		Map<String, List<StockIntradayPrice>> fiveIntradayPriceYahooInfoGroup = allStockFiveIntradayPrices.stream()
-				.collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
-		Map<String, List<StockIntradayPrice>> sixtyIntradayPriceYahooInfoGroup = allStockSixtyIntradayPrices.stream()
-				.collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
-		
-		// 抓取目前DB 5分K 60分K 最新60筆資料庫內容
-		Map<String, List<StockIntradayPrice>> sixtyIntradayPriceDbInfoGroup = stockIntradayPriceService
-				.getTop60ByPeriod("60m").stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
-		Map<String, List<StockIntradayPrice>> fiveIntradayPriceDbInfoGroup = stockIntradayPriceService
-				.getTop60ByPeriod("5m").stream().collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
+	    // =====================================================
+	    // 1. 取得股票清單
+	    // =====================================================
 
-		// 存放整理完後的 5分K 與 60分K內容
-		List<StockIntradayPrice> adjustmentedStockIntradayPrices = Lists.newArrayList();
+	    List<String> stockCodes = stockInfoService
+	            .getStockCodeByStockType(stockType)
+	            .stream()
+	            .filter(StringUtils::isNotBlank)
+	            .filter(code -> !code.matches(".*[a-zA-Z].*"))
+	            .distinct()
+	            .toList();
 
-		// 5分K整理
-		fiveIntradayPriceYahooInfoGroup.entrySet().forEach(entry -> {
-			String stockCode = entry.getKey();
-			if (StringUtils.isBlank(stockCode)) {
-				return;
-			}
-			List<StockIntradayPrice> fiveIntradayPriceYahooInfos = entry.getValue();
+	    if (stockCodes.isEmpty()) {
 
-			List<StockIntradayPrice> fiveIntradayPriceDbInfos = fiveIntradayPriceDbInfoGroup.getOrDefault(stockCode, Lists.newArrayList());
-			LocalDateTime lastTradingDateTime = fiveIntradayPriceDbInfos.stream()
-					.map(StockIntradayPrice::getTradingTime).max(LocalDateTime::compareTo)
-					.orElse(perviouslyTradingDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
-			List<StockIntradayPrice> avaliableStockIntradayPrices = fiveIntradayPriceYahooInfos.stream()
-					.filter(iveIntradayPriceYahooInfo -> iveIntradayPriceYahooInfo.getTradingTime()
-							.isAfter(lastTradingDateTime))
-					.toList();
-			List<StockIntradayPrice> halfCompletedfiveIntradayPriceDbInfos = Lists.newArrayList();
-			halfCompletedfiveIntradayPriceDbInfos.addAll(fiveIntradayPriceDbInfos);
-			halfCompletedfiveIntradayPriceDbInfos.addAll(avaliableStockIntradayPrices);
-			calculateMissingIndicators(halfCompletedfiveIntradayPriceDbInfos);
-			adjustmentedStockIntradayPrices.addAll(avaliableStockIntradayPrices);
-			cacheOperatorService.putSnapshotDataListAtomic(
-			        "ultraLongLivedCache",
-			        "stock-intraday:5m:" + stockCode,
-			        avaliableStockIntradayPrices
-			);
-			cacheOperatorService.cleanupOldSnapshots("ultraLongLivedCache",  "stock-intraday:5m:" + stockCode, 2);
-		});
-		// 整理60分K
-		sixtyIntradayPriceYahooInfoGroup.entrySet().forEach(entry -> {
-			String stockCode = entry.getKey();
-			if (StringUtils.isBlank(stockCode)) {
-				return;
-			}
-			List<StockIntradayPrice> sixtyIntradayPriceYahooInfos = entry.getValue();
+	        log.info(
+	                "No stock codes found, stockType={}",
+	                stockType
+	        );
 
-			List<StockIntradayPrice> fiveIntradayPriceDbInfos = sixtyIntradayPriceDbInfoGroup.getOrDefault(stockCode, Lists.newArrayList());
-			LocalDateTime lastTradingDateTime = fiveIntradayPriceDbInfos.stream()
-					.map(StockIntradayPrice::getTradingTime).max(LocalDateTime::compareTo)
-					.orElse(perviouslyTradingDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
-			List<StockIntradayPrice> avaliableStockIntradayPrices = sixtyIntradayPriceYahooInfos.stream()
-					.filter(iveIntradayPriceYahooInfo -> iveIntradayPriceYahooInfo.getTradingTime()
-							.isAfter(lastTradingDateTime))
-					.toList();
-			List<StockIntradayPrice> halfCompletedfiveIntradayPriceDbInfos = Lists.newArrayList();
-			halfCompletedfiveIntradayPriceDbInfos.addAll(fiveIntradayPriceDbInfos);
-			halfCompletedfiveIntradayPriceDbInfos.addAll(avaliableStockIntradayPrices);
-			calculateMissingIndicators(halfCompletedfiveIntradayPriceDbInfos);
-			adjustmentedStockIntradayPrices.addAll(avaliableStockIntradayPrices);
-			cacheOperatorService.putSnapshotDataListAtomic(
-			        "ultraLongLivedCache",
-			        "stock-intraday:60m:" + stockCode,
-			        avaliableStockIntradayPrices
-			);
-			cacheOperatorService.cleanupOldSnapshots("ultraLongLivedCache",  "stock-intraday:60m:" + stockCode, 2);
-		});
+	        return;
+	    }
 
-		
-		stockIntradayPriceService.bulkUpsertIntradayPrices(adjustmentedStockIntradayPrices);
+	    log.info(
+	            "Start calculating intraday prices, stockType={}, totalStocks={}",
+	            stockType,
+	            stockCodes.size()
+	    );
+
+	    int successCount = 0;
+	    int failedCount = 0;
+	    int emptyCount = 0;
+
+	    // =====================================================
+	    // 2. 每批處理 50 檔
+	    // =====================================================
+
+	    for (int start = 0;
+	         start < stockCodes.size();
+	         start += STOCK_BATCH_SIZE) {
+
+	        int end = Math.min(
+	                start + STOCK_BATCH_SIZE,
+	                stockCodes.size()
+	        );
+
+	        List<String> batchStockCodes =
+	                stockCodes.subList(start, end);
+
+	        log.info(
+	                "Start intraday batch, range={}~{}, total={}",
+	                start + 1,
+	                end,
+	                stockCodes.size()
+	        );
+
+	        // =================================================
+	        // 3. 只取得本批股票的 DB 歷史資料
+	        // =================================================
+
+	        Map<String, List<StockIntradayPrice>> fiveDbGroup =
+	                stockIntradayPriceService
+	                        .getTopByPeriodAndStockCodes(
+	                                "5m",
+	                                batchStockCodes,
+	                                INDICATOR_HISTORY_SIZE
+	                        )
+	                        .stream()
+	                        .collect(Collectors.groupingBy(
+	                                StockIntradayPrice::getStockCode
+	                        ));
+
+	        Map<String, List<StockIntradayPrice>> sixtyDbGroup =
+	                stockIntradayPriceService
+	                        .getTopByPeriodAndStockCodes(
+	                                "60m",
+	                                batchStockCodes,
+	                                INDICATOR_HISTORY_SIZE
+	                        )
+	                        .stream()
+	                        .collect(Collectors.groupingBy(
+	                                StockIntradayPrice::getStockCode
+	                        ));
+
+	        // =================================================
+	        // 4. 本批資料
+	        // =================================================
+
+	        List<StockIntradayPrice> batchUpsertPrices =
+	                new ArrayList<>();
+
+	        Map<String, List<StockIntradayPrice>> batchFiveCache =
+	                new LinkedHashMap<>();
+
+	        Map<String, List<StockIntradayPrice>> batchSixtyCache =
+	                new LinkedHashMap<>();
+
+	        int batchSuccessCount = 0;
+	        int batchFailedCount = 0;
+
+	        // =================================================
+	        // 5. 處理本批股票
+	        // =================================================
+
+	        for (String stockCode : batchStockCodes) {
+
+	            try {
+
+	                // =========================================
+	                // 5.1 Yahoo 抓取 5m K 線
+	                // =========================================
+
+	                List<StockIntradayPrice> fiveMinutes =
+	                        grabThirdPartyStockDayPrice
+	                                .grabIntradayFromYahoo(
+	                                        stockCode,
+	                                        "5m"
+	                                );
+
+	                if (fiveMinutes == null || fiveMinutes.isEmpty()) {
+
+	                    log.warn(
+	                            "Yahoo returned empty intraday prices, stockCode={}",
+	                            stockCode
+	                    );
+
+	                    emptyCount++;
+
+	                    continue;
+	                }
+
+	                // =========================================
+	                // 5.2 整理 Yahoo 5m
+	                // =========================================
+
+	                fiveMinutes = normalizeIntradayPrices(
+	                        fiveMinutes,
+	                        FIVE_MINUTE_MAX_SIZE
+	                );
+
+	                if (fiveMinutes.isEmpty()) {
+
+	                    emptyCount++;
+
+	                    continue;
+	                }
+
+	                // =========================================
+	                // 5.3 聚合成 60m
+	                // =========================================
+
+	                List<StockIntradayPrice> sixtyMinutes =
+	                        grabThirdPartyStockDayPrice
+	                                .aggregateToHourly(fiveMinutes);
+
+	                sixtyMinutes = normalizeIntradayPrices(
+	                        sixtyMinutes,
+	                        SIXTY_MINUTE_MAX_SIZE
+	                );
+
+	                // =========================================
+	                // 5.4 整理 5m 與計算技術指標
+	                // =========================================
+
+	                List<StockIntradayPrice> fivePrices =
+	                        prepareIntradayPrices(
+	                                fiveMinutes,
+	                                fiveDbGroup.get(stockCode),
+	                                FIVE_MINUTE_MAX_SIZE
+	                        );
+
+	                // =========================================
+	                // 5.5 整理 60m 與計算技術指標
+	                // =========================================
+
+	                List<StockIntradayPrice> sixtyPrices =
+	                        sixtyMinutes.isEmpty()
+	                                ? new ArrayList<>()
+	                                : prepareIntradayPrices(
+	                                        sixtyMinutes,
+	                                        sixtyDbGroup.get(stockCode),
+	                                        SIXTY_MINUTE_MAX_SIZE
+	                                );
+
+	                // =========================================
+	                // 5.6 累積 PostgreSQL Upsert 資料
+	                // =========================================
+
+	                batchUpsertPrices.addAll(fivePrices);
+	                batchUpsertPrices.addAll(sixtyPrices);
+
+	                // =========================================
+	                // 5.7 暫存 Redis 資料
+	                // =========================================
+
+	                batchFiveCache.put(
+	                        stockCode,
+	                        fivePrices
+	                );
+
+	                if (!sixtyPrices.isEmpty()) {
+
+	                    batchSixtyCache.put(
+	                            stockCode,
+	                            sixtyPrices
+	                    );
+
+	                }
+
+	                successCount++;
+	                batchSuccessCount++;
+
+	                log.debug(
+	                        "Stock intraday calculated, stockCode={}, fiveSize={}, sixtySize={}",
+	                        stockCode,
+	                        fivePrices.size(),
+	                        sixtyPrices.size()
+	                );
+
+	            } catch (Exception e) {
+	                failedCount++;
+	                batchFailedCount++;
+
+	                log.error(
+	                        "Failed to calculate intraday prices, stockCode={}",
+	                        stockCode,
+	                        e
+	                );
+
+	            } finally {
+
+	                // =========================================
+	                // Yahoo request interval
+	                // =========================================
+
+	                if (!Thread.currentThread().isInterrupted()) {
+
+	                    try {
+
+	                        Thread.sleep(
+	                                YAHOO_REQUEST_INTERVAL_MS
+	                        );
+
+	                    } catch (InterruptedException e) {
+
+	                        Thread.currentThread().interrupt();
+
+	                        throw e;
+
+	                    }
+
+	                }
+
+	            }
+
+	        }
+
+	        // =================================================
+	        // 6. PostgreSQL 批次寫入
+	        // =================================================
+
+	        if (batchUpsertPrices.isEmpty()) {
+
+	            log.warn(
+	                    "Skip empty intraday batch, start={}, end={}",
+	                    start,
+	                    end
+	            );
+
+	            continue;
+	        }
+
+	        log.info(
+	                "Start PostgreSQL bulk upsert, records={}",
+	                batchUpsertPrices.size()
+	        );
+
+	        stockIntradayPriceService
+	                .bulkUpsertIntradayPrices(
+	                        batchUpsertPrices
+	                );
+
+	        log.info(
+	                "PostgreSQL bulk upsert completed, records={}",
+	                batchUpsertPrices.size()
+	        );
+
+	        // =================================================
+	        // 7. PostgreSQL 成功後更新 Redis
+	        // =================================================
+
+	        // 5m Redis
+	        batchFiveCache.forEach((stockCode, prices) -> {
+
+	            try {
+
+	                updateIntradayRedis(
+	                        stockCode,
+	                        "5m",
+	                        prices
+	                );
+
+	            } catch (Exception e) {
+
+	                log.error(
+	                        "Failed to update 5m Redis, stockCode={}",
+	                        stockCode,
+	                        e
+	                );
+
+	            }
+
+	        });
+
+	        // 60m Redis
+	        batchSixtyCache.forEach((stockCode, prices) -> {
+
+	            try {
+
+	                updateIntradayRedis(
+	                        stockCode,
+	                        "60m",
+	                        prices
+	                );
+
+	            } catch (Exception e) {
+
+	                log.error(
+	                        "Failed to update 60m Redis, stockCode={}",
+	                        stockCode,
+	                        e
+	                );
+
+	            }
+
+	        });
+
+	        // =================================================
+	        // 8. 本批完成
+	        // =================================================
+
+	        log.info(
+	                "Intraday batch completed, processed={}/{}, success={}, failed={}, upsertRecords={}",
+	                end,
+	                stockCodes.size(),
+	                batchSuccessCount,
+	                batchFailedCount,
+	                batchUpsertPrices.size()
+	        );
+
+	    }
+
+	    // =====================================================
+	    // 9. 全部完成
+	    // =====================================================
+
+	    log.info(
+	            "Intraday calculation completed, stockType={}, success={}, failed={}, empty={}",
+	            stockType,
+	            successCount,
+	            failedCount,
+	            emptyCount
+	    );
+
+	}
 	
+	private List<StockIntradayPrice> normalizeIntradayPrices(
+	        List<StockIntradayPrice> prices,
+	        int maxSize) {
+
+	    if (prices == null || prices.isEmpty()) {
+	        return new ArrayList<>();
+	    }
+
+	    // 按交易時間排序；相同時間以後出現的資料為準
+	    Map<LocalDateTime, StockIntradayPrice> uniquePrices =
+	            new TreeMap<>();
+
+	    for (StockIntradayPrice price : prices) {
+
+	        if (price == null || price.getTradingTime() == null) {
+	            continue;
+	        }
+
+	        uniquePrices.put(
+	                price.getTradingTime(),
+	                price
+	        );
+
+	    }
+
+	    List<StockIntradayPrice> sortedPrices =
+	            new ArrayList<>(uniquePrices.values());
+
+	    int fromIndex = Math.max(
+	            0,
+	            sortedPrices.size() - maxSize
+	    );
+
+	    return new ArrayList<>(
+	            sortedPrices.subList(
+	                    fromIndex,
+	                    sortedPrices.size()
+	            )
+	    );
+
+	}
+	
+	private List<StockIntradayPrice> prepareIntradayPrices(
+	        List<StockIntradayPrice> yahooPrices,
+	        List<StockIntradayPrice> dbPrices,
+	        int maxSize) {
+
+	    if (yahooPrices == null || yahooPrices.isEmpty()) {
+	        return new ArrayList<>();
+	    }
+
+	    // ==========================================
+	    // 1. 合併 DB 與 Yahoo
+	    // ==========================================
+
+	    Map<LocalDateTime, StockIntradayPrice> mergedPrices =
+	            new TreeMap<>();
+
+	    if (dbPrices != null) {
+
+	        for (StockIntradayPrice price : dbPrices) {
+
+	            if (price != null && price.getTradingTime() != null) {
+
+	                mergedPrices.put(
+	                        price.getTradingTime(),
+	                        price
+	                );
+
+	            }
+
+	        }
+
+	    }
+
+	    // Yahoo 資料優先，覆蓋 DB 同時間 K 線
+	    for (StockIntradayPrice price : yahooPrices) {
+
+	        if (price != null && price.getTradingTime() != null) {
+
+	            mergedPrices.put(
+	                    price.getTradingTime(),
+	                    price
+	            );
+
+	        }
+
+	    }
+
+	    // ==========================================
+	    // 2. 按時間由舊到新排列
+	    // ==========================================
+
+	    List<StockIntradayPrice> calculatedPrices =
+	            new ArrayList<>(mergedPrices.values());
+
+	    // ==========================================
+	    // 3. 計算技術指標
+	    // ==========================================
+
+	    calculateMissingIndicators(calculatedPrices);
+
+	    // ==========================================
+	    // 4. 保留最新指定筆數
+	    // ==========================================
+
+	    return normalizeIntradayPrices(
+	            calculatedPrices,
+	            maxSize
+	    );
+	}
+	private void updateIntradayRedis(
+	        String stockCode,
+	        String period,
+	        List<StockIntradayPrice> prices) {
+
+	    if (StringUtils.isBlank(stockCode)
+	            || prices == null
+	            || prices.isEmpty()) {
+	        return;
+	    }
+
+	    int maxSize;
+
+	    switch (period) {
+
+	        case "5m":
+	            maxSize = FIVE_MINUTE_MAX_SIZE;
+	            break;
+
+	        case "60m":
+	            maxSize = SIXTY_MINUTE_MAX_SIZE;
+	            break;
+
+	        default:
+	            throw new IllegalArgumentException(
+	                    "Unsupported intraday period: " + period
+	            );
+
+	    }
+
+	    List<StockIntradayPrice> latestPrices =
+	            normalizeIntradayPrices(prices, maxSize);
+
+	    String redisKey =
+	            "stock-intraday:" + period + ":" + stockCode;
+
+	    // 寫入最新 Snapshot
+	    cacheOperatorService.putSnapshotDataListAtomic(
+	            "ultraLongLivedCache",
+	            redisKey,
+	            latestPrices
+	    );
+
+	    // 保留最新兩個 Snapshot 版本
+	    cacheOperatorService.cleanupOldSnapshots(
+	            "ultraLongLivedCache",
+	            redisKey,
+	            2
+	    );
+
 	}
 }
