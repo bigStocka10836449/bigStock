@@ -33,7 +33,7 @@ public class GrabUSMarketHistory {
 	private final CacheOperatorService cacheOperatorService;
 	
 //	@PostConstruct
-	@Scheduled(cron = "0 45 14 * * ?", zone = "Asia/Taipei")
+	@Scheduled(cron = "0 45 8 * * ?", zone = "Asia/Taipei")
 	public void grabUSHistory() {
 		ObjectMapper objectMapper = new ObjectMapper();
 	    Instant now = Instant.now();
@@ -126,7 +126,7 @@ public class GrabUSMarketHistory {
 	}
 	
 //	@PostConstruct
-	@Scheduled(cron = "0 20 17 * * ?", zone = "Asia/Taipei")
+	@Scheduled(cron = "0 20 15 * * ?", zone = "Asia/Taipei")
 	public void grabTWPMHistory() {
 		String json = grabThirdPartyStockDayPrice.grabAndCacheTWPMMarketHistoryFromYahoo();
 		cacheOperatorService.putCompressedValue("market:raw:history", "WTX00", json);
