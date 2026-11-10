@@ -20,12 +20,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.bigstock.biz.dto.SingleStockIntradayPriceBizVo;
 import com.bigstock.biz.service.BizService;
 import com.bigstock.sharedComponent.dto.DynamicFilterStockCodeVo;
 import com.bigstock.sharedComponent.dto.SingleStockPriceBizVo;
 import com.bigstock.sharedComponent.dto.SingleStockPriceVo;
 import com.bigstock.sharedComponent.dto.StockInfoVo;
 import com.bigstock.sharedComponent.dto.StructureContinueIncreaseVo;
+import com.bigstock.sharedComponent.entity.StockIntradayPrice;
 //import com.bigstock.sharedComponent.service.SocketPushService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -70,7 +72,35 @@ public class GatewayController {
 	        return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
 	    }
 	}
+	
+	@Operation(summary = "個別股票 5 分 K、60 分 K", description = "依股票代號及 K 線週期查詢盤中 K 線資料")
+	@PostMapping(value = "SingleStockIntradayPrice", produces = "application/json; charset=UTF-8")
+	public ResponseEntity<List<StockIntradayPrice>> singleStockIntradayPrice(
+			@RequestBody SingleStockIntradayPriceBizVo request) {
 
+		try {
+
+			List<StockIntradayPrice> prices = bizService.getSingleStockIntradayPrices(request.getStockCode(),
+					request.getPeriod());
+
+			return ResponseEntity.ok(prices);
+
+		} catch (IllegalArgumentException e) {
+
+			log.warn("Invalid intraday request, stockCode={}, period={}", request.getStockCode(), request.getPeriod(),
+					e);
+
+			return ResponseEntity.badRequest().build();
+
+		} catch (Exception e) {
+
+			log.error("Query intraday K-line failed, stockCode={}, period={}", request.getStockCode(),
+					request.getPeriod(), e);
+
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
+	}
+	
 	@Operation(summary = "依照查詢條件篩選符合的股票代碼", description = "")
 	@PostMapping("StockCodeByFilter")
 	public ResponseEntity<List<StockInfoVo>> getStockCodeByFilter(

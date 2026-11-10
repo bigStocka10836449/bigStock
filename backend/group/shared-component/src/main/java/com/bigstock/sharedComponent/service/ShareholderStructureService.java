@@ -8,7 +8,6 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -26,12 +25,11 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
-import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.ShareholderStructure;
-import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.repository.ShareholderStructureRepository;
-import com.bigstock.sharedComponent.repository.StockDayPriceRepository;
+import com.bigstock.sharedComponent.service.support.CacheAsideExecutor;
+import com.bigstock.sharedComponent.service.support.CacheAsideService;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ShareholderStructureService {
+public class ShareholderStructureService implements CacheAsideService {
 	private static final String LATEST_QUERY_CACHE = "shareholderQueryCache";
 	private static final Duration LATEST_QUERY_TTL = Duration.ofMinutes(1);
 	private final ShareholderStructureRepository shareholderStructureRepository;
@@ -51,6 +49,8 @@ public class ShareholderStructureService {
 	private final DataSource dataSource;
 	
 	private final CacheOperatorService cacheOperatorService;
+	
+	private final CacheAsideExecutor cacheAsideExecutor;
 	
 	private final RedissonClient redissonClient;
 
@@ -90,48 +90,41 @@ public class ShareholderStructureService {
 	}
 
 //	@Cacheable(value = "longLivedCache", key = "#stockCode")
-	public List<ShareholderStructure> getShareholderStructureByStockCodeDesc(String stockCode) {
-		List<ShareholderStructure> shareholderStructures = cacheOperatorService.getCompressedZSetAllScore(
-				"ultraLongLivedCache", "shareholderStructure:compressed:" + stockCode, ShareholderStructure.class);
-		if (CollectionUtils.isNotEmpty(shareholderStructures)) {
-			return shareholderStructures;
+	public List<ShareholderStructure> getShareholderStructureByStockCodeDesc(
+	        String stockCode) {
 
-		} else {
-			String lockKey = "lock:getShareholderStructureByStockCodeDesc:cacheName:ultraLongLivedCache:shareholderStructure:compressed:"
-					+ stockCode;
+	    String cacheName = "ultraLongLivedCache";
+	    String cacheKey = "shareholderStructure:compressed:" + stockCode;
 
-			RLock lock = redissonClient.getLock(lockKey);
-			boolean lockAcquired = false;
-			try {
+	    return cacheAsideExecutor.executeList(
+	            cacheName,
+	            cacheKey,
 
-				lockAcquired = lock.tryLock(10, TimeUnit.MINUTES);
+	            // 1. Redis Reader
+	            () -> cacheOperatorService.getCompressedZSetAllScore(
+	                    cacheName,
+	                    cacheKey,
+	                    ShareholderStructure.class
+	            ),
 
-				if (lockAcquired) {
-					List<ShareholderStructure> nonCacheShareholderStructures = getSelf()
-							.getShareholderStructureByStockCodeDescWithDataBase(stockCode);
-					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
-							"shareholderStructure:compressed:" + stockCode, nonCacheShareholderStructures,
-							shareholderStructure -> ShareholderStructureService
-									.weekOfYearToScore(shareholderStructure.getWeekOfYear()),
-							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
-					return nonCacheShareholderStructures;
-				} else {
-					throw new RuntimeException("Could not acquire lock for " + lockKey);
-				}
+	            // 2. DB Loader
+	            () -> getSelf()
+	                    .getShareholderStructureByStockCodeDescWithDataBase(
+	                            stockCode
+	                    ),
 
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				throw new RuntimeException("Interrupted while trying to acquire lock", e);
-			} finally {
-
-				if (lockAcquired && lock.isHeldByCurrentThread()) {
-					lock.unlock();
-				}
-
-			}
-
-				}
-		}
+	            // 3. Redis Writer
+	            data -> cacheOperatorService.batchUpsertCompressedZSetSeries(
+	                    cacheName,
+	                    cacheKey,
+	                    data,
+	                    item -> ShareholderStructureService.weekOfYearToScore(
+	                            item.getWeekOfYear()
+	                    ),
+	                    CacheOperatorService.DEFAULT_SERIES_MAX_SIZE
+	            )
+	    );
+	}
 	
 		/** Read the API's bounded history without truncating the shared full-history cache. */
 		public List<ShareholderStructure> getLatestShareholderStructureByStockCode(String stockCode, int limit) {
@@ -482,5 +475,11 @@ public class ShareholderStructureService {
 	    int week = Integer.parseInt(weekText.substring(5));
 
 	    return year * 100 + week;
+	}
+	
+
+	@Override
+	public CacheAsideExecutor getCacheAsideExecutor() {
+		return cacheAsideExecutor;
 	}
 }

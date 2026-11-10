@@ -44,6 +44,7 @@ import com.bigstock.sharedComponent.entity.ShareholderStructure;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockExchangeDetail;
 import com.bigstock.sharedComponent.entity.StockInfo;
+import com.bigstock.sharedComponent.entity.StockIntradayPrice;
 import com.bigstock.sharedComponent.entity.StockMonthPrice;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
 import com.bigstock.sharedComponent.service.MarginTradingAndShortSellingInfoService;
@@ -51,12 +52,12 @@ import com.bigstock.sharedComponent.service.ShareholderStructureService;
 import com.bigstock.sharedComponent.service.StockDayPriceService;
 import com.bigstock.sharedComponent.service.StockExchangeDetailService;
 import com.bigstock.sharedComponent.service.StockInfoService;
+import com.bigstock.sharedComponent.service.StockIntradayPriceService;
 import com.bigstock.sharedComponent.service.StockMonthPriceService;
 import com.bigstock.sharedComponent.service.StockTagCacheService;
 import com.bigstock.sharedComponent.service.StockWeekPriceService;
 import com.google.common.collect.Lists;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -88,6 +89,8 @@ public class BizService {
 	private final StockMonthPriceService stockMonthPriceService;
 
 	private final StockInfoService stockInfoService;
+	
+	private final StockIntradayPriceService stockIntradayPriceService;
 
 	  private final JdbcTemplate jdbcTemplate;
 	    private final StockTagCacheService stockTagCacheService;
@@ -540,6 +543,32 @@ public class BizService {
 				}).toList();
 	}
 
+	/**
+	 * 取得個別股票盤中 K 線
+	 *
+	 * @param stockCode 股票代號
+	 * @param period 5m / 60m
+	 */
+	public List<StockIntradayPrice> getSingleStockIntradayPrices(String stockCode, String period) {
+
+		if (stockCode == null || stockCode.isBlank()) {
+			throw new IllegalArgumentException("stockCode cannot be blank");
+		}
+
+		if (period == null) {
+			throw new IllegalArgumentException("period cannot be null");
+		}
+
+		return switch (period) {
+
+		case "5m" -> stockIntradayPriceService.getFiveMinutePricesCache(stockCode);
+
+		case "60m" -> stockIntradayPriceService.getSixtyMinutePricesCache(stockCode);
+
+		default -> throw new IllegalArgumentException("Unsupported K-line period: " + period);
+		};
+	}
+	
 	@Transactional
 	public List<StockInfoVo> getMatchStockCodeByCondition(List<DynamicFilterStockCodeVo> dynamicFilterStockCodeVos) {
 
@@ -870,4 +899,5 @@ public class BizService {
 		}
 		return String.valueOf(today.getYear()) + "W" + weekOfYear;
 	}
+	
 }

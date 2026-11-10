@@ -620,6 +620,7 @@ public class CacheOperatorService {
 		String redisKey = buildKey(cacheName, key);
 		try {
 			ObjectMapper objectMapper = new ObjectMapper();
+			objectMapper.registerModule(new JavaTimeModule());
 			String activeKey = redisKey + ":active";
 
 			byte[] activeVersionBytes = rawRedisTemplate.opsForValue().get(activeKey);

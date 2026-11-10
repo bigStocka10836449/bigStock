@@ -6,36 +6,33 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
-import org.apache.commons.collections4.CollectionUtils;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
-import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.repository.MarginTradingAndShortSellingInfoRepository;
+import com.bigstock.sharedComponent.service.support.CacheAsideExecutor;
+import com.bigstock.sharedComponent.service.support.CacheAsideService;
 
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-public class MarginTradingAndShortSellingInfoService {
+public class MarginTradingAndShortSellingInfoService implements CacheAsideService {
 
 	private final MarginTradingAndShortSellingInfoRepository repository;
 
@@ -43,9 +40,9 @@ public class MarginTradingAndShortSellingInfoService {
 
 	private final DataSource dataSource;
 	
+	private final CacheAsideExecutor cacheAsideExecutor;
+
 	private final CacheOperatorService cacheOperatorService;
-	
-	private final RedissonClient redissonClient;
 
 	private static final DateTimeFormatter PG_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -73,52 +70,21 @@ public class MarginTradingAndShortSellingInfoService {
 
 	public List<MarginTradingAndShortSellingInfo> findMarginTradingAndShortSellingInfoByDateRange(String stockCode,
 			Date firstDate, Date secondDate) {
-		List<MarginTradingAndShortSellingInfo> marginTradingAndShortSellingInfos = cacheOperatorService
-				.getCompressedZSetAllScore("ultraLongLivedCache", "marginTrading:compressed:" + stockCode,
-						MarginTradingAndShortSellingInfo.class);
-		if (CollectionUtils.isNotEmpty(marginTradingAndShortSellingInfos)) {
-			return marginTradingAndShortSellingInfos;
-		} else {
-			String lockKey = "lock:findMarginTradingAndShortSellingInfoByDateRange:cacheName:ultraLongLivedCache:marginTrading:compressed:"
-					+ stockCode;
 
-			RLock lock = redissonClient.getLock(lockKey);
-			boolean lockAcquired = false;
-			try {
+		String cacheName = "ultraLongLivedCache";
+		String cacheKey = "marginTrading:compressed:" + stockCode;
 
-				lockAcquired = lock.tryLock(10, TimeUnit.MINUTES);
+		return cacheAsideExecutor.executeList(cacheName, cacheKey,
 
-				if (lockAcquired) {
-					marginTradingAndShortSellingInfos = cacheOperatorService
-							.getCompressedZSetAllScore("ultraLongLivedCache", "marginTrading:compressed:" + stockCode,
-									MarginTradingAndShortSellingInfo.class);
-					if(!marginTradingAndShortSellingInfos.isEmpty()) {
-						return marginTradingAndShortSellingInfos;
-					}
-					List<MarginTradingAndShortSellingInfo> nonCacheMarginTradingAndShortSellingInfos = repository
-							.findMarginTradingAndShortSellingInfoByDateRange(stockCode, firstDate, secondDate);
-					cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
-							"marginTrading:compressed:" + stockCode, nonCacheMarginTradingAndShortSellingInfos,
-							marginTradingAndShortSellingInfo -> marginTradingAndShortSellingInfo.getTradingDay().getTime(),
-							CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
-					return nonCacheMarginTradingAndShortSellingInfos;
-				} else {
-					throw new RuntimeException("Could not acquire lock for " + lockKey);
-				}
+				() -> cacheOperatorService.getCompressedZSetAllScore(cacheName, cacheKey,
+						MarginTradingAndShortSellingInfo.class),
 
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				throw new RuntimeException("Interrupted while trying to acquire lock", e);
-			} finally {
+				() -> repository.findMarginTradingAndShortSellingInfoByDateRange(stockCode, firstDate, secondDate),
 
-				if (lockAcquired && lock.isHeldByCurrentThread()) {
-					lock.unlock();
-				}
-
-			}
-
-		}
+				data -> cacheOperatorService.batchUpsertCompressedZSetSeries(cacheName, cacheKey, data,
+						item -> item.getTradingDay().getTime(), CacheOperatorService.DEFAULT_SERIES_MAX_SIZE));
 	}
+
 
 	public List<MarginTradingAndShortSellingInfo> findByTradingDayBeforEqualLimitTwoFourty(Date startDateMinus360,
 			Date endDate) {
@@ -342,5 +308,10 @@ public class MarginTradingAndShortSellingInfoService {
 			return null;
 
 		return d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate().toString();
+	}
+
+	@Override
+	public CacheAsideExecutor getCacheAsideExecutor() {
+		return cacheAsideExecutor;
 	}
 }
