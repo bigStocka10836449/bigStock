@@ -2,6 +2,11 @@ app:
   env: local
   cors:
     allowed-origins: https://bstock.bigstockserver.link,http://localhost:4173,http://localhost:5173,http://localhost:13001
+similarity:
+  api:
+    base-url: ${SIMILARITY_API_BASEURL:http://127.0.0.1:38080}
+    connect-timeout: 5s
+    read-timeout: 5m       
 bstock:
   rate-limit:
 

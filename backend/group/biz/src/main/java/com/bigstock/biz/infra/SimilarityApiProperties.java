@@ -12,7 +12,9 @@ import lombok.Data;
 @ConfigurationProperties(prefix = "similarity.api")
 public class SimilarityApiProperties {
 
-    private String baseUrl = "https://bigstock-similiarearch.zeabur.app";
+    private String baseUrl;
+
     private Duration connectTimeout = Duration.ofSeconds(5);
+
     private Duration readTimeout = Duration.ofMinutes(5);
 }
