@@ -31,10 +31,13 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import com.bigstock.biz.controller.MarketQuotesController;
 import com.bigstock.sharedComponent.entity.RolePath;
 import com.bigstock.sharedComponent.service.RolePathService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -46,6 +49,9 @@ import lombok.RequiredArgsConstructor;
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+	static final RequestMatcher MARKET_QUOTES_IMPORT =
+			new AntPathRequestMatcher(MarketQuotesController.IMPORT_PATH, HttpMethod.POST.name());
 
 	@Value("${server.oauth2.secret-key}")
 	private String secretKey;
@@ -89,11 +95,14 @@ public class SecurityConfig {
 
 				.csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
 
+				.ignoringRequestMatchers(MARKET_QUOTES_IMPORT)
 				.requireCsrfProtectionMatcher(bigStockCsrfRequestMatcher)).httpBasic(httpBasic -> httpBasic.disable())
 				.formLogin(form -> form.disable())
 				.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
 
 				.authorizeHttpRequests(auth -> {
+
+					auth.requestMatchers(MARKET_QUOTES_IMPORT).permitAll();
 
 					auth.requestMatchers("/gateway/swagger/**", "/api/biz/swagger/**", "/biz/swagger/**", "/ws/**",
 							"/v3/api-docs/**", "/swagger-ui/**", "/webjars/**", "/auth/**", "/device/**",
