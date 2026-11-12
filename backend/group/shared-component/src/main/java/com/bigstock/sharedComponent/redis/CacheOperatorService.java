@@ -898,6 +898,12 @@ public class CacheOperatorService {
 		rawRedisTemplate.opsForValue().set(redisKey, jsonByte, ttl);
 	}
 
+	public <T> void putObject(String cacheName, String cacheKey, T object) throws JsonProcessingException {
+		String redisKey = buildKey(cacheName, cacheKey);
+		byte[] json = new ObjectMapper().writeValueAsBytes(object);
+		rawRedisTemplate.opsForValue().set(redisKey, json);
+	}
+
 	public <T> T getObject(String cacheName, String cacheKey, Class<T> clazz) throws IOException {
 		String redisKey = buildKey(cacheName, cacheKey);
 		ObjectMapper objectMapper = new ObjectMapper();

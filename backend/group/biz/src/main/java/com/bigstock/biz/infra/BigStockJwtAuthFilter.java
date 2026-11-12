@@ -179,6 +179,11 @@ public class BigStockJwtAuthFilter extends OncePerRequestFilter {
 
 			throws ServletException, IOException {
 
+		if (SecurityConfig.MARKET_QUOTES_IMPORT.matches(request)) {
+			filterChain.doFilter(request, response);
+			return;
+		}
+
 		String path = request.getRequestURI();
 
 		// ========================================================
