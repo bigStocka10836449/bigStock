@@ -67,7 +67,8 @@ public class WebSocketMessageSecurityConfig
                         "/topic/marketNASDAQ_F",
                         "/topic/marketS_P_500_F",
                         "/topic/marketDOW_JONES_F",
-                        "/topic/marketPHLX_SEMICONDUCTOR_SECTOR"
+                        "/topic/marketPHLX_SEMICONDUCTOR_SECTOR",
+                        "/topic/NewsData"
                 )
                 .authenticated()
 
