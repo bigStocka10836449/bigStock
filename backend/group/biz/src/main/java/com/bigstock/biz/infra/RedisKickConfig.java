@@ -9,6 +9,8 @@ import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 import com.bigstock.biz.component.LocalSessionRegistry;
+import com.bigstock.biz.service.MarketQuoteEvents;
+import com.bigstock.biz.service.MarketQuoteWebSocketService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +23,8 @@ public class RedisKickConfig {
 	private final LocalSessionRegistry registry;
 
 	@Bean
-	public RedisMessageListenerContainer container(RedisConnectionFactory factory) {
+	public RedisMessageListenerContainer container(RedisConnectionFactory factory,
+			MarketQuoteWebSocketService marketQuoteWebSocket) {
 
 		RedisMessageListenerContainer container = new RedisMessageListenerContainer();
 
@@ -47,6 +50,9 @@ public class RedisKickConfig {
 			}
 
 		}, new ChannelTopic("WS_KICK"));
+
+		container.addMessageListener((message, pattern) -> marketQuoteWebSocket.onRedisUpdate(message.getBody()),
+				new ChannelTopic(MarketQuoteEvents.CHANNEL));
 
 		return container;
 	}

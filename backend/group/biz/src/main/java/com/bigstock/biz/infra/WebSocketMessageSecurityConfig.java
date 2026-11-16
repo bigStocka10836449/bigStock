@@ -14,6 +14,8 @@ import org.springframework.security.messaging.context.SecurityContextChannelInte
 
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
+import com.bigstock.biz.service.MarketQuoteWebSocketService;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -60,7 +62,7 @@ public class WebSocketMessageSecurityConfig
                 .nullDestMatcher()
                 .authenticated()
 
-                // 只允許六個市場行情 Topic
+                // 僅允許下列市場行情、快訊與報價 Topic
                 .simpSubscribeDestMatchers(
                         "/topic/marketTWPM",
                         "/topic/marketTWPMN",
@@ -68,7 +70,9 @@ public class WebSocketMessageSecurityConfig
                         "/topic/marketS_P_500_F",
                         "/topic/marketDOW_JONES_F",
                         "/topic/marketPHLX_SEMICONDUCTOR_SECTOR",
-                        "/topic/NewsData"
+                        "/topic/NewsData",
+                        MarketQuoteWebSocketService.DEFAULT_DESTINATION,
+                        MarketQuoteWebSocketService.SUBSCRIBED_DESTINATION
                 )
                 .authenticated()
 

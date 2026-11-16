@@ -15,6 +15,11 @@ public class LocalSessionRegistry {
 		sessions.put(session.getId(), session);
 	}
 
+	public boolean isOpen(String sessionId) {
+		WebSocketSession session = sessions.get(sessionId);
+		return session != null && session.isOpen();
+	}
+
 	public void remove(String sessionId) {
 		sessions.remove(sessionId);
 	}
