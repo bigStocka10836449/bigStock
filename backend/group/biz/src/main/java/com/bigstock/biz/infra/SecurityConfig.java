@@ -31,9 +31,11 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
@@ -43,6 +45,10 @@ import com.bigstock.sharedComponent.service.RolePathService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
 @Configuration
@@ -50,8 +56,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-	static final RequestMatcher MARKET_QUOTES_IMPORT =
-			new AntPathRequestMatcher(MarketQuotesController.IMPORT_PATH, HttpMethod.POST.name());
+	private static final RequestMatcher MARKET_QUOTES_PATH = new AntPathRequestMatcher(MarketQuotesController.IMPORT_PATH);
+	static final RequestMatcher MARKET_QUOTES_IMPORT = request -> MarketQuoteImportNetworkConfig.isInternal(request)
+			&& HttpMethod.POST.matches(request.getMethod()) && MARKET_QUOTES_PATH.matches(request);
 
 	@Value("${server.oauth2.secret-key}")
 	private String secretKey;
@@ -98,6 +105,7 @@ public class SecurityConfig {
 				.ignoringRequestMatchers(MARKET_QUOTES_IMPORT)
 				.requireCsrfProtectionMatcher(bigStockCsrfRequestMatcher)).httpBasic(httpBasic -> httpBasic.disable())
 				.formLogin(form -> form.disable())
+				.addFilterBefore(marketQuoteNetworkFilter(), CsrfFilter.class)
 				.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
 
 				.authorizeHttpRequests(auth -> {
@@ -153,6 +161,21 @@ public class SecurityConfig {
 						.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
 		return http.build();
+	}
+
+	private OncePerRequestFilter marketQuoteNetworkFilter() {
+		return new OncePerRequestFilter() {
+			@Override
+			protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+					throws ServletException, IOException {
+				if ((MarketQuoteImportNetworkConfig.isInternal(request) || MARKET_QUOTES_PATH.matches(request))
+						&& !MARKET_QUOTES_IMPORT.matches(request)) {
+					response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+					return;
+				}
+				chain.doFilter(request, response);
+			}
+		};
 	}
 
 	/* ========= JWT → Authority 轉換 ========= */

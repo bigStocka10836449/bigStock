@@ -11,11 +11,14 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.bigstock.biz.infra.MarketQuoteImportNetworkConfig;
 import com.bigstock.biz.service.MarketQuotesService;
 import com.bigstock.biz.service.MarketQuotesService.QuoteBatch;
 import com.bigstock.sharedComponent.service.MarketQuotesJobService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
+import io.swagger.v3.oas.annotations.Hidden;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -26,9 +29,13 @@ public class MarketQuotesController {
     private final MarketQuotesService service;
     private final MarketQuotesJobService job;
 
+    @Hidden
     @PostMapping(IMPORT_PATH)
-    public ResponseEntity<Void> importQuotes(@PathVariable("source") String source, @RequestBody QuoteBatch request)
-            throws JsonProcessingException {
+    public ResponseEntity<Void> importQuotes(@PathVariable("source") String source, @RequestBody QuoteBatch request,
+            HttpServletRequest servletRequest) throws JsonProcessingException {
+        if (!MarketQuoteImportNetworkConfig.isInternal(servletRequest)) {
+            return ResponseEntity.notFound().build();
+        }
         service.importQuotes(source, request);
         return ResponseEntity.ok().build();
     }
