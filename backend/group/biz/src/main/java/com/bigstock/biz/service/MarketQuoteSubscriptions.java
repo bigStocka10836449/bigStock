@@ -70,8 +70,8 @@ public class MarketQuoteSubscriptions {
         return change(List.of(key(userId)), userId, stockCode, subscribed);
     }
 
-    public void changeWeb(WebQuoteVisitor.Visitor visitor, String stockCode, boolean subscribed) {
-        change(List.of(key(visitor.owner()), visitor.redisKey()), visitor.owner(), stockCode, subscribed);
+    public boolean changeWeb(WebQuoteVisitor.Visitor visitor, String stockCode, boolean subscribed) {
+        return change(List.of(key(visitor.owner()), visitor.redisKey()), visitor.owner(), stockCode, subscribed);
     }
 
     private boolean change(List<String> keys, String owner, String stockCode, boolean subscribed) {

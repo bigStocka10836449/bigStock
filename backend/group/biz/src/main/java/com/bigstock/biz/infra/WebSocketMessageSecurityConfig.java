@@ -72,7 +72,8 @@ public class WebSocketMessageSecurityConfig
                         "/topic/marketPHLX_SEMICONDUCTOR_SECTOR",
                         "/topic/NewsData",
                         MarketQuoteWebSocketService.DEFAULT_DESTINATION,
-                        MarketQuoteWebSocketService.SUBSCRIBED_DESTINATION
+                        MarketQuoteWebSocketService.SUBSCRIBED_DESTINATION,
+                        MarketQuoteWebSocketService.WEB_DESTINATION
                 )
                 .authenticated()
 

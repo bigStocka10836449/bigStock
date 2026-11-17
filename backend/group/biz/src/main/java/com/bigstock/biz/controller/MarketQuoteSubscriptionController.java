@@ -42,7 +42,7 @@ public class MarketQuoteSubscriptionController {
                     MarketQuoteSubscriptions.DEFAULT_STOCKS);
         }
         requireOwner(owner, request.userId());
-        String code = resolveStockCode(owner, request.stock(), request.subscribed());
+        String code = resolveStockCode(owner, request.stock(), request.subscribed(), false);
         if (subscriptions.change(owner, code, request.subscribed())) {
             events.subscriptionsUpdated(owner);
         }
@@ -69,7 +69,7 @@ public class MarketQuoteSubscriptionController {
         requireWebGuest(auth);
         Visitor visitor = visitors.find(token);
         List<String> stockCodes = visitor == null ? List.of() : subscriptions.stockCodes(visitor.owner());
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new WebListResponse(stockCodes));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(webResponse(stockCodes, false));
     }
 
     @PostMapping("/biz/marketQuotes/subscriptions/web")
@@ -79,18 +79,21 @@ public class MarketQuoteSubscriptionController {
         requireWebGuest(auth);
         Visitor visitor = visitors.find(token);
         String owner = visitor == null ? null : visitor.owner();
-        String code = resolveStockCode(owner, request.stock(), request.subscribed());
+        String code = resolveStockCode(owner, request.stock(), request.subscribed(), true);
         var response = ResponseEntity.ok().cacheControl(CacheControl.noStore());
-        if (visitor == null) {
+        boolean visitorCreated = visitor == null;
+        if (visitorCreated) {
             if (!request.subscribed()) {
-                return response.body(new WebListResponse(List.of()));
+                return response.body(webResponse(List.of(), false));
             }
             var issued = visitors.issue();
             visitor = issued.visitor();
             response.header(HttpHeaders.SET_COOKIE, issued.cookie().toString());
         }
-        subscriptions.changeWeb(visitor, code, request.subscribed());
-        return response.body(new WebListResponse(subscriptions.stockCodes(visitor.owner())));
+        if (subscriptions.changeWeb(visitor, code, request.subscribed())) {
+            events.subscriptionsUpdated(visitor.owner());
+        }
+        return response.body(webResponse(subscriptions.stockCodes(visitor.owner()), visitorCreated));
     }
 
     @PostMapping("/biz/marketQuotes/subscriptions/web/refresh")
@@ -106,7 +109,12 @@ public class MarketQuoteSubscriptionController {
                 .body(new RefreshResponse(MarketQuoteSubscriptions.LIFETIME.toSeconds()));
     }
 
-    private String resolveStockCode(String owner, String stock, Boolean subscribed) throws IOException {
+    private WebListResponse webResponse(List<String> stockCodes, boolean visitorCreated) {
+        return new WebListResponse(stockCodes, MarketQuoteWebSocketService.WEB_DESTINATION, visitorCreated);
+    }
+
+    private String resolveStockCode(String owner, String stock, Boolean subscribed, boolean codeOnly)
+            throws IOException {
         if (stock == null || stock.isBlank() || subscribed == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Expected stock and subscribed");
         }
@@ -115,7 +123,7 @@ public class MarketQuoteSubscriptionController {
         if (!subscribed && owner != null && subscriptions.stockCodes(owner).contains(value)) {
             return value;
         }
-        return quotes.resolveStockCode(value);
+        return codeOnly ? quotes.requireStockCode(value) : quotes.resolveStockCode(value);
     }
 
     private void requireWebGuest(JwtAuthenticationToken auth) {
@@ -140,7 +148,7 @@ public class MarketQuoteSubscriptionController {
 
     public record ChangeRequest(String stock, Boolean subscribed, String userId) {}
     public record WebChangeRequest(String stock, Boolean subscribed) {}
-    public record WebListResponse(List<String> stockCodes) {}
+    public record WebListResponse(List<String> stockCodes, String destination, boolean visitorCreated) {}
     public record RefreshRequest(String userId) {}
     public record SubscriptionResponse(String destination, List<String> stockCodes) {}
     public record RefreshResponse(long ttlSeconds) {}

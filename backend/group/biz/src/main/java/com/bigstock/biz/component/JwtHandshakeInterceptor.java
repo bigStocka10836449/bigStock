@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
+import com.bigstock.biz.service.WebQuoteVisitor;
 import com.bigstock.sharedComponent.entity.FcmRecord;
 import com.bigstock.sharedComponent.service.FcmRecordService;
 
@@ -45,6 +46,7 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 	private final RedissonClient redissonClient;
 
 	private final FcmRecordService fcmRecordService;
+	private final WebQuoteVisitor webQuoteVisitor;
 
 	@Value("${server.oauth2.secret-key}")
 	private String secretKey;
@@ -170,6 +172,8 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 				return false;
 			}
 
+			attributes.put(WebSocketAttributes.WEB_QUOTE_IDENTITY, new WebQuoteVisitor.SocketIdentity(
+					webQuoteVisitor.findForSocket(httpRequest.getCookies()), expiration.toInstant()));
 			log.debug("[WS AUTH] Web guest authenticated, userId={}", userId);
 
 			// ========================================================

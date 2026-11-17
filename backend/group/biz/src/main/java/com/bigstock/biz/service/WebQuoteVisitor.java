@@ -1,6 +1,7 @@
 package com.bigstock.biz.service;
 
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -10,10 +11,13 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 
+import jakarta.servlet.http.Cookie;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class WebQuoteVisitor {
 
     public static final String COOKIE_NAME = "__Host-bstock_visitor";
@@ -31,6 +35,31 @@ public class WebQuoteVisitor {
         String key = key(token);
         String owner = redis.opsForValue().get(key);
         return owner == null ? null : new Visitor(owner, key);
+    }
+
+    public Visitor findForSocket(Cookie[] cookies) {
+        if (cookies == null) {
+            return null;
+        }
+        String token = null;
+        for (Cookie cookie : cookies) {
+            if (COOKIE_NAME.equals(cookie.getName())) {
+                if (token != null) {
+                    return null;
+                }
+                token = cookie.getValue();
+            }
+        }
+        try {
+            return find(token);
+        } catch (RuntimeException ex) {
+            log.warn("Could not load web quote visitor for WebSocket", ex);
+            return null;
+        }
+    }
+
+    public boolean isCurrent(Visitor visitor) {
+        return visitor.owner().equals(redis.opsForValue().get(visitor.redisKey()));
     }
 
     public IssuedVisitor issue() {
@@ -56,6 +85,8 @@ public class WebQuoteVisitor {
     }
 
     public record Visitor(String owner, String redisKey) {}
+
+    public record SocketIdentity(Visitor visitor, Instant expiresAt) {}
 
     public record IssuedVisitor(Visitor visitor, ResponseCookie cookie) {}
 }

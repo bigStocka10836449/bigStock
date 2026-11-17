@@ -50,6 +50,14 @@ public class MarketQuotesService {
     }
 
     public String resolveStockCode(String stock) throws IOException {
+        return resolveStock(stock, true);
+    }
+
+    public String requireStockCode(String stock) throws IOException {
+        return resolveStock(stock, false);
+    }
+
+    private String resolveStock(String stock, boolean matchName) throws IOException {
         Set<String> names = new HashSet<>();
         for (String source : SOURCES) {
             Snapshot snapshot = readSnapshot(source);
@@ -60,7 +68,7 @@ public class MarketQuotesService {
                 if (stock.equalsIgnoreCase(quote.name())) {
                     return quote.name();
                 }
-                if (stock.equals(quote.description())) {
+                if (matchName && stock.equals(quote.description())) {
                     names.add(quote.name());
                 }
             }
