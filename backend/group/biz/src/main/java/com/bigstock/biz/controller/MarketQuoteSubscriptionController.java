@@ -3,8 +3,13 @@ package com.bigstock.biz.controller;
 import java.io.IOException;
 import java.util.List;
 
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,6 +19,8 @@ import com.bigstock.biz.service.MarketQuoteEvents;
 import com.bigstock.biz.service.MarketQuoteSubscriptions;
 import com.bigstock.biz.service.MarketQuoteWebSocketService;
 import com.bigstock.biz.service.MarketQuotesService;
+import com.bigstock.biz.service.WebQuoteVisitor;
+import com.bigstock.biz.service.WebQuoteVisitor.Visitor;
 
 import lombok.RequiredArgsConstructor;
 
@@ -24,6 +31,7 @@ public class MarketQuoteSubscriptionController {
     private final MarketQuotesService quotes;
     private final MarketQuoteSubscriptions subscriptions;
     private final MarketQuoteEvents events;
+    private final WebQuoteVisitor visitors;
 
     @PostMapping("/biz/marketQuotes/subscriptions")
     public SubscriptionResponse change(JwtAuthenticationToken auth, @RequestBody ChangeRequest request)
@@ -34,14 +42,7 @@ public class MarketQuoteSubscriptionController {
                     MarketQuoteSubscriptions.DEFAULT_STOCKS);
         }
         requireOwner(owner, request.userId());
-        if (request.stock() == null || request.stock().isBlank() || request.subscribed() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Expected stock and subscribed");
-        }
-
-        String stock = request.stock().strip();
-        List<String> existing = subscriptions.stockCodes(owner);
-        // Allow a stored code to be removed even if the quote vanished from the latest feed.
-        String code = !request.subscribed() && existing.contains(stock) ? stock : quotes.resolveStockCode(stock);
+        String code = resolveStockCode(owner, request.stock(), request.subscribed());
         if (subscriptions.change(owner, code, request.subscribed())) {
             events.subscriptionsUpdated(owner);
         }
@@ -62,6 +63,68 @@ public class MarketQuoteSubscriptionController {
         return new RefreshResponse(MarketQuoteSubscriptions.LIFETIME.toSeconds());
     }
 
+    @GetMapping("/biz/marketQuotes/subscriptions/web")
+    public ResponseEntity<WebListResponse> webList(JwtAuthenticationToken auth,
+            @CookieValue(name = WebQuoteVisitor.COOKIE_NAME, required = false) String token) {
+        requireWebGuest(auth);
+        Visitor visitor = visitors.find(token);
+        List<String> stockCodes = visitor == null ? List.of() : subscriptions.stockCodes(visitor.owner());
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new WebListResponse(stockCodes));
+    }
+
+    @PostMapping("/biz/marketQuotes/subscriptions/web")
+    public ResponseEntity<WebListResponse> changeWeb(JwtAuthenticationToken auth,
+            @CookieValue(name = WebQuoteVisitor.COOKIE_NAME, required = false) String token,
+            @RequestBody WebChangeRequest request) throws IOException {
+        requireWebGuest(auth);
+        Visitor visitor = visitors.find(token);
+        String owner = visitor == null ? null : visitor.owner();
+        String code = resolveStockCode(owner, request.stock(), request.subscribed());
+        var response = ResponseEntity.ok().cacheControl(CacheControl.noStore());
+        if (visitor == null) {
+            if (!request.subscribed()) {
+                return response.body(new WebListResponse(List.of()));
+            }
+            var issued = visitors.issue();
+            visitor = issued.visitor();
+            response.header(HttpHeaders.SET_COOKIE, issued.cookie().toString());
+        }
+        subscriptions.changeWeb(visitor, code, request.subscribed());
+        return response.body(new WebListResponse(subscriptions.stockCodes(visitor.owner())));
+    }
+
+    @PostMapping("/biz/marketQuotes/subscriptions/web/refresh")
+    public ResponseEntity<RefreshResponse> refreshWeb(JwtAuthenticationToken auth,
+            @CookieValue(name = WebQuoteVisitor.COOKIE_NAME, required = false) String token) {
+        requireWebGuest(auth);
+        Visitor visitor = visitors.find(token);
+        if (visitor == null || !subscriptions.refreshWeb(visitor)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No web subscription list");
+        }
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.SET_COOKIE, visitors.cookie(token).toString())
+                .body(new RefreshResponse(MarketQuoteSubscriptions.LIFETIME.toSeconds()));
+    }
+
+    private String resolveStockCode(String owner, String stock, Boolean subscribed) throws IOException {
+        if (stock == null || stock.isBlank() || subscribed == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Expected stock and subscribed");
+        }
+        String value = stock.strip();
+        // Stored codes can be removed when the stock is missing from the current feed.
+        if (!subscribed && owner != null && subscriptions.stockCodes(owner).contains(value)) {
+            return value;
+        }
+        return quotes.resolveStockCode(value);
+    }
+
+    private void requireWebGuest(JwtAuthenticationToken auth) {
+        subject(auth);
+        if (!"web_guest".equals(auth.getToken().getClaimAsString("token_type"))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Expected a web guest session");
+        }
+    }
+
     private String subject(JwtAuthenticationToken auth) {
         if (auth == null || auth.getToken().getSubject() == null || auth.getToken().getSubject().isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing JWT subject");
@@ -76,6 +139,8 @@ public class MarketQuoteSubscriptionController {
     }
 
     public record ChangeRequest(String stock, Boolean subscribed, String userId) {}
+    public record WebChangeRequest(String stock, Boolean subscribed) {}
+    public record WebListResponse(List<String> stockCodes) {}
     public record RefreshRequest(String userId) {}
     public record SubscriptionResponse(String destination, List<String> stockCodes) {}
     public record RefreshResponse(long ttlSeconds) {}
