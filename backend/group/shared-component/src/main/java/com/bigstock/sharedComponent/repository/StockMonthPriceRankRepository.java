@@ -18,26 +18,30 @@ public interface StockMonthPriceRankRepository
 	void deleteByRankNoLessThanZero();
 	
 	
+
 	@Modifying
 	@Query(value = """
-		UPDATE bstock.stock_month_price_rank t
-		SET rank_no = r.new_rank
-		FROM (
-		    SELECT 
-		        stock_code,
-		        year,
-		        month,
-		        ROW_NUMBER() OVER (
-		            PARTITION BY stock_code
-		            ORDER BY first_trading_day DESC
-		        ) AS new_rank
-		    FROM bstock.stock_month_price_rank
-		) r
-		WHERE t.stock_code = r.stock_code
-		  AND t.year = r.year
-		  AND t.month = r.month
+			UPDATE bstock.stock_month_price_rank t
+			SET rank_no = r.new_rank
+			FROM (
+			    SELECT
+			        stock_code,
+			        year,
+			        month,
+			        ROW_NUMBER() OVER (
+			            PARTITION BY stock_code
+			            ORDER BY first_trading_day DESC
+			        ) AS new_rank
+			    FROM bstock.stock_month_price_rank
+			    WHERE stock_code IN (:stockCodes)
+			) r
+			WHERE t.stock_code = r.stock_code
+			  AND t.year = r.year
+			  AND t.month = r.month
+			  AND t.stock_code IN (:stockCodes)
 			""", nativeQuery = true)
-	void updateRankNo();
+	int updateRankNoByStockCodes(@Param("stockCodes") List<String> stockCodes);
+
 	
 	 
 }

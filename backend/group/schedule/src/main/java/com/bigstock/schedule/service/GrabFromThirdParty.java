@@ -12,6 +12,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -23,6 +24,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.bigstock.schedule.job.core.JobContext;
+import com.bigstock.schedule.job.core.JobTransactionalCheckpoint;
 import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockDayPrice;
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
@@ -43,7 +46,6 @@ import com.bigstock.sharedComponent.service.StockMonthPriceService;
 import com.bigstock.sharedComponent.service.StockWeekPriceService;
 import com.bigstock.sharedComponent.utils.ChromeDriverUtils;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -63,6 +65,13 @@ public class GrabFromThirdParty {
 	
 	// DB 歷史資料讀取數量
 	private static final int INDICATOR_HISTORY_SIZE = 240;
+	
+	private static final int MARGIN_BATCH_SIZE = 50;
+
+	private static final long MARGIN_YAHOO_INTERVAL_MS = 1500L;
+	
+	private static final int DAILY_MANAGED_BATCH_SIZE = 50;
+	private static final long DAILY_YAHOO_DELAY_MS = 2000L;
 
 
 	private final StockInfoService stockInfoService;
@@ -83,6 +92,23 @@ public class GrabFromThirdParty {
 
 	private final StockIntradayPriceService stockIntradayPriceService;
 
+	
+	private final JobTransactionalCheckpoint transactionalCheckpoint;
+	
+	// 原有呼叫方式保留
+	private void doCalculateIntradayPrices(String stockType)
+	        throws Exception {
+	    doCalculateIntradayPrices(stockType, null);
+	}
+
+	// 給 Job Management Framework 使用
+	public void calculateIntradayManaged(
+	        String stockType,
+	        JobContext context) throws Exception {
+
+	    Objects.requireNonNull(context, "JobContext cannot be null");
+	    doCalculateIntradayPrices(stockType, context);
+	}	
 	@Scheduled(cron = "0 50 18 * * ?", zone = "Asia/Taipei")
 	public void updateStockIntradayPriceByThirdParty() throws Exception {
 		doCalculateIntradayPrices("0");
@@ -90,340 +116,655 @@ public class GrabFromThirdParty {
 		doCalculateIntradayPrices("2");
 	}
 
-//	@PostConstruct
-	@Scheduled(cron = "0 30 15 * * ?", zone = "Asia/Taipei")
+
+	/** Legacy entry: no duplicate @Scheduled when DatabaseCronTrigger is active. */
 	public void updateStockDayPriceByThirdParty() throws Exception {
-		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
-			return !data.matches(".*[a-zA-Z].*");
-		}).toList();
-		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
-			return !data.matches(".*[a-zA-Z].*");
-		}).toList();
-		List<String> oesStockCodes = stockInfoService.getStockCodeByStockType("2").stream().filter(data -> {
-			return !data.matches(".*[a-zA-Z].*");
-		}).toList();
-		List<String> allStockCodes = Lists.newArrayList();
-		List<StockInfo> allStockInfos = stockInfoService.getAllStockInfo().stream().filter(data -> {
-			return !data.getStockCode().matches(".*[a-zA-Z].*");
-		}).toList();
-		Map<String, List<StockInfo>> allStockInfoMap = allStockInfos.stream()
-				.collect(Collectors.groupingBy(StockInfo::getStockCode));
-		allStockCodes.addAll(tpexStockCodes);
-		allStockCodes.addAll(twseStockCodes);
-		allStockCodes.addAll(oesStockCodes);
-		List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
-		allStockCodes.forEach(stockCode -> {
-			allStockDayPrices.addAll(grabThirdPartyStockDayPrice.grabFromYahoo(stockCode));
-			try {
-				Thread.sleep(2000);
-			} catch (InterruptedException e) {
-				log.warn(stockCode + e.getMessage(), e);
-			}
-		});
-		stockDayPriceService.upsertBatch(allStockDayPrices);
-		Date tradeDate = allStockDayPrices.stream().findFirst().get().getTradingDay();
-		LocalDate tradeDateLdt = LocalDate.ofInstant(tradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
-		Integer years = tradeDateLdt.getYear();
-		LocalDate tradeDateMinus365 = tradeDateLdt.minusDays(500);
-		Instant instant = tradeDateMinus365.atStartOfDay(ZoneId.of("Asia/Taipei")).toInstant();
-		Date tradeDateBefore365Days = Date.from(instant);
-		List<StockDayPrice> stockDayPricesFor365Ds = stockDayPriceService
-				.findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, tradeDate);
-		Map<String, List<StockDayPrice>> groupedStockDayPrices = stockDayPricesFor365Ds.stream().filter(data -> {
-			java.util.Date tradingDay = data.getTradingDay();
-			LocalDate dataTradeDateLdt = ((java.sql.Date) tradingDay).toLocalDate();
-			return dataTradeDateLdt.compareTo(tradeDateLdt) < 0;
-		}
+	    calculateDailyManaged(null);
+	}
 
-		).collect(Collectors.groupingBy(StockDayPrice::getStockCode));
+	/** Each 50-stock batch finishes its OWN day/week/month calculations before moving on. */
+	public void calculateDailyManaged(JobContext context) throws Exception {
+			List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
 
-		stockDayPriceService.upsertBatch(allStockDayPrices);
-		allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
-			if ("2454".equals(stockTwseDayPrice.getStockCode())) {
-				log.info("2454");
+				return !data.matches(".*[a-zA-Z].*");
+
+			}).toList();
+
+			List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
+
+				return !data.matches(".*[a-zA-Z].*");
+
+			}).toList();
+
+			List<String> oesStockCodes = stockInfoService.getStockCodeByStockType("2").stream().filter(data -> {
+
+				return !data.matches(".*[a-zA-Z].*");
+
+			}).toList();
+
+			List<String> allStockCodes = Lists.newArrayList();
+
+			List<StockInfo> allStockInfos = stockInfoService.getAllStockInfo().stream().filter(data -> {
+
+				return !data.getStockCode().matches(".*[a-zA-Z].*");
+
+			}).toList();
+
+			Map<String, List<StockInfo>> allStockInfoMap = allStockInfos.stream()
+
+					.collect(Collectors.groupingBy(StockInfo::getStockCode));
+
+			allStockCodes.addAll(tpexStockCodes);
+
+			allStockCodes.addAll(twseStockCodes);
+
+			allStockCodes.addAll(oesStockCodes);
+
+	    // 全市場 Redis 排名原本以全部日 K 計算，因此保留跨批次日資料集合
+	    List<StockDayPrice> dailyPriceSnapshots = new ArrayList<>();
+	    if (context != null) {
+	        // +1: 全市場 Redis 排名；向量工作量在向量階段開始時由 Service 加入
+	        context.addTotal(allStockCodes.size() + 1);
+	        context.stage("DAILY_BATCH_PROCESSING");
+	    }
+	    int batchNo = 0;
+	    for (int start = 0; start < allStockCodes.size(); start += DAILY_MANAGED_BATCH_SIZE) {
+	        if (context != null) context.checkCancellation();
+	        final int end = Math.min(start + DAILY_MANAGED_BATCH_SIZE, allStockCodes.size());
+	        final List<String> batchStockCodes = allStockCodes.subList(start, end);
+	        batchNo++;
+	        log.info("Daily batch {} started range={}..{} total={}", batchNo, start, end, allStockCodes.size());
+	        // Below is the original data processing pipeline, scoped to batchStockCodes.
+	        // Do not put entire batch in a new transaction without checking existing TX boundaries.
+
+	    // 個股仍採原本串行 Yahoo 抓取，每檔請求後等待 2 秒
+	    List<StockDayPrice> allStockDayPrices = Lists.newArrayList();
+	    int batchFetchedStocks = 0;
+	    int batchEmptyStocks = 0;
+	    for (String stockCode : batchStockCodes) {
+	        List<StockDayPrice> fetched = grabThirdPartyStockDayPrice.grabFromYahoo(stockCode);
+	        allStockDayPrices.addAll(fetched);
+	        if (fetched.isEmpty()) batchEmptyStocks++;
+	        else batchFetchedStocks++;
+	        try {
+	            Thread.sleep(DAILY_YAHOO_DELAY_MS);
+	        } catch (InterruptedException e) {
+	            // 維持舊方法記錄後繼續的行為；Cancel 由 Batch 邊界處理
+	            log.warn(stockCode + e.getMessage(), e);
+	        }
+	    }
+	    // 這批全部空資料不代表整個日 K 任務應失敗；舊流程也會繼續後續股票。
+	    if (allStockDayPrices.isEmpty()) {
+	        if (context != null) context.batchResult(batchStockCodes.size(), 0, 0, batchEmptyStocks,
+	                "DAILY_BATCH_EMPTY " + end + "/" + allStockCodes.size());
+	        continue;
+	    }
+	    dailyPriceSnapshots.addAll(allStockDayPrices);
+
+	        if (context != null) context.stage("DAILY_DAY_PRICE_BATCH");
+			stockDayPriceService.upsertBatch(allStockDayPrices);
+
+			Date tradeDate = allStockDayPrices.stream().findFirst().get().getTradingDay();
+
+			LocalDate tradeDateLdt = LocalDate.ofInstant(tradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
+
+			Integer years = tradeDateLdt.getYear();
+
+			LocalDate tradeDateMinus365 = tradeDateLdt.minusDays(500);
+
+			Instant instant = tradeDateMinus365.atStartOfDay(ZoneId.of("Asia/Taipei")).toInstant();
+
+			Date tradeDateBefore365Days = Date.from(instant);
+
+			List<StockDayPrice> stockDayPricesFor365Ds = stockDayPriceService
+
+					.findByStockCodeAndTradingDayBeforEqualLimitTwoFourtyAndStockCodes(tradeDateBefore365Days, tradeDate, batchStockCodes);
+
+			Map<String, List<StockDayPrice>> groupedStockDayPrices = stockDayPricesFor365Ds.stream().filter(data -> {
+
+				java.util.Date tradingDay = data.getTradingDay();
+
+				LocalDate dataTradeDateLdt = ((java.sql.Date) tradingDay).toLocalDate();
+
+				return dataTradeDateLdt.compareTo(tradeDateLdt) < 0;
+
 			}
-			List<StockDayPrice> allThisStockCodeDayPrices = Lists.newArrayList();
-			allThisStockCodeDayPrices.add(stockTwseDayPrice);
-			if (groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
-				List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTwseDayPrice.getStockCode());
-				allThisStockCodeDayPrices.addAll(stockDayPrices);
-			}
-			calculateRSVValueAndLimitDownUp(stockTwseDayPrice, allThisStockCodeDayPrices,
-					allStockInfoMap.get(stockTwseDayPrice.getStockCode()).stream().findFirst().get().getStockType());
-			stockTwseDayPrice.setMonthOfYear((stockTwseDayPrice.getTradingDay().getYear() + 1900) + "W"
-					+ (stockTwseDayPrice.getTradingDay().getMonth() + 1));
-			groupedStockDayPrices.put(stockTwseDayPrice.getStockCode(), allThisStockCodeDayPrices);
-		});
-		stockDayPriceService.upsertBatch(allStockDayPrices);
-		List<StockDayPriceRank> allStockDayPriceRanks = Lists.newArrayList();
-		allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
-			if (groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
+
+			).collect(Collectors.groupingBy(StockDayPrice::getStockCode));
+
+			stockDayPriceService.upsertBatch(allStockDayPrices);
+
+			allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
+
 				if ("2454".equals(stockTwseDayPrice.getStockCode())) {
+
 					log.info("2454");
+
 				}
-				StockDayPriceRank lastStockMonthPriceRank = stockDayPriceService
-						.buildRanks(stockTwseDayPrice.getStockCode(), stockTwseDayPrice);
-				allStockDayPriceRanks.add(lastStockMonthPriceRank);
-			}
-		});
-		stockDayPriceService.bulkUpsertDayRankPrices(allStockDayPriceRanks, tradeDate);
-		stockDayPriceService.updateRankNo();
-		stockDayPriceService.deleteRankNoByStockCode();
-		String targetWeek = allStockDayPriceRanks.get(0).getWeekOfYear();
 
-		List<StockWeekPrice> stockWeekPriceForYears = stockWeekPriceService
-				.findByYearBeforEqualLimitTwoFourty(String.valueOf(years - 6), String.valueOf(years));
-		Map<String, List<StockWeekPrice>> groupedStockWeekPrice = stockWeekPriceForYears.stream()
-				.collect(Collectors.groupingBy(StockWeekPrice::getStockCode));
+				List<StockDayPrice> allThisStockCodeDayPrices = Lists.newArrayList();
 
-		List<StockDayPrice> weekDayPrices = stockDayPriceService.findByWeekOfYear(targetWeek);
+				allThisStockCodeDayPrices.add(stockTwseDayPrice);
 
-		Map<String, List<StockDayPrice>> stockWeekGroupMap = weekDayPrices.stream()
-				.collect(Collectors.groupingBy(StockDayPrice::getStockCode));
+				if (groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
 
-		List<StockWeekPrice> allStockWeekPrices = new ArrayList<>();
+					List<StockDayPrice> stockDayPrices = groupedStockDayPrices.get(stockTwseDayPrice.getStockCode());
 
-		stockWeekGroupMap.forEach((stockCode, stockDayList) -> {
+					allThisStockCodeDayPrices.addAll(stockDayPrices);
 
-			// 過濾無效資料
-			List<StockDayPrice> validDayPrices = stockDayList.stream()
-					.filter(p -> StringUtils.isNotBlank(p.getOpeningPrice()) && !p.getOpeningPrice().contains("--"))
-					.toList();
-
-			if (validDayPrices.isEmpty()) {
-				return;
-			}
-
-			// 依交易日排序（只做一次）
-			List<StockDayPrice> sortedDays = validDayPrices.stream()
-					.sorted(Comparator.comparing(StockDayPrice::getTradingDay)).toList();
-
-			StockDayPrice firstDay = sortedDays.get(0);
-			StockDayPrice lastDay = sortedDays.get(sortedDays.size() - 1);
-
-			// 計算 high / low / volume
-			BigDecimal high = null;
-			BigDecimal low = null;
-			int totalTradingVolume = 0;
-
-			for (StockDayPrice d : sortedDays) {
-				BigDecimal h = new BigDecimal(d.getHighPrice().replace(",", ""));
-				BigDecimal l = new BigDecimal(d.getLowPrice().replace(",", ""));
-
-				high = (high == null || h.compareTo(high) > 0) ? h : high;
-				low = (low == null || l.compareTo(low) < 0) ? l : low;
-
-				if (d.getTradingVolume() != null) {
-					totalTradingVolume += Integer.parseInt(d.getTradingVolume());
 				}
-			}
 
-			// 組裝唯一一筆 StockWeekPrice
-			StockWeekPrice stockWeekPrice = new StockWeekPrice();
-			stockWeekPrice.setStockCode(stockCode);
-			stockWeekPrice.setWeekOfYear(firstDay.getWeekOfYear());
-			stockWeekPrice.setOpeningPrice(new BigDecimal(firstDay.getOpeningPrice().replace(",", "")));
-			stockWeekPrice.setClosingPrice(new BigDecimal(lastDay.getClosingPrice().replace(",", "")));
-			stockWeekPrice.setHighPrice(high);
-			stockWeekPrice.setLowPrice(low);
-			stockWeekPrice.setTradingVolume(totalTradingVolume);
-			stockWeekPrice.setFirstTradingDay(firstDay.getTradingDay());
-			stockWeekPrice.setMonth(firstDay.getTradingDay().getMonth() + 1);
-			stockWeekPrice.setYear(String.valueOf(firstDay.getTradingDay().getYear() + 1900));
-			List<StockWeekPrice> stockWeekPrices = Lists.newArrayList();
-			stockWeekPrices.add(stockWeekPrice);
-			if (groupedStockWeekPrice.containsKey(stockCode)) {
-				stockWeekPrices.addAll(groupedStockWeekPrice.get(stockCode));
-			}
-			calculateRSVValueAndLimitDownUp(stockWeekPrice, stockWeekPrices);
-			allStockWeekPrices.add(stockWeekPrice);
-			groupedStockWeekPrice.put(stockCode, stockWeekPrices);
-		});
-		stockWeekPriceService.batchInsertWeekPrices(allStockWeekPrices);
+				calculateRSVValueAndLimitDownUp(stockTwseDayPrice, allThisStockCodeDayPrices,
 
-		List<StockWeekPriceRank> allStockWeekPriceRanks = Lists.newArrayList();
-		allStockWeekPrices.stream().forEach(allStockWeekPrice -> {
-			if (groupedStockWeekPrice.containsKey(allStockWeekPrice.getStockCode())) {
-				StockWeekPriceRank stockMonthPriceRanks = stockWeekPriceService
-						.buildRanks(allStockWeekPrice.getStockCode(), allStockWeekPrice);
-				allStockWeekPriceRanks.add(stockMonthPriceRanks);
-			}
-		});
-//		
-		stockWeekPriceService.batchInsertWeekRankPrices(allStockWeekPriceRanks);
-		stockWeekPriceService.updateRankNo();
-		stockWeekPriceService.deleteByRankNoLessThanZero();
+						allStockInfoMap.get(stockTwseDayPrice.getStockCode()).stream().findFirst().get().getStockType());
 
-		// 取得欲處理的月份
-		String targetMonth = allStockDayPrices.get(0).getMonthOfYear();
-		List<StockMonthPrice> twoFourtyStockMonthPrices = stockMonthPriceService.findByMmonthOfYearAndDesc(targetMonth);
-		Map<String, List<StockMonthPrice>> groupedStockMonthPrice = twoFourtyStockMonthPrices.stream()
-				.collect(Collectors.groupingBy(StockMonthPrice::getStockCode));
-		// 取得該月份所有日成交資料
-		List<StockDayPrice> monthDayPrices = stockDayPriceService.findByMonthOfYear(targetMonth);
+				stockTwseDayPrice.setMonthOfYear((stockTwseDayPrice.getTradingDay().getYear() + 1900) + "W"
 
-		// 依 stockCode 分組
-		Map<String, List<StockDayPrice>> stockMonthGroupMap = monthDayPrices.stream()
-				.collect(Collectors.groupingBy(StockDayPrice::getStockCode));
+						+ (stockTwseDayPrice.getTradingDay().getMonth() + 1));
 
-		// 用來 batch insert 的集合
-		List<StockMonthPrice> allStockMonthPrices = new ArrayList<>();
+				groupedStockDayPrices.put(stockTwseDayPrice.getStockCode(), allThisStockCodeDayPrices);
 
-		stockMonthGroupMap.forEach((stockCode, stockDayList) -> {
-			if (groupedStockMonthPrice.containsKey(stockCode)) {
-				// 過濾無效的開盤價資料
+			});
+
+			stockDayPriceService.upsertBatch(allStockDayPrices);
+
+			List<StockDayPriceRank> allStockDayPriceRanks = Lists.newArrayList();
+
+			allStockDayPrices.stream().forEach(stockTwseDayPrice -> {
+
+				if (groupedStockDayPrices.containsKey(stockTwseDayPrice.getStockCode())) {
+
+					if ("2454".equals(stockTwseDayPrice.getStockCode())) {
+
+						log.info("2454");
+
+					}
+
+					StockDayPriceRank lastStockMonthPriceRank = stockDayPriceService
+
+							.buildRanks(stockTwseDayPrice.getStockCode(), stockTwseDayPrice);
+
+					allStockDayPriceRanks.add(lastStockMonthPriceRank);
+
+				}
+
+			});
+
+			stockDayPriceService.bulkUpsertDayRankPrices(allStockDayPriceRanks, tradeDate);
+
+			stockDayPriceService.updateRankNo(batchStockCodes);
+
+			// 原清理 SQL 尚未提供，為避免變更刪除範圍，移到所有 Batch 完成後執行一次
+
+			String targetWeek = allStockDayPriceRanks.get(0).getWeekOfYear();
+
+	        if (context != null) context.stage("DAILY_WEEK_PRICE_BATCH");
+			List<StockWeekPrice> stockWeekPriceForYears = stockWeekPriceService
+
+					.findByYearBeforEqualLimitTwoFourtyAndStockCodes(String.valueOf(years - 6), String.valueOf(years), batchStockCodes);
+
+			Map<String, List<StockWeekPrice>> groupedStockWeekPrice = stockWeekPriceForYears.stream()
+
+					.collect(Collectors.groupingBy(StockWeekPrice::getStockCode));
+
+			List<StockDayPrice> weekDayPrices = stockDayPriceService.findByWeekOfYearAndStockCodes(targetWeek, batchStockCodes);
+
+			Map<String, List<StockDayPrice>> stockWeekGroupMap = weekDayPrices.stream()
+
+					.collect(Collectors.groupingBy(StockDayPrice::getStockCode));
+
+			List<StockWeekPrice> allStockWeekPrices = new ArrayList<>();
+
+			stockWeekGroupMap.forEach((stockCode, stockDayList) -> {
+
+				// 過濾無效資料
+
 				List<StockDayPrice> validDayPrices = stockDayList.stream()
+
 						.filter(p -> StringUtils.isNotBlank(p.getOpeningPrice()) && !p.getOpeningPrice().contains("--"))
+
 						.toList();
 
 				if (validDayPrices.isEmpty()) {
-					return; // 該股票該月無有效資料
+
+					return;
+
 				}
 
 				// 依交易日排序（只做一次）
+
 				List<StockDayPrice> sortedDays = validDayPrices.stream()
+
 						.sorted(Comparator.comparing(StockDayPrice::getTradingDay)).toList();
 
 				StockDayPrice firstDay = sortedDays.get(0);
+
 				StockDayPrice lastDay = sortedDays.get(sortedDays.size() - 1);
 
-				// 計算最高、最低、成交量
+				// 計算 high / low / volume
+
 				BigDecimal high = null;
+
 				BigDecimal low = null;
+
 				int totalTradingVolume = 0;
 
 				for (StockDayPrice d : sortedDays) {
+
 					BigDecimal h = new BigDecimal(d.getHighPrice().replace(",", ""));
+
 					BigDecimal l = new BigDecimal(d.getLowPrice().replace(",", ""));
 
 					high = (high == null || h.compareTo(high) > 0) ? h : high;
+
 					low = (low == null || l.compareTo(low) < 0) ? l : low;
 
 					if (d.getTradingVolume() != null) {
+
 						totalTradingVolume += Integer.parseInt(d.getTradingVolume());
+
 					}
+
 				}
 
-				// 組裝唯一一筆 StockMonthPrice
-				StockMonthPrice stockMonthPrice = new StockMonthPrice();
-				stockMonthPrice.setStockCode(stockCode);
-				stockMonthPrice.setOpeningPrice(new BigDecimal(firstDay.getOpeningPrice().replace(",", "")));
-				stockMonthPrice.setClosingPrice(new BigDecimal(lastDay.getClosingPrice().replace(",", "")));
-				stockMonthPrice.setHighPrice(high);
-				stockMonthPrice.setLowPrice(low);
-				stockMonthPrice.setTradingVolume(totalTradingVolume);
-				stockMonthPrice.setFirstTradingDay(firstDay.getTradingDay());
+				// 組裝唯一一筆 StockWeekPrice
 
-				int year = firstDay.getTradingDay().getYear() + 1900;
-				int month = firstDay.getTradingDay().getMonth() + 1;
+				StockWeekPrice stockWeekPrice = new StockWeekPrice();
 
-				stockMonthPrice.setYear(String.valueOf(year));
-				stockMonthPrice.setMonth(month);
-				stockMonthPrice.setMonthOfYear(year + "M" + month);
-				List<StockMonthPrice> stockMonthPrices = Lists.newArrayList();
-				stockMonthPrices.add(stockMonthPrice);
+				stockWeekPrice.setStockCode(stockCode);
+
+				stockWeekPrice.setWeekOfYear(firstDay.getWeekOfYear());
+
+				stockWeekPrice.setOpeningPrice(new BigDecimal(firstDay.getOpeningPrice().replace(",", "")));
+
+				stockWeekPrice.setClosingPrice(new BigDecimal(lastDay.getClosingPrice().replace(",", "")));
+
+				stockWeekPrice.setHighPrice(high);
+
+				stockWeekPrice.setLowPrice(low);
+
+				stockWeekPrice.setTradingVolume(totalTradingVolume);
+
+				stockWeekPrice.setFirstTradingDay(firstDay.getTradingDay());
+
+				stockWeekPrice.setMonth(firstDay.getTradingDay().getMonth() + 1);
+
+				stockWeekPrice.setYear(String.valueOf(firstDay.getTradingDay().getYear() + 1900));
+
+				List<StockWeekPrice> stockWeekPrices = Lists.newArrayList();
+
+				stockWeekPrices.add(stockWeekPrice);
+
+				if (groupedStockWeekPrice.containsKey(stockCode)) {
+
+					stockWeekPrices.addAll(groupedStockWeekPrice.get(stockCode));
+
+				}
+
+				calculateRSVValueAndLimitDownUp(stockWeekPrice, stockWeekPrices);
+
+				allStockWeekPrices.add(stockWeekPrice);
+
+				groupedStockWeekPrice.put(stockCode, stockWeekPrices);
+
+			});
+
+			stockWeekPriceService.batchInsertWeekPrices(allStockWeekPrices);
+
+			List<StockWeekPriceRank> allStockWeekPriceRanks = Lists.newArrayList();
+
+			allStockWeekPrices.stream().forEach(allStockWeekPrice -> {
+
+				if (groupedStockWeekPrice.containsKey(allStockWeekPrice.getStockCode())) {
+
+					StockWeekPriceRank stockMonthPriceRanks = stockWeekPriceService
+
+							.buildRanks(allStockWeekPrice.getStockCode(), allStockWeekPrice);
+
+					allStockWeekPriceRanks.add(stockMonthPriceRanks);
+
+				}
+
+			});
+
+//			
+
+			stockWeekPriceService.batchInsertWeekRankPrices(allStockWeekPriceRanks);
+
+			stockWeekPriceService.updateRankNo(batchStockCodes);
+
+			// 原清理 SQL 尚未提供，暫移至所有 Batch 完成後一次執行
+
+	        if (context != null) context.stage("DAILY_MONTH_PRICE_BATCH");
+			// 取得欲處理的月份
+
+			String targetMonth = allStockDayPrices.get(0).getMonthOfYear();
+
+			List<StockMonthPrice> twoFourtyStockMonthPrices = stockMonthPriceService.findByMmonthOfYearAndDescAndStockCodes(targetMonth, batchStockCodes);
+
+			Map<String, List<StockMonthPrice>> groupedStockMonthPrice = twoFourtyStockMonthPrices.stream()
+
+					.collect(Collectors.groupingBy(StockMonthPrice::getStockCode));
+
+			// 取得該月份所有日成交資料
+
+			List<StockDayPrice> monthDayPrices = stockDayPriceService.findByMonthOfYearAndStockCodes(targetMonth, batchStockCodes);
+
+			// 依 stockCode 分組
+
+			Map<String, List<StockDayPrice>> stockMonthGroupMap = monthDayPrices.stream()
+
+					.collect(Collectors.groupingBy(StockDayPrice::getStockCode));
+
+			// 用來 batch insert 的集合
+
+			List<StockMonthPrice> allStockMonthPrices = new ArrayList<>();
+
+			stockMonthGroupMap.forEach((stockCode, stockDayList) -> {
+
 				if (groupedStockMonthPrice.containsKey(stockCode)) {
-					stockMonthPrices.addAll(groupedStockMonthPrice.get(stockCode));
+
+					// 過濾無效的開盤價資料
+
+					List<StockDayPrice> validDayPrices = stockDayList.stream()
+
+							.filter(p -> StringUtils.isNotBlank(p.getOpeningPrice()) && !p.getOpeningPrice().contains("--"))
+
+							.toList();
+
+					if (validDayPrices.isEmpty()) {
+
+						return; // 該股票該月無有效資料
+
+					}
+
+					// 依交易日排序（只做一次）
+
+					List<StockDayPrice> sortedDays = validDayPrices.stream()
+
+							.sorted(Comparator.comparing(StockDayPrice::getTradingDay)).toList();
+
+					StockDayPrice firstDay = sortedDays.get(0);
+
+					StockDayPrice lastDay = sortedDays.get(sortedDays.size() - 1);
+
+					// 計算最高、最低、成交量
+
+					BigDecimal high = null;
+
+					BigDecimal low = null;
+
+					int totalTradingVolume = 0;
+
+					for (StockDayPrice d : sortedDays) {
+
+						BigDecimal h = new BigDecimal(d.getHighPrice().replace(",", ""));
+
+						BigDecimal l = new BigDecimal(d.getLowPrice().replace(",", ""));
+
+						high = (high == null || h.compareTo(high) > 0) ? h : high;
+
+						low = (low == null || l.compareTo(low) < 0) ? l : low;
+
+						if (d.getTradingVolume() != null) {
+
+							totalTradingVolume += Integer.parseInt(d.getTradingVolume());
+
+						}
+
+					}
+
+					// 組裝唯一一筆 StockMonthPrice
+
+					StockMonthPrice stockMonthPrice = new StockMonthPrice();
+
+					stockMonthPrice.setStockCode(stockCode);
+
+					stockMonthPrice.setOpeningPrice(new BigDecimal(firstDay.getOpeningPrice().replace(",", "")));
+
+					stockMonthPrice.setClosingPrice(new BigDecimal(lastDay.getClosingPrice().replace(",", "")));
+
+					stockMonthPrice.setHighPrice(high);
+
+					stockMonthPrice.setLowPrice(low);
+
+					stockMonthPrice.setTradingVolume(totalTradingVolume);
+
+					stockMonthPrice.setFirstTradingDay(firstDay.getTradingDay());
+
+					int year = firstDay.getTradingDay().getYear() + 1900;
+
+					int month = firstDay.getTradingDay().getMonth() + 1;
+
+					stockMonthPrice.setYear(String.valueOf(year));
+
+					stockMonthPrice.setMonth(month);
+
+					stockMonthPrice.setMonthOfYear(year + "M" + month);
+
+					List<StockMonthPrice> stockMonthPrices = Lists.newArrayList();
+
+					stockMonthPrices.add(stockMonthPrice);
+
+					if (groupedStockMonthPrice.containsKey(stockCode)) {
+
+						stockMonthPrices.addAll(groupedStockMonthPrice.get(stockCode));
+
+					}
+
+					calculateRSVValueAndLimitDownUp(stockMonthPrice, stockMonthPrices);
+
+					allStockMonthPrices.add(stockMonthPrice);
+
+					groupedStockMonthPrice.put(stockCode, stockMonthPrices);
+
 				}
-				calculateRSVValueAndLimitDownUp(stockMonthPrice, stockMonthPrices);
-				allStockMonthPrices.add(stockMonthPrice);
-				groupedStockMonthPrice.put(stockCode, stockMonthPrices);
-			}
 
-		});
+			});
 
-		// 真正合理的 batch insert
-		stockMonthPriceService.batchInsertMonthPrices(allStockMonthPrices);
+			// 真正合理的 batch insert
 
-		List<StockMonthPriceRank> allStockMonthPriceRank = Lists.newArrayList();
-		allStockMonthPrices.stream().forEach(stockMonthPrice -> {
-			if (groupedStockMonthPrice.containsKey(stockMonthPrice.getStockCode())) {
+			stockMonthPriceService.batchInsertMonthPrices(allStockMonthPrices);
 
-				List<StockMonthPrice> singleStockStockMonthPrices = groupedStockMonthPrice
-						.get(stockMonthPrice.getStockCode());
-				List<StockMonthPrice> oriStockMonthPrices = Lists.newArrayList();
-				oriStockMonthPrices.add(stockMonthPrice);
-				oriStockMonthPrices.addAll(singleStockStockMonthPrices);
-				StockMonthPriceRank stockMonthPriceRanks = stockMonthPriceService
-						.buildRanks(stockMonthPrice.getStockCode(), oriStockMonthPrices);
-				allStockMonthPriceRank.add(stockMonthPriceRanks);
-			}
-		});
-		stockMonthPriceService.updateRankNo();
-		stockMonthPriceService.batchInsertMonthRankPrices(allStockMonthPriceRank);
-		stockMonthPriceService.deleteByRankNoLessThanZero();
+			List<StockMonthPriceRank> allStockMonthPriceRank = Lists.newArrayList();
 
-		// 計算漲跌幅排名
-		List<StockDayPrice> needRankTPEXs = allStockDayPrices.stream()
-				.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
-						&& tpexStockCodes.contains(data.getStockCode())
-						&& ObjectUtils.isNotEmpty(data.getChangeRate())))
-				.toList();
-		List<StockDayPrice> needRankTWSEs = allStockDayPrices.stream()
-				.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
-						&& twseStockCodes.contains(data.getStockCode())
-						&& ObjectUtils.isNotEmpty(data.getChangeRate())))
-				.toList();
-		List<StockDayPrice> needRankOESs = allStockDayPrices.stream()
-				.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
-						&& oesStockCodes.contains(data.getStockCode()) && ObjectUtils.isNotEmpty(data.getChangeRate())))
-				.toList();
-		rankStockChangeService.writeStockListToRedis(needRankTPEXs, allStockInfoMap, "TPEX");
-		rankStockChangeService.writeStockListToRedis(needRankTWSEs, allStockInfoMap, "TWSE");
-		rankStockChangeService.writeStockListToRedis(needRankOESs, allStockInfoMap, "OES");
-		// 成交量排名
-		rankStockChangeService.writeStockListTradingQuantityRankToRedis(
-				allStockDayPrices.stream().filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
-						&& ObjectUtils.isNotEmpty(data.getChangeRate()))).toList(),
-				allStockInfoMap);
-		groupedStockDayPrices.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
-				.forEach(entry -> {
-					String stockCode = entry.getKey();
-					List<StockDayPrice> stockDayPrices = entry.getValue();
-					if (allStockInfoMap.containsKey(stockCode)) {
-						List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getCompressedZSetAllScore(
-								"ultraLongLivedCache", "stock:compressed:" + stockCode, StockDayPrice.class);
-						if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
+			allStockMonthPrices.stream().forEach(stockMonthPrice -> {
 
-							cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
-									"stock:compressed:" + stockCode, stockDayPrices.stream().findFirst().get(),
-									stockDayPrices.stream().findFirst().get().getTradingDay().getTime(),
-									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+				if (groupedStockMonthPrice.containsKey(stockMonthPrice.getStockCode())) {
+
+					List<StockMonthPrice> singleStockStockMonthPrices = groupedStockMonthPrice
+
+							.get(stockMonthPrice.getStockCode());
+
+					List<StockMonthPrice> oriStockMonthPrices = Lists.newArrayList();
+
+					oriStockMonthPrices.add(stockMonthPrice);
+
+					oriStockMonthPrices.addAll(singleStockStockMonthPrices);
+
+					StockMonthPriceRank stockMonthPriceRanks = stockMonthPriceService
+
+							.buildRanks(stockMonthPrice.getStockCode(), oriStockMonthPrices);
+
+					allStockMonthPriceRank.add(stockMonthPriceRanks);
+
+				}
+
+			});
+
+			// 挪到 batchInsertMonthRankPrices() 後，以納入本批新排名資料
+
+			stockMonthPriceService.batchInsertMonthRankPrices(allStockMonthPriceRank);
+	        stockMonthPriceService.updateRankNo(batchStockCodes);
+
+			// 原清理 SQL 尚未提供，暫移至所有 Batch 完成後一次執行
+
+	        if (context != null) context.stage("DAILY_REDIS_KLINE_BATCH");
+			groupedStockDayPrices.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
+
+					.forEach(entry -> {
+
+						String stockCode = entry.getKey();
+
+						List<StockDayPrice> stockDayPrices = entry.getValue();
+
+						if (allStockInfoMap.containsKey(stockCode)) {
+
+							List<StockDayPrice> cacheStockDayPrices = cacheOperatorService.getCompressedZSetAllScore(
+
+									"ultraLongLivedCache", "stock:compressed:" + stockCode, StockDayPrice.class);
+
+							if (CollectionUtils.isNotEmpty(cacheStockDayPrices)) {
+
+								cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
+
+										"stock:compressed:" + stockCode, stockDayPrices.stream().findFirst().get(),
+
+										stockDayPrices.stream().findFirst().get().getTradingDay().getTime(),
+
+										CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+
+							} else {
+
+								cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+
+										"stock:compressed:" + stockCode, stockDayPrices,
+
+										stockDayPrice -> stockDayPrice.getTradingDay().getTime(),
+
+										CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+
+							}
+
 						} else {
-							cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
-									"stock:compressed:" + stockCode, stockDayPrices,
-									stockDayPrice -> stockDayPrice.getTradingDay().getTime(),
-									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
-						}
-					} else {
-						log.warn("stock_info missing : {}", stockCode);
-					}
-				});
-		groupedStockWeekPrice.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
-				.forEach(entry -> {
-					String stockCode = entry.getKey();
-					List<StockWeekPrice> stockWeekPrices = entry.getValue();
-					if (allStockInfoMap.containsKey(stockCode)) {
-						List<StockWeekPrice> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
-								"ultraLongLivedCache", "stock-weekly:compressed:" + stockCode, StockWeekPrice.class);
-						if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
 
-							cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
-									"stock-weekly:compressed:" + stockCode, stockWeekPrices.stream().findFirst().get(),
-									stockWeekPrices.stream().findFirst().get().getFirstTradingDay().getTime(),
-									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
-						} else {
-							cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
-									"stock-weekly:compressed:" + stockCode, stockWeekPrices,
-									stockWeekPrice -> stockWeekPrice.getFirstTradingDay().getTime(),
-									CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+							log.warn("stock_info missing : {}", stockCode);
+
 						}
-					} else {
-						log.warn("stock_info missing : {}", stockCode);
-					}
-				});
-		calculateCosineSimilarityVectorService.calculateAsDailyAspect();
+
+					});
+
+			groupedStockWeekPrice.entrySet().stream().filter(entry -> CollectionUtils.isNotEmpty(entry.getValue()))
+
+					.forEach(entry -> {
+
+						String stockCode = entry.getKey();
+
+						List<StockWeekPrice> stockWeekPrices = entry.getValue();
+
+						if (allStockInfoMap.containsKey(stockCode)) {
+
+							List<StockWeekPrice> cacheStockWeekPrices = cacheOperatorService.getCompressedZSetAllScore(
+
+									"ultraLongLivedCache", "stock-weekly:compressed:" + stockCode, StockWeekPrice.class);
+
+							if (CollectionUtils.isNotEmpty(cacheStockWeekPrices)) {
+
+								cacheOperatorService.upsertCompressedZSetSeries("ultraLongLivedCache",
+
+										"stock-weekly:compressed:" + stockCode, stockWeekPrices.stream().findFirst().get(),
+
+										stockWeekPrices.stream().findFirst().get().getFirstTradingDay().getTime(),
+
+										CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+
+							} else {
+
+								cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
+
+										"stock-weekly:compressed:" + stockCode, stockWeekPrices,
+
+										stockWeekPrice -> stockWeekPrice.getFirstTradingDay().getTime(),
+
+										CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
+
+							}
+
+						} else {
+
+							log.warn("stock_info missing : {}", stockCode);
+
+						}
+
+					});
+
+	        // All existing per-stock processing has now finished for this batch.
+	        if (context != null) {
+	            context.batchResult(batchStockCodes.size(), batchFetchedStocks, 0, batchEmptyStocks,
+	                    "DAILY_BATCH_DONE " + end + "/" + allStockCodes.size());
+	        }
+	        log.info("Daily batch {} completed range={}..{}", batchNo, start, end);
+	    }
+
+	    // Original cleanup methods are global-scoped. Keep their original semantics once per run
+	    // until their SQL is reviewed and correctly restricted by stock_code.
+	    stockDayPriceService.deleteRankNoByStockCode();
+	    stockWeekPriceService.deleteByRankNoLessThanZero();
+	    stockMonthPriceService.deleteByRankNoLessThanZero();
+
+	    if (context != null) { context.checkCancellation(); context.stage("DAILY_MARKET_REDIS_RANK"); }
+	    if (dailyPriceSnapshots.isEmpty()) {
+	        throw new IllegalStateException("Yahoo returned no daily prices for the entire run");
+	    }
+	    List<StockDayPrice> allStockDayPrices = dailyPriceSnapshots;
+			// 計算漲跌幅排名
+
+			List<StockDayPrice> needRankTPEXs = allStockDayPrices.stream()
+
+					.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
+
+							&& tpexStockCodes.contains(data.getStockCode())
+
+							&& ObjectUtils.isNotEmpty(data.getChangeRate())))
+
+					.toList();
+
+			List<StockDayPrice> needRankTWSEs = allStockDayPrices.stream()
+
+					.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
+
+							&& twseStockCodes.contains(data.getStockCode())
+
+							&& ObjectUtils.isNotEmpty(data.getChangeRate())))
+
+					.toList();
+
+			List<StockDayPrice> needRankOESs = allStockDayPrices.stream()
+
+					.filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
+
+							&& oesStockCodes.contains(data.getStockCode()) && ObjectUtils.isNotEmpty(data.getChangeRate())))
+
+					.toList();
+
+			rankStockChangeService.writeStockListToRedis(needRankTPEXs, allStockInfoMap, "TPEX");
+
+			rankStockChangeService.writeStockListToRedis(needRankTWSEs, allStockInfoMap, "TWSE");
+
+			rankStockChangeService.writeStockListToRedis(needRankOESs, allStockInfoMap, "OES");
+
+			// 成交量排名
+
+			rankStockChangeService.writeStockListTradingQuantityRankToRedis(
+
+					allStockDayPrices.stream().filter(data -> (!List.of("--", "---", "----").contains(data.getChange())
+
+							&& ObjectUtils.isNotEmpty(data.getChangeRate()))).toList(),
+
+					allStockInfoMap);
+
+	    if (context != null) context.batchResult(1, 1, 0, 0, "DAILY_MARKET_REDIS_RANK_DONE");
+	    if (context != null) { context.checkCancellation(); context.stage("DAILY_COSINE_VECTOR"); }
+	    if (context != null) {
+	        // 必須同步等待向量計算 + Python Cache reload 真正完成
+	        // Vector Service 自行回報每 100 檔的進度，避免重複計數。
+	        calculateCosineSimilarityVectorService.calculateAsDailyAspectManaged(context);
+	    } else {
+	        // Legacy 呼叫維持原本非同步語意
+	        calculateCosineSimilarityVectorService.calculateAsDailyAspect();
+	    }
 	}
+
 
 	private void calculateMissingIndicators(List<StockIntradayPrice> prices) {
 
@@ -796,51 +1137,159 @@ public class GrabFromThirdParty {
 		}
 	}
 
-//	@PostConstruct
-	@Scheduled(cron = "0 50 21 * * ?", zone = "Asia/Taipei")
+
+	/**
+	 * 原有呼叫入口。
+	 *
+	 * 切換至 Job Management Framework 後， 不要再保留原本的 @Scheduled， 避免新舊排程同時執行。
+	 */
 	public void grabMarginTradingAndShortSellingInfo() throws Exception {
-		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream().filter(data -> {
-			return !data.matches(".*[a-zA-Z].*");
-		}).toList();
-		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream().filter(data -> {
-			return !data.matches(".*[a-zA-Z].*");
-		}).toList();
-		List<String> allStockCodes = Lists.newArrayList();
-		List<MarginTradingAndShortSellingInfo> allMarginTradingAndShortSellingInfos = Lists.newArrayList();
+
+		calculateMarginTradingManaged(null);
+	}
+
+	/**
+	 * Job Management Framework 專用入口。
+	 */
+	public void calculateMarginTradingManaged(JobContext context) throws Exception {
+
+		// 1. 取得 TPEX 股票清單
+		List<String> tpexStockCodes = stockInfoService.getStockCodeByStockType("0").stream()
+				.filter(data -> !data.matches(".*[a-zA-Z].*")).toList();
+
+		// 2. 取得 TWSE 股票清單
+		List<String> twseStockCodes = stockInfoService.getStockCodeByStockType("1").stream()
+				.filter(data -> !data.matches(".*[a-zA-Z].*")).toList();
+
+		// 3. 保留原本 TPEX -> TWSE 順序
+		List<String> allStockCodes = new ArrayList<>();
+
 		allStockCodes.addAll(tpexStockCodes);
 		allStockCodes.addAll(twseStockCodes);
-		allStockCodes.stream().forEach(stockCode -> {
-			List<MarginTradingAndShortSellingInfo> singleStockCodeTop10MarginTradingAndShortSellingInfos = grabThirdPartyStockDayPrice
-					.grabMarginTradingAndShortSellingInfoFromYahoo(stockCode);
-			allMarginTradingAndShortSellingInfos.addAll(singleStockCodeTop10MarginTradingAndShortSellingInfos);
-			try {
-				Thread.sleep(1500);
-			} catch (InterruptedException e) {
-				log.warn(e.getMessage(), e);
-				throw new RuntimeException(e);
+
+		int totalStocks = allStockCodes.size();
+
+		log.info("Start margin trading sync, totalStocks={}", totalStocks);
+
+		// 4. 初始化任務進度
+		if (context != null) {
+
+			context.addTotal(totalStocks);
+			context.stage("MARGIN_TRADING_FETCH");
+		}
+
+		int totalSuccess = 0;
+		int totalEmpty = 0;
+
+		// 5. 每 50 檔一批
+		for (int start = 0; start < totalStocks; start += MARGIN_BATCH_SIZE) {
+
+			if (context != null) {
+				context.checkCancellation();
 			}
-		});
-//		Date currentTradeDate = stockDayPriceService.getCurrentTradeDate();
-//		LocalDate tradeDateLdt = LocalDate.ofInstant(currentTradeDate.toInstant(), ZoneId.of("Asia/Taipei"));
-//		Integer years = tradeDateLdt.getYear();
-//		LocalDate tradeDateMinus365 = tradeDateLdt.minusDays(500);
-//		Instant instant = tradeDateMinus365.atStartOfDay(ZoneId.of("Asia/Taipei")).toInstant();
-//		Date tradeDateBefore365Days = Date.from(instant);
-//		List<MarginTradingAndShortSellingInfo> stockDayPricesFor365Ds = marginTradingAndShortSellingInfoService
-//				.findByTradingDayBeforEqualLimitTwoFourty(tradeDateBefore365Days, currentTradeDate);
-		Map<String, List<MarginTradingAndShortSellingInfo>> groupedMarginTradingAndShortSellingInfos = allMarginTradingAndShortSellingInfos
-				.stream()
-//				.filter(data -> {
-//			java.util.Date tradingDay = data.getTradingDay();
-//			LocalDate dataTradeDateLdt = ((java.sql.Date) tradingDay).toLocalDate();
-//			return dataTradeDateLdt.compareTo(tradeDateLdt) <= 0;
-//		})
+
+			int end = Math.min(start + MARGIN_BATCH_SIZE, totalStocks);
+
+			List<String> batchStockCodes = allStockCodes.subList(start, end);
+
+			List<MarginTradingAndShortSellingInfo> batchMarginInfos = new ArrayList<>();
+
+			int batchSuccess = 0;
+			int batchEmpty = 0;
+
+			log.info("Start margin batch, range={}~{}, total={}", start + 1, end, totalStocks);
+
+			// 6. 原本 Yahoo 逐檔抓取邏輯
+			for (String stockCode : batchStockCodes) {
+
+				if (context != null) {
+					context.checkCancellation();
+				}
+
+				List<MarginTradingAndShortSellingInfo> singleStockCodeTop10 = grabThirdPartyStockDayPrice
+						.grabMarginTradingAndShortSellingInfoFromYahoo(stockCode);
+
+				// 保持原本 addAll 行為。
+				// 若來源回傳 null，仍由例外中斷任務。
+				batchMarginInfos.addAll(singleStockCodeTop10);
+
+				if (singleStockCodeTop10.isEmpty()) {
+					batchEmpty++;
+				} else {
+					batchSuccess++;
+				}
+
+				// 保留原本每檔等待 1500 ms
+				try {
+
+					Thread.sleep(MARGIN_YAHOO_INTERVAL_MS);
+
+				} catch (InterruptedException e) {
+
+					Thread.currentThread().interrupt();
+
+					log.warn("Margin trading interrupted, stockCode={}", stockCode, e);
+
+					throw e;
+				}
+			}
+
+			// 7. 本批 PostgreSQL + Redis
+			persistMarginTradingBatch(batchMarginInfos, start, end, context);
+
+			// 8. 本批資料成功處理完成後才更新進度
+			totalSuccess += batchSuccess;
+			totalEmpty += batchEmpty;
+
+			if (context != null) {
+
+				context.batchResult(batchStockCodes.size(), batchSuccess, 0, batchEmpty,
+						"MARGIN_BATCH_DONE " + start + ".." + end);
+			}
+
+			log.info("Margin batch completed, processed={}/{}, " + "success={}, empty={}, records={}", end, totalStocks,
+					batchSuccess, batchEmpty, batchMarginInfos.size());
+		}
+
+		// 9. 全部完成
+		log.info("Margin trading sync completed, " + "total={}, success={}, empty={}", totalStocks, totalSuccess,
+				totalEmpty);
+
+		if (context != null) {
+			context.stage("MARGIN_TRADING_COMPLETED");
+		}
+	}
+
+	
+	private void persistMarginTradingBatch(List<MarginTradingAndShortSellingInfo> batchMarginInfos, int start, int end,
+			JobContext context) throws Exception {
+
+		// 1. 保留原本依 stockCode 分組的邏輯
+		Map<String, List<MarginTradingAndShortSellingInfo>> groupedMarginInfos = batchMarginInfos.stream()
 				.collect(Collectors.groupingBy(MarginTradingAndShortSellingInfo::getStockCode));
-		marginTradingAndShortSellingInfoService
-				.bulkUpsertMarginTradingAndShortSellingInfo(allMarginTradingAndShortSellingInfos);
-		groupedMarginTradingAndShortSellingInfos.entrySet().forEach(entry -> {
+
+		// 2. PostgreSQL Bulk Upsert
+		if (context != null) {
+			context.stage("MARGIN_TRADING_DB_UPSERT");
+			context.checkCancellation();
+		}
+
+		marginTradingAndShortSellingInfoService.bulkUpsertMarginTradingAndShortSellingInfo(batchMarginInfos);
+
+		log.info("Margin PostgreSQL upsert returned, " + "range={}~{}, records={}", start + 1, end,
+				batchMarginInfos.size());
+
+		// 3. PostgreSQL 完成後更新原有 Redis ZSet
+		if (context != null) {
+			context.stage("MARGIN_TRADING_REDIS_SYNC");
+		}
+
+		groupedMarginInfos.entrySet().forEach(entry -> {
+
 			List<MarginTradingAndShortSellingInfo> singleMarginTradingAndShortSellingInfos = entry.getValue();
+
 			if (CollectionUtils.isNotEmpty(singleMarginTradingAndShortSellingInfos)) {
+
 				cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
 						"marginTrading:compressed:" + entry.getKey(), singleMarginTradingAndShortSellingInfos,
 						marginTradingAndShortSellingInfo -> marginTradingAndShortSellingInfo.getTradingDay().getTime(),
@@ -848,6 +1297,7 @@ public class GrabFromThirdParty {
 			}
 		});
 	}
+
 
 	public void calculateRSVValueAndLimitDownUp(StockWeekPrice stockWeekPrice,
 			List<StockWeekPrice> twoFourtyStockWeekPrices) {
@@ -950,370 +1400,284 @@ public class GrabFromThirdParty {
 		return total.divide(new BigDecimal(period), 4, RoundingMode.HALF_UP);
 	}
 
-	private void doCalculateIntradayPrices(String stockType) throws Exception {
-
-	    // =====================================================
-	    // 1. 取得股票清單
-	    // =====================================================
-
-	    List<String> stockCodes = stockInfoService
-	            .getStockCodeByStockType(stockType)
-	            .stream()
-	            .filter(StringUtils::isNotBlank)
-	            .filter(code -> !code.matches(".*[a-zA-Z].*"))
-	            .distinct()
-	            .toList();
-
-	    if (stockCodes.isEmpty()) {
-
-	        log.info(
-	                "No stock codes found, stockType={}",
-	                stockType
-	        );
-
-	        return;
-	    }
-
-	    log.info(
-	            "Start calculating intraday prices, stockType={}, totalStocks={}",
-	            stockType,
-	            stockCodes.size()
-	    );
-
-	    int successCount = 0;
-	    int failedCount = 0;
-	    int emptyCount = 0;
-
-	    // =====================================================
-	    // 2. 每批處理 50 檔
-	    // =====================================================
-
-	    for (int start = 0;
-	         start < stockCodes.size();
-	         start += STOCK_BATCH_SIZE) {
-
-	        int end = Math.min(
-	                start + STOCK_BATCH_SIZE,
-	                stockCodes.size()
-	        );
-
-	        List<String> batchStockCodes =
-	                stockCodes.subList(start, end);
-
-	        log.info(
-	                "Start intraday batch, range={}~{}, total={}",
-	                start + 1,
-	                end,
-	                stockCodes.size()
-	        );
-
-	        // =================================================
-	        // 3. 只取得本批股票的 DB 歷史資料
-	        // =================================================
-
-	        Map<String, List<StockIntradayPrice>> fiveDbGroup =
-	                stockIntradayPriceService
-	                        .getTopByPeriodAndStockCodes(
-	                                "5m",
-	                                batchStockCodes,
-	                                INDICATOR_HISTORY_SIZE
-	                        )
-	                        .stream()
-	                        .collect(Collectors.groupingBy(
-	                                StockIntradayPrice::getStockCode
-	                        ));
-
-	        Map<String, List<StockIntradayPrice>> sixtyDbGroup =
-	                stockIntradayPriceService
-	                        .getTopByPeriodAndStockCodes(
-	                                "60m",
-	                                batchStockCodes,
-	                                INDICATOR_HISTORY_SIZE
-	                        )
-	                        .stream()
-	                        .collect(Collectors.groupingBy(
-	                                StockIntradayPrice::getStockCode
-	                        ));
-
-	        // =================================================
-	        // 4. 本批資料
-	        // =================================================
-
-	        List<StockIntradayPrice> batchUpsertPrices =
-	                new ArrayList<>();
-
-	        Map<String, List<StockIntradayPrice>> batchFiveCache =
-	                new LinkedHashMap<>();
-
-	        Map<String, List<StockIntradayPrice>> batchSixtyCache =
-	                new LinkedHashMap<>();
-
-	        int batchSuccessCount = 0;
-	        int batchFailedCount = 0;
-
-	        // =================================================
-	        // 5. 處理本批股票
-	        // =================================================
+	private void doCalculateIntradayPrices(String stockType, JobContext context) throws Exception {
 
-	        for (String stockCode : batchStockCodes) {
+		// =====================================================
+		// 1. 取得股票清單
+		// =====================================================
 
-	            try {
+		List<String> stockCodes = stockInfoService.getStockCodeByStockType(stockType).stream()
+				.filter(StringUtils::isNotBlank).filter(code -> !code.matches(".*[a-zA-Z].*")).distinct().toList();
 
-	                // =========================================
-	                // 5.1 Yahoo 抓取 5m K 線
-	                // =========================================
+		if (context != null) {
+			context.addTotal(stockCodes.size());
+			context.stage("FETCH_" + stockType);
+		}
 
-	                List<StockIntradayPrice> fiveMinutes =
-	                        grabThirdPartyStockDayPrice
-	                                .grabIntradayFromYahoo(
-	                                        stockCode,
-	                                        "5m"
-	                                );
+		if (stockCodes.isEmpty()) {
 
-	                if (fiveMinutes == null || fiveMinutes.isEmpty()) {
+			log.info("No stock codes found, stockType={}", stockType);
 
-	                    log.warn(
-	                            "Yahoo returned empty intraday prices, stockCode={}",
-	                            stockCode
-	                    );
+			return;
+		}
 
-	                    emptyCount++;
+		log.info("Start calculating intraday prices, stockType={}, totalStocks={}", stockType, stockCodes.size());
 
-	                    continue;
-	                }
+		int successCount = 0;
+		int failedCount = 0;
+		int emptyCount = 0;
 
-	                // =========================================
-	                // 5.2 整理 Yahoo 5m
-	                // =========================================
+		// =====================================================
+		// 2. 每批處理 50 檔
+		// =====================================================
 
-	                fiveMinutes = normalizeIntradayPrices(
-	                        fiveMinutes,
-	                        FIVE_MINUTE_MAX_SIZE
-	                );
+		for (int start = 0; start < stockCodes.size(); start += STOCK_BATCH_SIZE) {
 
-	                if (fiveMinutes.isEmpty()) {
+			final int emptyBeforeBatch = emptyCount;
+			if (context != null)
+				context.checkCancellation();
 
-	                    emptyCount++;
+			int end = Math.min(start + STOCK_BATCH_SIZE, stockCodes.size());
 
-	                    continue;
-	                }
+			List<String> batchStockCodes = stockCodes.subList(start, end);
 
-	                // =========================================
-	                // 5.3 聚合成 60m
-	                // =========================================
+			log.info("Start intraday batch, range={}~{}, total={}", start + 1, end, stockCodes.size());
 
-	                List<StockIntradayPrice> sixtyMinutes =
-	                        grabThirdPartyStockDayPrice
-	                                .aggregateToHourly(fiveMinutes);
+			// =================================================
+			// 3. 只取得本批股票的 DB 歷史資料
+			// =================================================
 
-	                sixtyMinutes = normalizeIntradayPrices(
-	                        sixtyMinutes,
-	                        SIXTY_MINUTE_MAX_SIZE
-	                );
+			Map<String, List<StockIntradayPrice>> fiveDbGroup = stockIntradayPriceService
+					.getTopByPeriodAndStockCodes("5m", batchStockCodes, INDICATOR_HISTORY_SIZE).stream()
+					.collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
 
-	                // =========================================
-	                // 5.4 整理 5m 與計算技術指標
-	                // =========================================
+			Map<String, List<StockIntradayPrice>> sixtyDbGroup = stockIntradayPriceService
+					.getTopByPeriodAndStockCodes("60m", batchStockCodes, INDICATOR_HISTORY_SIZE).stream()
+					.collect(Collectors.groupingBy(StockIntradayPrice::getStockCode));
 
-	                List<StockIntradayPrice> fivePrices =
-	                        prepareIntradayPrices(
-	                                fiveMinutes,
-	                                fiveDbGroup.get(stockCode),
-	                                FIVE_MINUTE_MAX_SIZE
-	                        );
+			// =================================================
+			// 4. 本批資料
+			// =================================================
 
-	                // =========================================
-	                // 5.5 整理 60m 與計算技術指標
-	                // =========================================
+			List<StockIntradayPrice> batchUpsertPrices = new ArrayList<>();
 
-	                List<StockIntradayPrice> sixtyPrices =
-	                        sixtyMinutes.isEmpty()
-	                                ? new ArrayList<>()
-	                                : prepareIntradayPrices(
-	                                        sixtyMinutes,
-	                                        sixtyDbGroup.get(stockCode),
-	                                        SIXTY_MINUTE_MAX_SIZE
-	                                );
+			Map<String, List<StockIntradayPrice>> batchFiveCache = new LinkedHashMap<>();
 
-	                // =========================================
-	                // 5.6 累積 PostgreSQL Upsert 資料
-	                // =========================================
+			Map<String, List<StockIntradayPrice>> batchSixtyCache = new LinkedHashMap<>();
 
-	                batchUpsertPrices.addAll(fivePrices);
-	                batchUpsertPrices.addAll(sixtyPrices);
+			int batchSuccessCount = 0;
+			int batchFailedCount = 0;
 
-	                // =========================================
-	                // 5.7 暫存 Redis 資料
-	                // =========================================
+			// =================================================
+			// 5. 處理本批股票
+			// =================================================
 
-	                batchFiveCache.put(
-	                        stockCode,
-	                        fivePrices
-	                );
+			for (String stockCode : batchStockCodes) {
 
-	                if (!sixtyPrices.isEmpty()) {
+				try {
 
-	                    batchSixtyCache.put(
-	                            stockCode,
-	                            sixtyPrices
-	                    );
+					// =========================================
+					// 5.1 Yahoo 抓取 5m K 線
+					// =========================================
 
-	                }
+					List<StockIntradayPrice> fiveMinutes = grabThirdPartyStockDayPrice.grabIntradayFromYahoo(stockCode,
+							"5m");
 
-	                successCount++;
-	                batchSuccessCount++;
+					if (fiveMinutes == null || fiveMinutes.isEmpty()) {
 
-	                log.debug(
-	                        "Stock intraday calculated, stockCode={}, fiveSize={}, sixtySize={}",
-	                        stockCode,
-	                        fivePrices.size(),
-	                        sixtyPrices.size()
-	                );
+						log.warn("Yahoo returned empty intraday prices, stockCode={}", stockCode);
 
-	            } catch (Exception e) {
-	                failedCount++;
-	                batchFailedCount++;
+						emptyCount++;
 
-	                log.error(
-	                        "Failed to calculate intraday prices, stockCode={}",
-	                        stockCode,
-	                        e
-	                );
+						continue;
+					}
 
-	            } finally {
+					// =========================================
+					// 5.2 整理 Yahoo 5m
+					// =========================================
 
-	                // =========================================
-	                // Yahoo request interval
-	                // =========================================
+					fiveMinutes = normalizeIntradayPrices(fiveMinutes, FIVE_MINUTE_MAX_SIZE);
 
-	                if (!Thread.currentThread().isInterrupted()) {
+					if (fiveMinutes.isEmpty()) {
 
-	                    try {
+						emptyCount++;
 
-	                        Thread.sleep(
-	                                YAHOO_REQUEST_INTERVAL_MS
-	                        );
+						continue;
+					}
 
-	                    } catch (InterruptedException e) {
+					// =========================================
+					// 5.3 聚合成 60m
+					// =========================================
 
-	                        Thread.currentThread().interrupt();
+					List<StockIntradayPrice> sixtyMinutes = grabThirdPartyStockDayPrice.aggregateToHourly(fiveMinutes);
 
-	                        throw e;
+					sixtyMinutes = normalizeIntradayPrices(sixtyMinutes, SIXTY_MINUTE_MAX_SIZE);
 
-	                    }
+					// =========================================
+					// 5.4 整理 5m 與計算技術指標
+					// =========================================
 
-	                }
+					List<StockIntradayPrice> fivePrices = prepareIntradayPrices(fiveMinutes, fiveDbGroup.get(stockCode),
+							FIVE_MINUTE_MAX_SIZE);
 
-	            }
+					// =========================================
+					// 5.5 整理 60m 與計算技術指標
+					// =========================================
 
-	        }
+					List<StockIntradayPrice> sixtyPrices = sixtyMinutes.isEmpty() ? new ArrayList<>()
+							: prepareIntradayPrices(sixtyMinutes, sixtyDbGroup.get(stockCode), SIXTY_MINUTE_MAX_SIZE);
 
-	        // =================================================
-	        // 6. PostgreSQL 批次寫入
-	        // =================================================
+					// =========================================
+					// 5.6 累積 PostgreSQL Upsert 資料
+					// =========================================
 
-	        if (batchUpsertPrices.isEmpty()) {
+					batchUpsertPrices.addAll(fivePrices);
+					batchUpsertPrices.addAll(sixtyPrices);
 
-	            log.warn(
-	                    "Skip empty intraday batch, start={}, end={}",
-	                    start,
-	                    end
-	            );
+					// =========================================
+					// 5.7 暫存 Redis 資料
+					// =========================================
 
-	            continue;
-	        }
+					batchFiveCache.put(stockCode, fivePrices);
 
-	        log.info(
-	                "Start PostgreSQL bulk upsert, records={}",
-	                batchUpsertPrices.size()
-	        );
+					if (!sixtyPrices.isEmpty()) {
 
-	        stockIntradayPriceService
-	                .bulkUpsertIntradayPrices(
-	                        batchUpsertPrices
-	                );
+						batchSixtyCache.put(stockCode, sixtyPrices);
 
-	        log.info(
-	                "PostgreSQL bulk upsert completed, records={}",
-	                batchUpsertPrices.size()
-	        );
+					}
 
-	        // =================================================
-	        // 7. PostgreSQL 成功後更新 Redis
-	        // =================================================
+					successCount++;
+					batchSuccessCount++;
 
-	        // 5m Redis
-	        batchFiveCache.forEach((stockCode, prices) -> {
+					log.debug("Stock intraday calculated, stockCode={}, fiveSize={}, sixtySize={}", stockCode,
+							fivePrices.size(), sixtyPrices.size());
 
-	            try {
+				} catch (Exception e) {
+					failedCount++;
+					batchFailedCount++;
+					if (context != null) {
+						context.recordError(stockCode, e.getClass().getSimpleName() + ": " + e.getMessage());
+					}
 
-	                updateIntradayRedis(
-	                        stockCode,
-	                        "5m",
-	                        prices
-	                );
+					log.error("Failed to calculate intraday prices, stockCode={}", stockCode, e);
 
-	            } catch (Exception e) {
+				} finally {
 
-	                log.error(
-	                        "Failed to update 5m Redis, stockCode={}",
-	                        stockCode,
-	                        e
-	                );
+					// =========================================
+					// Yahoo request interval
+					// =========================================
 
-	            }
+					if (!Thread.currentThread().isInterrupted()) {
 
-	        });
+						try {
 
-	        // 60m Redis
-	        batchSixtyCache.forEach((stockCode, prices) -> {
+							Thread.sleep(YAHOO_REQUEST_INTERVAL_MS);
 
-	            try {
+						} catch (InterruptedException e) {
 
-	                updateIntradayRedis(
-	                        stockCode,
-	                        "60m",
-	                        prices
-	                );
+							Thread.currentThread().interrupt();
 
-	            } catch (Exception e) {
+							throw e;
 
-	                log.error(
-	                        "Failed to update 60m Redis, stockCode={}",
-	                        stockCode,
-	                        e
-	                );
+						}
 
-	            }
+					}
 
-	        });
+				}
 
-	        // =================================================
-	        // 8. 本批完成
-	        // =================================================
+			}
 
-	        log.info(
-	                "Intraday batch completed, processed={}/{}, success={}, failed={}, upsertRecords={}",
-	                end,
-	                stockCodes.size(),
-	                batchSuccessCount,
-	                batchFailedCount,
-	                batchUpsertPrices.size()
-	        );
+			// =================================================
+			// 6. PostgreSQL 批次寫入
+			// =================================================
 
-	    }
+			if (batchUpsertPrices.isEmpty()) {
+				if (context != null) {
+					context.batchResult(end - start, batchSuccessCount, batchFailedCount, emptyCount - emptyBeforeBatch,
+							"EMPTY_BATCH " + stockType + " " + start + ".." + end);
+				}
 
-	    // =====================================================
-	    // 9. 全部完成
-	    // =====================================================
+				log.warn("Skip empty intraday batch, start={}, end={}", start, end);
 
-	    log.info(
-	            "Intraday calculation completed, stockType={}, success={}, failed={}, empty={}",
-	            stockType,
-	            successCount,
-	            failedCount,
-	            emptyCount
-	    );
+				continue;
+			}
+
+			log.info("Start PostgreSQL bulk upsert, records={}", batchUpsertPrices.size());
+
+			if (context == null) {
+				stockIntradayPriceService.bulkUpsertIntradayPrices(batchUpsertPrices);
+			} else {
+				// 原子寫入 DB + checkpoint；僅代表 DB 已提交，不代表 Redis Cache 已完成。
+				// 必須確認 bulkUpsertIntradayPrices 使用相同 DataSource 和 REQUIRED 交易。
+				Map<String, Object> checkpoint = new LinkedHashMap<>();
+				checkpoint.put("stockType", stockType);
+				checkpoint.put("nextStart", end);
+				checkpoint.put("dbCommitted", true);
+				checkpoint.put("cacheReconciled", false);
+				transactionalCheckpoint.execute(
+				        context,
+				        checkpoint,
+				        () -> stockIntradayPriceService
+				                .bulkUpsertIntradayPrices(batchUpsertPrices)
+				);
+			}
+
+			log.info("PostgreSQL bulk upsert completed, records={}", batchUpsertPrices.size());
+
+			// =================================================
+			// 7. PostgreSQL 成功後更新 Redis
+			// =================================================
+
+			// 5m Redis
+			batchFiveCache.forEach((stockCode, prices) -> {
+
+				try {
+
+					updateIntradayRedis(stockCode, "5m", prices);
+
+				} catch (Exception e) {
+
+					log.error("Failed to update 5m Redis, stockCode={}", stockCode, e);
+
+				}
+
+			});
+
+			// 60m Redis
+			batchSixtyCache.forEach((stockCode, prices) -> {
+
+				try {
+
+					updateIntradayRedis(stockCode, "60m", prices);
+
+				} catch (Exception e) {
+
+					log.error("Failed to update 60m Redis, stockCode={}", stockCode, e);
+
+				}
+
+			});
+
+			// =================================================
+			// 8. 本批完成
+			// =================================================
+
+			if (context != null) {
+				context.batchResult(end - start, batchSuccessCount, batchFailedCount, emptyCount - emptyBeforeBatch,
+						"BATCH_DONE " + stockType + " " + start + ".." + end);
+			}
+
+			log.info("Intraday batch completed, processed={}/{}, success={}, failed={}, upsertRecords={}", end,
+					stockCodes.size(), batchSuccessCount, batchFailedCount, batchUpsertPrices.size());
+
+		}
+
+		// =====================================================
+		// 9. 全部完成
+		// =====================================================
+
+		log.info("Intraday calculation completed, stockType={}, success={}, failed={}, empty={}", stockType,
+				successCount, failedCount, emptyCount);
 
 	}
 	

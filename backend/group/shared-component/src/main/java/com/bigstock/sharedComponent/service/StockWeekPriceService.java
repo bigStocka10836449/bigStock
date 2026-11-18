@@ -10,8 +10,6 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -30,11 +28,10 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import com.bigstock.sharedComponent.entity.MarginTradingAndShortSellingInfo;
 import com.bigstock.sharedComponent.entity.StockWeekPrice;
 import com.bigstock.sharedComponent.entity.StockWeekPrice.StockWeekPriceId;
-import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.entity.StockWeekPriceRank;
+import com.bigstock.sharedComponent.redis.CacheOperatorService;
 import com.bigstock.sharedComponent.repository.StockWeekPriceRankRepository;
 import com.bigstock.sharedComponent.repository.StockWeekPriceRepository;
 
@@ -82,6 +79,10 @@ public class StockWeekPriceService {
 
 	public List<StockWeekPrice> findByYearBeforEqualLimitTwoFourty(String startyearMinus6, String endYear) {
 		return repository.findByYearBeforEqualLimitTwoFourty(startyearMinus6, endYear);
+	}
+	
+	public List<StockWeekPrice> findByYearBeforEqualLimitTwoFourtyAndStockCodes(String startyearMinus6, String endYear, List<String> stockCodes) {
+		return repository.findByYearBeforEqualLimitTwoFourtyAndStockCodes(startyearMinus6, endYear, stockCodes);
 	}
 
 	public List<StockWeekPrice> findBySockCode(@Param("stockCode") String stockCode) {
@@ -283,8 +284,8 @@ public class StockWeekPriceService {
 		return r;
 	}
 	@Transactional
-	public void updateRankNo() {
-		stockWeekPriceRankRepository.updateRankNo();
+	public void updateRankNo(List<String> stockCodes) {
+		stockWeekPriceRankRepository.updateRankNoByStockCodes(stockCodes);
 	}
 	
 	@Transactional

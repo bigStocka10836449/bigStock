@@ -28,6 +28,8 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationContext;
 import org.springframework.data.repository.query.Param;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,19 +49,21 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class StockDayPriceService {
-	
+
 	@Autowired
 	private ApplicationContext ctx;
-	
+
 	private final StockDayPriceRepository stockDayPriceRepository;
-	
+
 	private final StockDayPriceRankRepository stockDayPriceRankRepository;
-	
+
 	private final CacheOperatorService cacheOperatorService;
-	
+
 	private final DataSource dataSource;
-	
+
 	private final JdbcTemplate jdbcTemplate;
+	
+	private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
 	@CacheEvict(value = { "shortLivedCache", "longLivedCache", "defaultCache" }, allEntries = true)
 	public StockDayPrice save(StockDayPrice stockDayPrice) {
@@ -94,32 +98,30 @@ public class StockDayPriceService {
 
 	public List<StockDayPrice> findByStockCodeAndStartDateAndEndDateCache(String stockCode, String startDate,
 			String endDate) throws ParseException {
-		List<StockDayPrice> stockDayPrices = cacheOperatorService.getCompressedZSetAllScore("ultraLongLivedCache", "stock:compressed:" + stockCode, StockDayPrice.class);
-		if(!stockDayPrices.isEmpty()) {
+		List<StockDayPrice> stockDayPrices = cacheOperatorService.getCompressedZSetAllScore("ultraLongLivedCache",
+				"stock:compressed:" + stockCode, StockDayPrice.class);
+		if (!stockDayPrices.isEmpty()) {
 			return stockDayPrices;
 		}
 		return getSelf().findByStockCodeAndStartDateAndEndDate(stockCode, startDate, endDate);
 	}
-	
+
 	public List<StockDayPrice> findLastest600StockDayPriceByStockCodeCache(String stockCode) throws ParseException {
-		List<StockDayPrice> stockDayPrices = cacheOperatorService.getCompressedZSetAllScore("ultraLongLivedCache", "stock:compressed:" + stockCode, StockDayPrice.class);
-		if(!stockDayPrices.isEmpty()) {
+		List<StockDayPrice> stockDayPrices = cacheOperatorService.getCompressedZSetAllScore("ultraLongLivedCache",
+				"stock:compressed:" + stockCode, StockDayPrice.class);
+		if (!stockDayPrices.isEmpty()) {
 			return stockDayPrices;
 		}
 		return getSelf().findLastest600StockDayPriceByStockCode(stockCode);
 	}
-	
+
 	@BigStockCacheableWithLock(value = "ultraLongLivedCache", key = "#p0")
 	@Transactional(readOnly = true, timeout = 30)
-	public List<StockDayPrice> findLastest600StockDayPriceByStockCode(String stockCode){
+	public List<StockDayPrice> findLastest600StockDayPriceByStockCode(String stockCode) {
 		log.info("findLastest600StockDayPriceByStockCode , {}", stockCode);
-		List<StockDayPrice> stockDayPrices =
-		        stockDayPriceRankRepository.findByIdStockCode(stockCode)
-		                .stream()
-		                .map(this::buildStockDayPrice)
-		                .toList();
-		cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache",
-				"stock:compressed:" + stockCode,
+		List<StockDayPrice> stockDayPrices = stockDayPriceRankRepository.findByIdStockCode(stockCode).stream()
+				.map(this::buildStockDayPrice).toList();
+		cacheOperatorService.batchUpsertCompressedZSetSeries("ultraLongLivedCache", "stock:compressed:" + stockCode,
 				stockDayPrices, stockDayPrice -> stockDayPrice.getTradingDay().getTime(),
 				CacheOperatorService.DEFAULT_SERIES_MAX_SIZE);
 		return stockDayPrices;
@@ -150,57 +152,88 @@ public class StockDayPriceService {
 		return stockDayPriceRepository.findByStockCodeAndTradingDayBeforLimitOne(stockCode, endDate);
 	}
 
-	public List<StockDayPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(Date startDateMinus360,
-			 Date endDate){
+	public List<StockDayPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourtyAndStockCodes(Date startDateMinus360,
+			Date endDate, List<String> stockCodes) {
+
+		if (stockCodes == null || stockCodes.isEmpty()) {
+			return List.of();
+		}
+
 		String sql = """
-		        select sdpr.stock_code, sdpr.trading_day,sdpr.change, sdpr.change_rate, sdpr.opening_price,
-		         sdpr.closing_price, sdpr.high_price, sdpr.low_price,
-		         sdpr.start_of_week_date,sdpr.end_of_week_date,sdpr.week_of_year,
-		         sdpr.trading_volume,sdpr.limit_up,sdpr.limit_down, sdpr.line_k_value, sdpr.line_d_value,sdpr.five_ma,sdpr.twenty_ma,sdpr.ten_ma
-		         ,sdpr.sixty_ma,sdpr.one_twenty_ma,sdpr.two_fourty_ma
-		        from bstock.stock_day_price_rank sdpr, bstock.stock_info si
-		        where sdpr.trading_day between ? and ?
-		          and sdpr.stock_code = si.stock_code
-		          and sdpr.closing_price not in ('--','----','')
-		        order by sdpr.stock_code, sdpr.trading_day desc
-		    """;
-		    return jdbcTemplate.query(sql,
-		            ps -> {
-		                ps.setFetchSize(1000);
-		                ps.setDate(1, new java.sql.Date(startDateMinus360.getTime()));
-		                ps.setDate(2, new java.sql.Date(endDate.getTime()));
-		            },
-		            (rs, rowNum) -> {
-		                StockDayPrice s = new StockDayPrice();
-		                s.setStockCode(rs.getString("stock_code"));
-		                s.setTradingDay(rs.getDate("trading_day"));
-		                s.setOpeningPrice(rs.getString("opening_price"));
-		                s.setClosingPrice(rs.getString("closing_price"));
-		                s.setHighPrice(rs.getString("high_price"));
-		                s.setLowPrice(rs.getString("low_price"));
-		                s.setChange(rs.getString("change"));
-		                if(ObjectUtils.isNotEmpty(rs.getString("change_rate"))) {
-		                	s.setChangeRate(Double.valueOf(rs.getString("change_rate")));
-		                }
-		                s.setTradingVolume(rs.getString("trading_volume"));
-		                s.setEndOfWeekDate(rs.getDate("end_of_week_date"));
-		                s.setWeekOfYear(rs.getString("week_of_year"));
-		                s.setStartOfWeekDate(rs.getDate("start_of_week_date"));
-		                s.setLimitDown(rs.getString("limit_down"));
-		                s.setLimitUp(rs.getString("limit_up"));
-		                s.setLineKvalue(rs.getString("line_k_value"));
-		                s.setLineDvalue(rs.getString("line_d_value"));
-		                s.setFiveDaysMa(rs.getString("five_ma"));
-		                s.setTenDaysMa(rs.getString("ten_ma"));
-		                s.setTwentyDaysMa(rs.getString("twenty_ma"));
-		                s.setSixtyDaysMa(rs.getString("sixty_ma"));
-		                s.setOneTwentyDaysMa(rs.getString("one_twenty_ma"));
-		                s.setTwoFourtyDaysMa(rs.getString("two_fourty_ma"));
-		                return s;
-		            }
-		    );
+				SELECT
+				    sdpr.stock_code,
+				    sdpr.trading_day,
+				    sdpr.change,
+				    sdpr.change_rate,
+				    sdpr.opening_price,
+				    sdpr.closing_price,
+				    sdpr.high_price,
+				    sdpr.low_price,
+				    sdpr.start_of_week_date,
+				    sdpr.end_of_week_date,
+				    sdpr.week_of_year,
+				    sdpr.trading_volume,
+				    sdpr.limit_up,
+				    sdpr.limit_down,
+				    sdpr.line_k_value,
+				    sdpr.line_d_value,
+				    sdpr.five_ma,
+				    sdpr.twenty_ma,
+				    sdpr.ten_ma,
+				    sdpr.sixty_ma,
+				    sdpr.one_twenty_ma,
+				    sdpr.two_fourty_ma
+				FROM bstock.stock_day_price_rank sdpr
+				JOIN bstock.stock_info si
+				  ON sdpr.stock_code = si.stock_code
+				WHERE sdpr.trading_day BETWEEN :startDate AND :endDate
+				  AND sdpr.closing_price NOT IN ('--', '----', '')
+				  AND sdpr.stock_code IN (:stockCodes)
+				ORDER BY
+				    sdpr.stock_code,
+				    sdpr.trading_day DESC
+				""";
+
+		MapSqlParameterSource params = new MapSqlParameterSource()
+				.addValue("startDate", new java.sql.Date(startDateMinus360.getTime()))
+				.addValue("endDate", new java.sql.Date(endDate.getTime())).addValue("stockCodes", stockCodes);
+
+		return namedParameterJdbcTemplate.query(sql, params, (rs, rowNum) -> {
+
+			StockDayPrice s = new StockDayPrice();
+
+			s.setStockCode(rs.getString("stock_code"));
+			s.setTradingDay(rs.getDate("trading_day"));
+			s.setOpeningPrice(rs.getString("opening_price"));
+			s.setClosingPrice(rs.getString("closing_price"));
+			s.setHighPrice(rs.getString("high_price"));
+			s.setLowPrice(rs.getString("low_price"));
+			s.setChange(rs.getString("change"));
+
+			if (ObjectUtils.isNotEmpty(rs.getString("change_rate"))) {
+
+				s.setChangeRate(Double.valueOf(rs.getString("change_rate")));
+			}
+
+			s.setTradingVolume(rs.getString("trading_volume"));
+			s.setEndOfWeekDate(rs.getDate("end_of_week_date"));
+			s.setWeekOfYear(rs.getString("week_of_year"));
+			s.setStartOfWeekDate(rs.getDate("start_of_week_date"));
+			s.setLimitDown(rs.getString("limit_down"));
+			s.setLimitUp(rs.getString("limit_up"));
+			s.setLineKvalue(rs.getString("line_k_value"));
+			s.setLineDvalue(rs.getString("line_d_value"));
+			s.setFiveDaysMa(rs.getString("five_ma"));
+			s.setTenDaysMa(rs.getString("ten_ma"));
+			s.setTwentyDaysMa(rs.getString("twenty_ma"));
+			s.setSixtyDaysMa(rs.getString("sixty_ma"));
+			s.setOneTwentyDaysMa(rs.getString("one_twenty_ma"));
+			s.setTwoFourtyDaysMa(rs.getString("two_fourty_ma"));
+
+			return s;
+		});
 	}
-	
+
 	public Date getCurrentTradeDate() {
 		return stockDayPriceRankRepository.findByIdStockCode("2330").get(0).getTradingDay();
 	}
@@ -231,33 +264,40 @@ public class StockDayPriceService {
 	public List<StockDayPrice> findByWeekOfYear(String weekOfYear) {
 		return stockDayPriceRepository.findByWeekOfYear(weekOfYear);
 	}
+	public List<StockDayPrice> findByWeekOfYearAndStockCodes(String weekOfYear, List<String> stockCodes){
+		return stockDayPriceRepository.findByWeekOfYearAndStockCodes(weekOfYear, stockCodes);
+	}
 
 	public List<StockDayPrice> findByMonthOfYear(String monthOfYear) {
 		return stockDayPriceRepository.findByMonthOfYear(monthOfYear);
 	}
 
+	public List<StockDayPrice> findByMonthOfYearAndStockCodes(String monthOfYear, List<String> stockCode){ 
+		return stockDayPriceRepository.findByMonthOfYearAndStockCodes(monthOfYear, stockCode);
+	}
+	
 	public List<StockDayPrice> findStockCodeAndLimit(String stockCode, Integer limit) {
 		return stockDayPriceRepository.findStockCodeAndLimit(stockCode, limit);
 	}
-	
-	public List<StockDayPriceRank> findByIdTradingDay(LocalDate tradingDay){
+
+	public List<StockDayPriceRank> findByIdTradingDay(LocalDate tradingDay) {
 		return stockDayPriceRankRepository.findByIdTradingDay(tradingDay);
 	}
 
 	private StockDayPriceService getSelf() {
 		return ctx.getBean(StockDayPriceService.class);
 	}
-	
+
 	@Transactional
 	public void deleteRankNoByStockCode() {
 		stockDayPriceRankRepository.deleteByRankNoLessThanZero();
 	}
-	
+
 	@Transactional
-	public void updateRankNo() {
-		stockDayPriceRankRepository.updateRankNo();
+	public void updateRankNo(List<String> stockCodes) {
+		stockDayPriceRankRepository.updateRankNoByStockCodes(stockCodes);
 	}
-	
+
 	public void bulkUpsertDayRankPrices(List<StockDayPriceRank> data, Date tradingDate) throws Exception {
 
 		if (data == null || data.isEmpty()) {
@@ -369,38 +409,20 @@ public class StockDayPriceService {
 			connection.commit();
 		}
 	}
-	
+
 	private String buildCsvLine(StockDayPriceRank item) {
 
-	    return String.join(",",
-	            safe(item.getStockCode()),
-	            toDate(item.getTradingDay()),
-	            safe(item.getMonthOfYear()),
-	            safe(item.getOpeningPrice()),
-	            safe(item.getClosingPrice()),
-	            safe(item.getHighPrice()),
-	            safe(item.getLowPrice()),
-	            toDate(item.getStartOfWeekDate()),
-	            toDate(item.getEndOfWeekDate()),
-	            safe(item.getChange()),
-	            safe(item.getChangeRate()),
-	            safe(item.getWeekOfYear()),
-	            safe(item.getTradingVolume()),
-	            safe(item.getLimitUp()),
-	            safe(item.getLimitDown()),
-	            safe(item.getLineKvalue()),
-	            safe(item.getLineDvalue()),
-	            safe(item.getLineRSVvalue()),
-	            safe(item.getFiveDaysMa()),
-	            safe(item.getTwentyDaysMa()),
-	            safe(item.getTenDaysMa()),
-	            safe(item.getSixtyDaysMa()),
-	            safe(item.getOneTwentyDaysMa()),
-	            safe(item.getTwoFourtyDaysMa()),
-	            safe(item.getRankNo())
-	    );
+		return String.join(",", safe(item.getStockCode()), toDate(item.getTradingDay()), safe(item.getMonthOfYear()),
+				safe(item.getOpeningPrice()), safe(item.getClosingPrice()), safe(item.getHighPrice()),
+				safe(item.getLowPrice()), toDate(item.getStartOfWeekDate()), toDate(item.getEndOfWeekDate()),
+				safe(item.getChange()), safe(item.getChangeRate()), safe(item.getWeekOfYear()),
+				safe(item.getTradingVolume()), safe(item.getLimitUp()), safe(item.getLimitDown()),
+				safe(item.getLineKvalue()), safe(item.getLineDvalue()), safe(item.getLineRSVvalue()),
+				safe(item.getFiveDaysMa()), safe(item.getTwentyDaysMa()), safe(item.getTenDaysMa()),
+				safe(item.getSixtyDaysMa()), safe(item.getOneTwentyDaysMa()), safe(item.getTwoFourtyDaysMa()),
+				safe(item.getRankNo()));
 	}
-	
+
 	private String safe(Object value) {
 		if (value == null)
 			return "";
@@ -408,427 +430,320 @@ public class StockDayPriceService {
 	}
 
 	private String toDate(Date date) {
-	    if (date == null) return "";
-	    return new java.sql.Date(date.getTime()).toString();
+		if (date == null)
+			return "";
+		return new java.sql.Date(date.getTime()).toString();
 	}
-	
-	 @Transactional
-	    public void upsertBatch(List<StockDayPrice> list) {
 
-	        if (list == null || list.isEmpty()) {
-	            return;
-	        }
+	@Transactional
+	public void upsertBatch(List<StockDayPrice> list) {
 
-	        String sql = """
-	            INSERT INTO bstock.stock_day_price (
-	                stock_code,
-	                trading_day,
-	                opening_price,
-	                closing_price,
-	                high_price,
-	                low_price,
-	                start_of_week_date,
-	                end_of_week_date,
-	                "change",
-	                week_of_year,
-	                trading_volume,
-	                lmit_up,
-	                limit_down,
-	                change_rate,
-	                line_k_value,
-	                line_d_value,
-	                line_rsv_value,
-	                five_ma,
-	                twenty_ma,
-	                ten_ma,
-	                sixty_ma,
-	                one_twenty_ma,
-	                two_fourty_ma,
-	                month_of_year
-	            )
-	        	 VALUES (
+		if (list == null || list.isEmpty()) {
+			return;
+		}
+
+		String sql = """
+				         INSERT INTO bstock.stock_day_price (
+				             stock_code,
+				             trading_day,
+				             opening_price,
+				             closing_price,
+				             high_price,
+				             low_price,
+				             start_of_week_date,
+				             end_of_week_date,
+				             "change",
+				             week_of_year,
+				             trading_volume,
+				             lmit_up,
+				             limit_down,
+				             change_rate,
+				             line_k_value,
+				             line_d_value,
+				             line_rsv_value,
+				             five_ma,
+				             twenty_ma,
+				             ten_ma,
+				             sixty_ma,
+				             one_twenty_ma,
+				             two_fourty_ma,
+				             month_of_year
+				         )
+				     	 VALUES (
 				    ?,?,?,?,?,?,?,?,?,?,
 				    ?,?,?,?,?,?,?,?,?,?,
 				    ?,?,?,?
 				)
-	            ON CONFLICT (stock_code, trading_day)
-	            DO UPDATE SET
-	                opening_price = EXCLUDED.opening_price,
-	                closing_price = EXCLUDED.closing_price,
-	                high_price = EXCLUDED.high_price,
-	                low_price = EXCLUDED.low_price,
-	                start_of_week_date = EXCLUDED.start_of_week_date,
-	                end_of_week_date = EXCLUDED.end_of_week_date,
-	                "change" = EXCLUDED."change",
-	                week_of_year = EXCLUDED.week_of_year,
-	                trading_volume = EXCLUDED.trading_volume,
-	                lmit_up = EXCLUDED.lmit_up,
-	                limit_down = EXCLUDED.limit_down,
-	                change_rate = EXCLUDED.change_rate,
-	                line_k_value = EXCLUDED.line_k_value,
-	                line_d_value = EXCLUDED.line_d_value,
-	                line_rsv_value = EXCLUDED.line_rsv_value,
-	                five_ma = EXCLUDED.five_ma,
-	                twenty_ma = EXCLUDED.twenty_ma,
-	                ten_ma = EXCLUDED.ten_ma,
-	                sixty_ma = EXCLUDED.sixty_ma,
-	                one_twenty_ma = EXCLUDED.one_twenty_ma,
-	                two_fourty_ma = EXCLUDED.two_fourty_ma,
-	                month_of_year = EXCLUDED.month_of_year
-	        """;
+				         ON CONFLICT (stock_code, trading_day)
+				         DO UPDATE SET
+				             opening_price = EXCLUDED.opening_price,
+				             closing_price = EXCLUDED.closing_price,
+				             high_price = EXCLUDED.high_price,
+				             low_price = EXCLUDED.low_price,
+				             start_of_week_date = EXCLUDED.start_of_week_date,
+				             end_of_week_date = EXCLUDED.end_of_week_date,
+				             "change" = EXCLUDED."change",
+				             week_of_year = EXCLUDED.week_of_year,
+				             trading_volume = EXCLUDED.trading_volume,
+				             lmit_up = EXCLUDED.lmit_up,
+				             limit_down = EXCLUDED.limit_down,
+				             change_rate = EXCLUDED.change_rate,
+				             line_k_value = EXCLUDED.line_k_value,
+				             line_d_value = EXCLUDED.line_d_value,
+				             line_rsv_value = EXCLUDED.line_rsv_value,
+				             five_ma = EXCLUDED.five_ma,
+				             twenty_ma = EXCLUDED.twenty_ma,
+				             ten_ma = EXCLUDED.ten_ma,
+				             sixty_ma = EXCLUDED.sixty_ma,
+				             one_twenty_ma = EXCLUDED.one_twenty_ma,
+				             two_fourty_ma = EXCLUDED.two_fourty_ma,
+				             month_of_year = EXCLUDED.month_of_year
+				     """;
 
-	        jdbcTemplate.batchUpdate(sql, list, 100, (ps, price) -> {
+		jdbcTemplate.batchUpdate(sql, list, 100, (ps, price) -> {
 
-	            ps.setString(1, price.getStockCode());
-	            ps.setDate(2, new java.sql.Date(price.getTradingDay().getTime()));
-	            ps.setString(3, price.getOpeningPrice());
-	            ps.setString(4, price.getClosingPrice());
-	            ps.setString(5, price.getHighPrice());
-	            ps.setString(6, price.getLowPrice());
-	            ps.setDate(7, toSqlDate(price.getStartOfWeekDate()));
-	            ps.setDate(8, toSqlDate(price.getEndOfWeekDate()));
-	            ps.setString(9, price.getChange());
-	            ps.setString(10, price.getWeekOfYear());
-	            ps.setString(11, price.getTradingVolume());
-	            ps.setString(12, price.getLimitUp());
-	            ps.setString(13, price.getLimitDown());
-	            ps.setString(14, price.getChangeRate() == null ? null : price.getChangeRate().toString());
-	            ps.setString(15, price.getLineKvalue());
-	            ps.setString(16, price.getLineDvalue());
-	            ps.setString(17, price.getLineRSVvalue());
-	            ps.setString(18, price.getFiveDaysMa());
-	            ps.setString(19, price.getTwentyDaysMa());
-	            ps.setString(20, price.getTenDaysMa());
-	            ps.setString(21, price.getSixtyDaysMa());
-	            ps.setString(22, price.getOneTwentyDaysMa());
-	            ps.setString(23, price.getTwoFourtyDaysMa());
-	            ps.setString(24, price.getMonthOfYear());
-	        });
-	    }
+			ps.setString(1, price.getStockCode());
+			ps.setDate(2, new java.sql.Date(price.getTradingDay().getTime()));
+			ps.setString(3, price.getOpeningPrice());
+			ps.setString(4, price.getClosingPrice());
+			ps.setString(5, price.getHighPrice());
+			ps.setString(6, price.getLowPrice());
+			ps.setDate(7, toSqlDate(price.getStartOfWeekDate()));
+			ps.setDate(8, toSqlDate(price.getEndOfWeekDate()));
+			ps.setString(9, price.getChange());
+			ps.setString(10, price.getWeekOfYear());
+			ps.setString(11, price.getTradingVolume());
+			ps.setString(12, price.getLimitUp());
+			ps.setString(13, price.getLimitDown());
+			ps.setString(14, price.getChangeRate() == null ? null : price.getChangeRate().toString());
+			ps.setString(15, price.getLineKvalue());
+			ps.setString(16, price.getLineDvalue());
+			ps.setString(17, price.getLineRSVvalue());
+			ps.setString(18, price.getFiveDaysMa());
+			ps.setString(19, price.getTwentyDaysMa());
+			ps.setString(20, price.getTenDaysMa());
+			ps.setString(21, price.getSixtyDaysMa());
+			ps.setString(22, price.getOneTwentyDaysMa());
+			ps.setString(23, price.getTwoFourtyDaysMa());
+			ps.setString(24, price.getMonthOfYear());
+		});
+	}
 
-	    private java.sql.Date toSqlDate(Date date) {
-	        return date == null ? null : new java.sql.Date(date.getTime());
-	    }
-	
-	    
-	    public StockTrendCache calculationVectors(
-	            List<StockDayPrice> list) {
+	private java.sql.Date toSqlDate(Date date) {
+		return date == null ? null : new java.sql.Date(date.getTime());
+	}
 
-	        if (CollectionUtils.isEmpty(list)) {
-	            return null;
-	        }
+	public StockTrendCache calculationVectors(List<StockDayPrice> list) {
 
-	        list.sort(
-	                Comparator.comparing(
-	                        StockDayPrice::getTradingDay
-	                )
-	        );
-	        log.info("calculateOneStock stockCode={}", list.get(0).getStockCode());
-	        List<LocalDate> dates = new ArrayList<>();
+		if (CollectionUtils.isEmpty(list)) {
+			return null;
+		}
 
-	        List<Double> returns = new ArrayList<>();
-	        List<Double> dailyReturns = new ArrayList<>();
-	        List<Double> volumeRatio = new ArrayList<>();
+		list.sort(Comparator.comparing(StockDayPrice::getTradingDay));
+		log.info("calculateOneStock stockCode={}", list.get(0).getStockCode());
+		List<LocalDate> dates = new ArrayList<>();
 
-	        List<Double> k = new ArrayList<>();
-	        List<Double> d = new ArrayList<>();
-	        List<Double> rsv = new ArrayList<>();
+		List<Double> returns = new ArrayList<>();
+		List<Double> dailyReturns = new ArrayList<>();
+		List<Double> volumeRatio = new ArrayList<>();
 
-	        List<Double> bias5 = new ArrayList<>();
-	        List<Double> bias10 = new ArrayList<>();
-	        List<Double> bias20 = new ArrayList<>();
-	        List<Double> bias60 = new ArrayList<>();
-	        List<Double> bias120 = new ArrayList<>();
-	        List<Double> bias240 = new ArrayList<>();
+		List<Double> k = new ArrayList<>();
+		List<Double> d = new ArrayList<>();
+		List<Double> rsv = new ArrayList<>();
 
-	        List<Double> gap5_10 = new ArrayList<>();
-	        List<Double> gap10_20 = new ArrayList<>();
-	        List<Double> gap20_60 = new ArrayList<>();
-	        List<Double> gap60_120 = new ArrayList<>();
-	        List<Double> gap120_240 = new ArrayList<>();
+		List<Double> bias5 = new ArrayList<>();
+		List<Double> bias10 = new ArrayList<>();
+		List<Double> bias20 = new ArrayList<>();
+		List<Double> bias60 = new ArrayList<>();
+		List<Double> bias120 = new ArrayList<>();
+		List<Double> bias240 = new ArrayList<>();
 
-	        double firstClose =
-	                safeDouble(
-	                        list.get(0).getClosingPrice()
-	                );
+		List<Double> gap5_10 = new ArrayList<>();
+		List<Double> gap10_20 = new ArrayList<>();
+		List<Double> gap20_60 = new ArrayList<>();
+		List<Double> gap60_120 = new ArrayList<>();
+		List<Double> gap120_240 = new ArrayList<>();
 
-	        double previousClose = firstClose;
+		double firstClose = safeDouble(list.get(0).getClosingPrice());
 
-	        final int VOLUME_WINDOW = 20;
+		double previousClose = firstClose;
 
-	        for (int i = 0; i < list.size(); i++) {
+		final int VOLUME_WINDOW = 20;
 
-	            StockDayPrice item = list.get(i);
+		for (int i = 0; i < list.size(); i++) {
 
-	            double close =
-	                    safeDouble(
-	                            item.getClosingPrice()
-	                    );
+			StockDayPrice item = list.get(i);
 
-	            LocalDate tradingDate =
-	                    item.getTradingDay()
-	                            .toInstant()
-	                            .atZone(ZoneId.systemDefault())
-	                            .toLocalDate();
+			double close = safeDouble(item.getClosingPrice());
 
-	            dates.add(tradingDate);
+			LocalDate tradingDate = item.getTradingDay().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 
-	            /*
-	             * cumulative return
-	             */
-	            returns.add(
-	                    firstClose == 0
-	                            ? 0D
-	                            : (close / firstClose) - 1
-	            );
+			dates.add(tradingDate);
 
-	            /*
-	             * daily return
-	             */
-	            if (i == 0) {
+			/*
+			 * cumulative return
+			 */
+			returns.add(firstClose == 0 ? 0D : (close / firstClose) - 1);
 
-	                dailyReturns.add(0D);
+			/*
+			 * daily return
+			 */
+			if (i == 0) {
 
-	            } else {
+				dailyReturns.add(0D);
 
-	                dailyReturns.add(
-	                        previousClose == 0
-	                                ? 0D
-	                                : (close / previousClose) - 1
-	                );
-	            }
+			} else {
 
-	            previousClose = close;
+				dailyReturns.add(previousClose == 0 ? 0D : (close / previousClose) - 1);
+			}
 
-	            /*
-	             * KD RSV
-	             */
-	            k.add(
-	                    safeDouble(
-	                            item.getLineKvalue()
-	                    )
-	            );
+			previousClose = close;
 
-	            d.add(
-	                    safeDouble(
-	                            item.getLineDvalue()
-	                    )
-	            );
+			/*
+			 * KD RSV
+			 */
+			k.add(safeDouble(item.getLineKvalue()));
 
-	            rsv.add(
-	                    safeDouble(
-	                            item.getLineRSVvalue()
-	                    )
-	            );
+			d.add(safeDouble(item.getLineDvalue()));
 
-	            /*
-	             * volume ratio
-	             */
-	            if (i < VOLUME_WINDOW) {
+			rsv.add(safeDouble(item.getLineRSVvalue()));
 
-	                volumeRatio.add(1D);
+			/*
+			 * volume ratio
+			 */
+			if (i < VOLUME_WINDOW) {
 
-	            } else {
+				volumeRatio.add(1D);
 
-	                double avgVolume = 0;
+			} else {
 
-	                for (int j = i - VOLUME_WINDOW;
-	                     j < i;
-	                     j++) {
+				double avgVolume = 0;
 
-	                    avgVolume +=
-	                            safeDouble(
-	                                    list.get(j)
-	                                            .getTradingVolume()
-	                            );
-	                }
+				for (int j = i - VOLUME_WINDOW; j < i; j++) {
 
-	                avgVolume /= VOLUME_WINDOW;
+					avgVolume += safeDouble(list.get(j).getTradingVolume());
+				}
 
-	                double currentVolume =
-	                        safeDouble(
-	                                item.getTradingVolume()
-	                        );
+				avgVolume /= VOLUME_WINDOW;
 
-	                volumeRatio.add(
-	                        avgVolume == 0
-	                                ? 1D
-	                                : currentVolume / avgVolume
-	                );
-	            }
+				double currentVolume = safeDouble(item.getTradingVolume());
 
-	            /*
-	             * MA
-	             */
-	            
-	            double ma5 =
-	                    safeDouble(item.getFiveDaysMa());
-	            
-	            double ma10 =
-	                    safeDouble(item.getTenDaysMa());
+				volumeRatio.add(avgVolume == 0 ? 1D : currentVolume / avgVolume);
+			}
 
-	            double ma20 =
-	                    safeDouble(item.getTwentyDaysMa());
+			/*
+			 * MA
+			 */
 
-	            double ma60 =
-	                    safeDouble(item.getSixtyDaysMa());
+			double ma5 = safeDouble(item.getFiveDaysMa());
 
-	            double ma120 =
-	                    safeDouble(item.getOneTwentyDaysMa());
+			double ma10 = safeDouble(item.getTenDaysMa());
 
-	            double ma240 =
-	                    safeDouble(item.getTwentyDaysMa());
+			double ma20 = safeDouble(item.getTwentyDaysMa());
 
-	            /*
-	             * bias
-	             */
-	            bias5.add(
-	                    bias(close, ma5)
-	            );
-	            
-	            bias10.add(
-	                    bias(close, ma10)
-	            );
+			double ma60 = safeDouble(item.getSixtyDaysMa());
 
-	            bias20.add(
-	                    bias(close, ma20)
-	            );
+			double ma120 = safeDouble(item.getOneTwentyDaysMa());
 
-	            bias60.add(
-	                    bias(close, ma60)
-	            );
+			double ma240 = safeDouble(item.getTwentyDaysMa());
 
-	            bias120.add(
-	                    bias(close, ma120)
-	            );
+			/*
+			 * bias
+			 */
+			bias5.add(bias(close, ma5));
 
-	            bias240.add(
-	                    bias(close, ma240)
-	            );
+			bias10.add(bias(close, ma10));
 
-	            /*
-	             * MA hierarchy
-	             */
-	            gap5_10.add(
-	                    gap(ma5, ma10)
-	            );
-	            
-	            gap10_20.add(
-	                    gap(ma10, ma20)
-	            );
+			bias20.add(bias(close, ma20));
 
-	            gap20_60.add(
-	                    gap(ma20, ma60)
-	            );
+			bias60.add(bias(close, ma60));
 
-	            gap60_120.add(
-	                    gap(ma60, ma120)
-	            );
+			bias120.add(bias(close, ma120));
 
-	            gap120_240.add(
-	                    gap(ma120, ma240)
-	            );
-	        }
+			bias240.add(bias(close, ma240));
 
-	        StockDayPrice latest =
-	                list.get(list.size() - 1);
+			/*
+			 * MA hierarchy
+			 */
+			gap5_10.add(gap(ma5, ma10));
 
-	       TrendRegime  trendRegime =
-	                calculateTrendRegime(latest
-	                );
+			gap10_20.add(gap(ma10, ma20));
 
-	        return StockTrendCache.builder()
-	                .stockCode(
-	                        latest.getStockCode()
-	                )
-	                .lastDay(
-	                        dates.get(
-	                                dates.size() - 1
-	                        )
-	                )
-	                .trendRegime(
-	                        trendRegime
-	                )
-	                .dates(dates)
-	                .returns(returns)
-	                .dailyReturns(dailyReturns)
-	                .volumeRatio(volumeRatio)
-	                .k(k)
-	                .d(d)
-	                .rsv(rsv)
-	                .bias5(bias5)
-	                .bias10(bias10)
-	                .bias20(bias20)
-	                .bias60(bias60)
-	                .bias120(bias120)
-	                .bias240(bias240)
-	                .gap5_10(gap5_10)
-	                .gap10_20(gap10_20)
-	                .gap20_60(gap20_60)
-	                .gap60_120(gap60_120)
-	                .gap120_240(gap120_240)
-	                .build();
-	    }
+			gap20_60.add(gap(ma20, ma60));
+
+			gap60_120.add(gap(ma60, ma120));
+
+			gap120_240.add(gap(ma120, ma240));
+		}
+
+		StockDayPrice latest = list.get(list.size() - 1);
+
+		TrendRegime trendRegime = calculateTrendRegime(latest);
+
+		return StockTrendCache.builder().stockCode(latest.getStockCode()).lastDay(dates.get(dates.size() - 1))
+				.trendRegime(trendRegime).dates(dates).returns(returns).dailyReturns(dailyReturns)
+				.volumeRatio(volumeRatio).k(k).d(d).rsv(rsv).bias5(bias5).bias10(bias10).bias20(bias20).bias60(bias60)
+				.bias120(bias120).bias240(bias240).gap5_10(gap5_10).gap10_20(gap10_20).gap20_60(gap20_60)
+				.gap60_120(gap60_120).gap120_240(gap120_240).build();
+	}
 
 	public StockDayPriceRank buildRanks(String stockCode, StockDayPrice stockDayPrice) {
 
 		// 依 年 + 月 由新到舊排序
 
+		StockDayPriceRank r = new StockDayPriceRank();
 
-			StockDayPriceRank r = new StockDayPriceRank();
+		// =========================
+		// 🔹 PK / Business Key
+		// =========================
+		r.setStockCode(stockDayPrice.getStockCode());
+		r.setWeekOfYear(stockDayPrice.getWeekOfYear());
+		r.setMonthOfYear(stockDayPrice.getMonthOfYear());
 
-		    // =========================
-		    // 🔹 PK / Business Key
-		    // =========================
-		    r.setStockCode(stockDayPrice.getStockCode());
-		    r.setWeekOfYear(stockDayPrice.getWeekOfYear());
-		    r.setMonthOfYear(stockDayPrice.getMonthOfYear());
+		// =========================
+		// 🔹 時間相關欄位
+		// =========================
+		r.setTradingDay(stockDayPrice.getTradingDay());
+		r.setStartOfWeekDate(stockDayPrice.getStartOfWeekDate());
+		r.setEndOfWeekDate(stockDayPrice.getEndOfWeekDate());
+		// 若你擔心 Date 被修改，可改成：
+		// new Date(p.getFirstTradingDay().getTime())
 
-		    // =========================
-		    // 🔹 時間相關欄位
-		    // =========================
-		    r.setTradingDay(stockDayPrice.getTradingDay()); 
-		    r.setStartOfWeekDate(stockDayPrice.getStartOfWeekDate());
-		    r.setEndOfWeekDate(stockDayPrice.getEndOfWeekDate());
-		    // 若你擔心 Date 被修改，可改成：
-		    // new Date(p.getFirstTradingDay().getTime())
+		// =========================
+		// 🔹 價格資訊（完整快照）
+		// =========================
+		r.setOpeningPrice(stockDayPrice.getOpeningPrice());
+		r.setClosingPrice(stockDayPrice.getClosingPrice());
+		r.setHighPrice(stockDayPrice.getHighPrice());
+		r.setLowPrice(stockDayPrice.getLowPrice());
+		r.setChange(stockDayPrice.getChange());
+		// =========================
+		// 🔹 成交 / 變動
+		// =========================
+		r.setTradingVolume(stockDayPrice.getTradingVolume());
+		r.setChangeRate(stockDayPrice.getChangeRate());
+		r.setLimitUp(stockDayPrice.getLimitUp());
+		r.setLimitDown(stockDayPrice.getLimitDown());
+		// =========================
+		// 🔹 技術指標（KD / RSV）
+		// =========================
+		r.setLineKvalue(stockDayPrice.getLineKvalue());
+		r.setLineDvalue(stockDayPrice.getLineDvalue());
+		r.setLineRSVvalue(stockDayPrice.getLineRSVvalue());
 
-		    // =========================
-		    // 🔹 價格資訊（完整快照）
-		    // =========================
-		    r.setOpeningPrice(stockDayPrice.getOpeningPrice());
-		    r.setClosingPrice(stockDayPrice.getClosingPrice());
-		    r.setHighPrice(stockDayPrice.getHighPrice());
-		    r.setLowPrice(stockDayPrice.getLowPrice());
-		    r.setChange(stockDayPrice.getChange());
-		    // =========================
-		    // 🔹 成交 / 變動
-		    // =========================
-		    r.setTradingVolume(stockDayPrice.getTradingVolume());
-		    r.setChangeRate(stockDayPrice.getChangeRate());
-		    r.setLimitUp(stockDayPrice.getLimitUp());
-		    r.setLimitDown(stockDayPrice.getLimitDown());
-		    // =========================
-		    // 🔹 技術指標（KD / RSV）
-		    // =========================
-		    r.setLineKvalue(stockDayPrice.getLineKvalue());
-		    r.setLineDvalue(stockDayPrice.getLineDvalue());
-		    r.setLineRSVvalue(stockDayPrice.getLineRSVvalue());
-
-		    // =========================
-		    // 🔹 均線（MA）
-		    // =========================
-		    r.setFiveDaysMa(stockDayPrice.getFiveDaysMa());
-		    r.setTenDaysMa(stockDayPrice.getTenDaysMa());
-		    r.setTwentyDaysMa(stockDayPrice.getTwentyDaysMa());
-		    r.setSixtyDaysMa(stockDayPrice.getSixtyDaysMa());
-		    r.setOneTwentyDaysMa(stockDayPrice.getOneTwentyDaysMa());
-		    r.setTwoFourtyDaysMa(stockDayPrice.getTwoFourtyDaysMa());
-
+		// =========================
+		// 🔹 均線（MA）
+		// =========================
+		r.setFiveDaysMa(stockDayPrice.getFiveDaysMa());
+		r.setTenDaysMa(stockDayPrice.getTenDaysMa());
+		r.setTwentyDaysMa(stockDayPrice.getTwentyDaysMa());
+		r.setSixtyDaysMa(stockDayPrice.getSixtyDaysMa());
+		r.setOneTwentyDaysMa(stockDayPrice.getOneTwentyDaysMa());
+		r.setTwoFourtyDaysMa(stockDayPrice.getTwoFourtyDaysMa());
 
 		return r;
 	}
-	
+
 	public StockDayPrice buildStockDayPrice(StockDayPriceRank source) {
 		if (source == null) {
 			return null;
@@ -873,56 +788,55 @@ public class StockDayPriceService {
 
 	private double safeDouble(String value) {
 
-	    if (StringUtils.isBlank(value)) {
-	        return 0D;
-	    }
+		if (StringUtils.isBlank(value)) {
+			return 0D;
+		}
 
-	    try {
+		try {
 
-	        return Double.parseDouble(
-	                value.replace(",", "")
-	        );
+			return Double.parseDouble(value.replace(",", ""));
 
-	    } catch (Exception e) {
+		} catch (Exception e) {
 
-	        return 0D;
-	    }
+			return 0D;
+		}
 	}
 
 	private TrendRegime calculateTrendRegime(StockDayPrice item) {
 
-	    double close = safeDouble(item.getClosingPrice());
+		double close = safeDouble(item.getClosingPrice());
 
-	    double ma120 = safeDouble(item.getOneTwentyDaysMa());
-	    double ma240 = safeDouble(item.getTwoFourtyDaysMa());
+		double ma120 = safeDouble(item.getOneTwentyDaysMa());
+		double ma240 = safeDouble(item.getTwoFourtyDaysMa());
 
-	    if (close == 0 || ma120 == 0 || ma240 == 0) {
-	    	return TrendRegime.SIDEWAY;  // sideway / unknown
-	    }
+		if (close == 0 || ma120 == 0 || ma240 == 0) {
+			return TrendRegime.SIDEWAY; // sideway / unknown
+		}
 
-	    if (close > ma120 && ma120 > ma240) {
-	        return TrendRegime.BULL; // bull
-	    }
+		if (close > ma120 && ma120 > ma240) {
+			return TrendRegime.BULL; // bull
+		}
 
-	    if (close < ma120 && ma120 < ma240) {
-	        return TrendRegime.BEAR; // bear
-	    }
+		if (close < ma120 && ma120 < ma240) {
+			return TrendRegime.BEAR; // bear
+		}
 
-	    return TrendRegime.SIDEWAY; // sideway
+		return TrendRegime.SIDEWAY; // sideway
 	}
+
 	private double gap(double shortMa, double longMa) {
-	    if (longMa == 0) {
-	        return 0D;
-	    }
+		if (longMa == 0) {
+			return 0D;
+		}
 
-	    return (shortMa - longMa) / longMa;
+		return (shortMa - longMa) / longMa;
 	}
-	
-	private double bias(double close, double ma) {
-	    if (ma == 0) {
-	        return 0D;
-	    }
 
-	    return (close - ma) / ma;
+	private double bias(double close, double ma) {
+		if (ma == 0) {
+			return 0D;
+		}
+
+		return (close - ma) / ma;
 	}
 }

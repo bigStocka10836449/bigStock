@@ -18,6 +18,19 @@ public interface StockWeekPriceRepository extends JpaRepository<StockWeekPrice, 
 			""", nativeQuery = true)
 	List<StockWeekPrice> findByYearBeforEqualLimitTwoFourty(@Param("startyearMinus6")String startyearMinus6, @Param("endYear") String endYear);
 	
+	@Query(value = """
+		    SELECT *
+		    FROM bstock.stock_week_price
+		    WHERE year BETWEEN :startyearMinus6 AND :endYear
+		      AND stock_code IN (:stockCodes)
+		    ORDER BY week_of_year DESC
+		    """, nativeQuery = true)
+		List<StockWeekPrice> findByYearBeforEqualLimitTwoFourtyAndStockCodes(
+		        @Param("startyearMinus6") String startyearMinus6,
+		        @Param("endYear") String endYear,
+		        @Param("stockCodes") List<String> stockCodes
+		);
+	
 //	@Query(value = "select swp.* from bstock.bstock.stock_week_price swp where swp.stock_code =:stockCode and swp.week_of_year <= :weekOfYear order by swp.week_of_year desc limit 240", 
 //		    nativeQuery = true)
 //	List<StockWeekPrice> findByStockCodeAndTradingDayBeforEqualLimitTwoFourty(@Param("stockCode")String stockCode, @Param("weekOfYear") String weekOfYear);

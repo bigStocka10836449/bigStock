@@ -1,6 +1,5 @@
 package com.bigstock.schedule.service;
 
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -8,13 +7,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import javax.annotation.PostConstruct;
-
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import org.threeten.bp.LocalDate;
 
 import com.bigstock.sharedComponent.entity.FinancialCalendar;

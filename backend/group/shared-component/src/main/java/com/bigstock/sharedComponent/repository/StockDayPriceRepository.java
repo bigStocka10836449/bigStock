@@ -134,5 +134,23 @@ public interface StockDayPriceRepository extends JpaRepository<StockDayPrice, St
 	@Query(value = "select sdp.* from bstock.bstock.stock_day_price sdp where sdp.month_of_year =:monthOfYear ", nativeQuery = true)
 	List<StockDayPrice> findByMonthOfYear(@Param("monthOfYear") String monthOfYear);
 	
+	@Query(value = """
+			SELECT sdp.*
+			FROM bstock.stock_day_price sdp
+			WHERE sdp.month_of_year = :monthOfYear
+			  AND sdp.stock_code IN (:stockCodes)
+			""", nativeQuery = true)
+	List<StockDayPrice> findByMonthOfYearAndStockCodes(@Param("monthOfYear") String monthOfYear,
+			@Param("stockCodes") List<String> stockCodes);
+	
+	
+	@Query(value = """
+			SELECT sdp.*
+			FROM bstock.stock_day_price sdp
+			WHERE sdp.week_of_year = :weekOfYear
+			  AND sdp.stock_code IN (:stockCodes)
+			""", nativeQuery = true)
+	List<StockDayPrice> findByWeekOfYearAndStockCodes(@Param("weekOfYear") String weekOfYear,
+			@Param("stockCodes") List<String> stockCodes);
 	
 }

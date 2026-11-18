@@ -15,6 +15,17 @@ public interface StockMonthPriceRepository extends JpaRepository<StockMonthPrice
 		    nativeQuery = true)
 	List<StockMonthPrice> findByMmonthOfYearAndDesc(@Param("monthOfYear") String monthOfYear);
 	
+
+	@Query(value = """
+			SELECT smp.*
+			FROM bstock.stock_month_price smp
+			WHERE smp.month_of_year <= :monthOfYear
+			  AND smp.stock_code IN (:stockCodes)
+			ORDER BY smp.month_of_year DESC
+			""", nativeQuery = true)
+	List<StockMonthPrice> findByMmonthOfYearAndDescAndStockCodes(@Param("monthOfYear") String monthOfYear,
+			@Param("stockCodes") List<String> stockCodes);
+	
 	@Query(value = "select smp.* from bstock.bstock.stock_month_price smp where  smp.month_of_year = :monthOfYear", 
 		    nativeQuery = true)
 	List<StockMonthPrice> findByMmonthOfYear(@Param("monthOfYear") String monthOfYear);

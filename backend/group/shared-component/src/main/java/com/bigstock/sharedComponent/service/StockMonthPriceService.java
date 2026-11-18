@@ -61,8 +61,8 @@ public class StockMonthPriceService {
 	}
 	
 	@Transactional
-	public void updateRankNo() {
-		stockMonthPriceRankRepository.updateRankNo();
+	public void updateRankNo(List<String> stockCodes) {
+		stockMonthPriceRankRepository.updateRankNoByStockCodes(stockCodes);
 	}
 	
 	@Transactional
@@ -85,6 +85,10 @@ public class StockMonthPriceService {
 
 	public List<StockMonthPrice> findByMmonthOfYearAndDesc(String monthOfYear) {
 		return repository.findByMmonthOfYearAndDesc(monthOfYear);
+	}
+	
+	public List<StockMonthPrice> findByMmonthOfYearAndDescAndStockCodes(String monthOfYear, List<String> stockCodes){
+		return repository.findByMmonthOfYearAndDescAndStockCodes(monthOfYear, stockCodes);
 	}
 
 	public List<StockMonthPrice> findStockCodeAndLimit(String stockCode, Integer limit) {
