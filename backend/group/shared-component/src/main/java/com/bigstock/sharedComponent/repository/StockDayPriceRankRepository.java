@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.bigstock.sharedComponent.entity.StockDayPriceRank;
 
@@ -29,24 +30,26 @@ public interface StockDayPriceRankRepository extends JpaRepository<StockDayPrice
 	
 	
 	@Modifying
-	@Query(value ="""
-				             
-	  UPDATE bstock.stock_day_price_rank t
-		SET rank_no = r.new_rank
-		FROM (
-		    SELECT 
-		        stock_code,
-		        trading_day,
-		        ROW_NUMBER() OVER (
-		            PARTITION BY stock_code
-		            ORDER BY trading_day DESC
-		        ) AS new_rank
-		    FROM bstock.stock_day_price_rank
-		) r
-		WHERE t.stock_code = r.stock_code
-		  AND t.trading_day = r.trading_day
+	@Query(value = """
+			UPDATE bstock.stock_day_price_rank t
+			SET rank_no = r.new_rank
+			FROM (
+			    SELECT
+			        stock_code,
+			        trading_day,
+			        ROW_NUMBER() OVER (
+			            PARTITION BY stock_code
+			            ORDER BY trading_day DESC
+			        ) AS new_rank
+			    FROM bstock.stock_day_price_rank
+			    WHERE stock_code IN (:stockCodes)
+			) r
+			WHERE t.stock_code = r.stock_code
+			  AND t.trading_day = r.trading_day
+			  AND t.stock_code IN (:stockCodes)
 			""", nativeQuery = true)
-	void updateRankNo();
+	int updateRankNoByStockCodes(@Param("stockCodes") List<String> stockCodes);
+
 	
 	
 }

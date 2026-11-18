@@ -1,0 +1,2 @@
+package com.bigstock.schedule.job.model;
+public enum JobStatus { PENDING,RUNNING,CANCEL_REQUESTED,CANCELLED,SUCCESS,PARTIAL_SUCCESS,FAILED,INTERRUPTED,TIMED_OUT }
