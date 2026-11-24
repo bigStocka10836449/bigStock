@@ -1,4 +1,4 @@
-FROM openjdk:22-ea-21-jdk-slim-bullseye
+FROM eclipse-temurin:21-jdk-jammy
 
 # 以 root 用户运行以下命令
 USER root
