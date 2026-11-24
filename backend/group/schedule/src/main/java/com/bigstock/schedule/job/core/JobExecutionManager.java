@@ -140,7 +140,7 @@ public class JobExecutionManager {
 		return repo.definitions();
 	}
 
-	@Scheduled(fixedDelayString = "${bstock.jobs.dispatch-scan-ms:10000}")
+	@Scheduled(fixedDelayString = "${bstock.jobs.dispatch-scan-ms:120000}")
 	public void dispatchPending() {
 		for (JobRun run : repo.pending(20))
 			dispatch(run.executionId());
