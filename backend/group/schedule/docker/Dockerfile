@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21-jdk-jammy
+FROM mcr.microsoft.com/openjdk/jdk:21-ubuntu
 
 # 以 root 用户运行以下命令
 USER root
